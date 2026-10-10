@@ -33,6 +33,17 @@ func getHeaderNavAccess(module string) headerNavAccess {
 		return fallback
 	}
 
+	// model_usage 承接原 rankings 槽位；存量配置仅有 rankings 时回退读取
+	if module == "model_usage" {
+		if _, ok := parsed["model_usage"]; ok {
+			return parseHeaderNavAccess(parsed["model_usage"], fallback)
+		}
+		if _, ok := parsed["rankings"]; ok {
+			return parseHeaderNavAccess(parsed["rankings"], fallback)
+		}
+		return fallback
+	}
+
 	return parseHeaderNavAccess(parsed[module], fallback)
 }
 

@@ -39,6 +39,10 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { register, wechatLoginByCode } from '@/features/auth/api'
+import {
+  ImageCaptcha,
+  type ImageCaptchaValue,
+} from '@/features/auth/components/image-captcha'
 import { LegalConsent } from '@/features/auth/components/legal-consent'
 import { OAuthProviders } from '@/features/auth/components/oauth-providers'
 import { registerFormSchema } from '@/features/auth/constants'
@@ -67,6 +71,11 @@ export function SignUpForm({
   const [isWeChatDialogOpen, setIsWeChatDialogOpen] = useState(false)
   const [isWeChatSubmitting, setIsWeChatSubmitting] = useState(false)
   const [turnstileWidgetKey, setTurnstileWidgetKey] = useState(0)
+  const [captcha, setCaptcha] = useState<ImageCaptchaValue>({
+    captchaId: '',
+    captchaCode: '',
+  })
+  const [captchaReloadKey, setCaptchaReloadKey] = useState(0)
   const legalConsentErrorMessage = t('Please agree to the legal terms first')
 
   const { status } = useStatus()
@@ -78,6 +87,23 @@ export function SignUpForm({
     validateTurnstile,
   } = useTurnstile()
   const { redirectToLogin, handleLoginResult } = useAuthRedirect()
+
+  const captchaReady =
+    Boolean(captcha.captchaId) && Boolean(captcha.captchaCode)
+
+  const validateCaptcha = () => {
+    if (!captchaReady) {
+      toast.error(t('Please enter the captcha'))
+      return false
+    }
+    return true
+  }
+
+  const refreshCaptcha = () => {
+    setCaptcha({ captchaId: '', captchaCode: '' })
+    setCaptchaReloadKey((current) => current + 1)
+  }
+
   const {
     isSending: isSendingCode,
     secondsLeft,
@@ -86,6 +112,10 @@ export function SignUpForm({
   } = useEmailVerification({
     turnstileToken,
     validateTurnstile,
+    captchaId: captcha.captchaId,
+    captchaCode: captcha.captchaCode,
+    validateCaptcha,
+    onCaptchaConsumed: refreshCaptcha,
   })
 
   const form = useForm<z.infer<typeof registerFormSchema>>({
@@ -93,6 +123,7 @@ export function SignUpForm({
     defaultValues: {
       username: '',
       email: '',
+      phone: '',
       password: '',
       confirmPassword: '',
     },
@@ -155,6 +186,9 @@ export function SignUpForm({
         toast.error(t('Please enter the verification code'))
         return
       }
+    } else if (!validateCaptcha()) {
+      // 未开启邮箱验证时，注册提交须先通过图形验证码
+      return
     }
 
     if (!validateTurnstile()) return
@@ -165,7 +199,14 @@ export function SignUpForm({
         username: data.username,
         password: data.password,
         email: data.email || undefined,
+        phone: data.phone?.trim() || undefined,
         verification_code: verificationCode || undefined,
+        captcha_id: emailVerificationRequired
+          ? undefined
+          : captcha.captchaId,
+        captcha_code: emailVerificationRequired
+          ? undefined
+          : captcha.captchaCode,
         aff_code: getAffiliateCode(),
         turnstile: turnstileToken,
       })
@@ -174,9 +215,11 @@ export function SignUpForm({
         toast.success(t('Account created! Please sign in'))
         redirectToLogin()
       } else {
+        refreshCaptcha()
         handleServerError(createServerError(res, t('Failed to create account')))
       }
     } catch (error) {
+      refreshCaptcha()
       handleServerError(
         AuthOperationError.from(error, t('Failed to create account'))
       )
@@ -299,10 +342,28 @@ export function SignUpForm({
           )}
         />
 
-        {/* Email Verification Section */}
-        {emailVerificationRequired && (
+        <FormField
+          control={form.control}
+          name='phone'
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>{t('Phone (optional)')}</FormLabel>
+              <FormControl>
+                <Input
+                  placeholder={t('Enter phone number (optional)')}
+                  type='tel'
+                  autoComplete='tel'
+                  {...field}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* 邮箱验证流程：邮箱 → 图形码 → 邮箱验证码，按步骤填写 */}
+        {emailVerificationRequired ? (
           <>
-            {/* Email Field */}
             <FormField
               control={form.control}
               name='email'
@@ -323,7 +384,13 @@ export function SignUpForm({
               )}
             />
 
-            {/* Verification Code Field */}
+            <ImageCaptcha
+              value={captcha}
+              onChange={setCaptcha}
+              reloadKey={captchaReloadKey}
+              disabled={isLoading || isSendingCode}
+            />
+
             <div className='flex items-end gap-2'>
               <div className='flex-1'>
                 <Input
@@ -340,6 +407,7 @@ export function SignUpForm({
                   isSendingCode ||
                   isActive ||
                   !emailValue ||
+                  !captchaReady ||
                   !turnstileReady
                 }
                 onClick={handleSendVerificationCode}
@@ -348,6 +416,13 @@ export function SignUpForm({
               </Button>
             </div>
           </>
+        ) : (
+          <ImageCaptcha
+            value={captcha}
+            onChange={setCaptcha}
+            reloadKey={captchaReloadKey}
+            disabled={isLoading || isSendingCode}
+          />
         )}
 
         {/* Turnstile */}
@@ -375,6 +450,7 @@ export function SignUpForm({
           disabled={
             isLoading ||
             (requiresLegalConsent && !agreedToLegal) ||
+            (!emailVerificationRequired && !captchaReady) ||
             !turnstileReady
           }
         >

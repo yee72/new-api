@@ -106,17 +106,10 @@ export function PluginsTable(props: PluginsTableProps) {
     },
   })
   const deleteMutation = useMutation({
-    mutationFn: ({
-      plugin,
-      force,
-    }: {
-      plugin: TaskPluginListItem
-      force?: boolean
-    }) => deleteTaskPluginVersion(plugin.meta.key, plugin.meta.version, force),
+    mutationFn: (plugin: TaskPluginListItem) =>
+      deleteTaskPluginVersion(plugin.meta.key, plugin.meta.version),
     onSuccess: () => {
       setDeleteTarget(null)
-      setBlockedAction(null)
-      setBlockedUsage(null)
       toast.success(t('Plugin version deleted'))
       queryClient.invalidateQueries({ queryKey: ['task-plugins'] })
     },
@@ -422,7 +415,7 @@ export function PluginsTable(props: PluginsTableProps) {
         isLoading={deleteMutation.isPending}
         confirmText={t('Delete')}
         handleConfirm={() => {
-          if (deleteTarget) deleteMutation.mutate({ plugin: deleteTarget })
+          if (deleteTarget) deleteMutation.mutate(deleteTarget)
         }}
         desc={
           hasFactoryFallback
@@ -444,23 +437,11 @@ export function PluginsTable(props: PluginsTableProps) {
         }}
         title={t('Plugin is still in use')}
         desc={usageDescription}
-        destructive
-        isLoading={statusMutation.isPending || deleteMutation.isPending}
-        confirmText={t('Force operation')}
-        handleConfirm={() => {
-          if (blockedAction === 'delete' && deleteTarget) {
-            deleteMutation.mutate({ plugin: deleteTarget, force: true })
-          } else if (blockedAction === 'disable' && statusTarget) {
-            statusMutation.mutate({
-              key: statusTarget.meta.key,
-              enabled: false,
-              options: { cascade: true, force: true },
-            })
-          }
-        }}
+        handleConfirm={() => setBlockedAction(null)}
+        confirmText={t('Cancel')}
       >
-        {blockedAction === 'disable' && blockedUsage?.channels.length ? (
-          <div className='flex'>
+        <div className='flex flex-wrap gap-2'>
+          {blockedAction === 'disable' && blockedUsage?.channels.length ? (
             <Button
               variant='outline'
               onClick={() =>
@@ -474,8 +455,37 @@ export function PluginsTable(props: PluginsTableProps) {
             >
               {t('Cascade disable channels')}
             </Button>
-          </div>
-        ) : null}
+          ) : null}
+          <Button
+            variant='destructive'
+            onClick={() => {
+              if (blockedAction === 'delete' && deleteTarget) {
+                deleteTaskPluginVersion(
+                  deleteTarget.meta.key,
+                  deleteTarget.meta.version,
+                  true
+                )
+                  .then(() => {
+                    setBlockedAction(null)
+                    setDeleteTarget(null)
+                    queryClient.invalidateQueries({
+                      queryKey: ['task-plugins'],
+                    })
+                  })
+                  .catch((error: Error) => handleServerError(error))
+              }
+              if (blockedAction === 'disable' && statusTarget) {
+                statusMutation.mutate({
+                  key: statusTarget.meta.key,
+                  enabled: false,
+                  options: { cascade: true, force: true },
+                })
+              }
+            }}
+          >
+            {t('Force operation')}
+          </Button>
+        </div>
       </ConfirmDialog>
     </>
   )

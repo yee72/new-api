@@ -53,10 +53,8 @@ const headerNavSchema = z.object({
   console: z.boolean(),
   pricingEnabled: z.boolean(),
   pricingRequireAuth: z.boolean(),
-  rankingsEnabled: z.boolean(),
-  rankingsRequireAuth: z.boolean(),
-  docs: z.boolean(),
-  about: z.boolean(),
+  modelUsageEnabled: z.boolean(),
+  modelUsageRequireAuth: z.boolean(),
 })
 
 type HeaderNavFormValues = z.infer<typeof headerNavSchema>
@@ -81,20 +79,14 @@ const toFormValues = (config: HeaderNavModulesConfig): HeaderNavFormValues => ({
     config.pricing?.requireAuth === undefined
       ? HEADER_NAV_DEFAULT.pricing.requireAuth
       : Boolean(config.pricing.requireAuth),
-  rankingsEnabled:
-    config.rankings?.enabled === undefined
-      ? HEADER_NAV_DEFAULT.rankings.enabled
-      : Boolean(config.rankings.enabled),
-  rankingsRequireAuth:
-    config.rankings?.requireAuth === undefined
-      ? HEADER_NAV_DEFAULT.rankings.requireAuth
-      : Boolean(config.rankings.requireAuth),
-  docs:
-    config.docs === undefined ? HEADER_NAV_DEFAULT.docs : Boolean(config.docs),
-  about:
-    config.about === undefined
-      ? HEADER_NAV_DEFAULT.about
-      : Boolean(config.about),
+  modelUsageEnabled:
+    config.model_usage?.enabled === undefined
+      ? HEADER_NAV_DEFAULT.model_usage.enabled
+      : Boolean(config.model_usage.enabled),
+  modelUsageRequireAuth:
+    config.model_usage?.requireAuth === undefined
+      ? HEADER_NAV_DEFAULT.model_usage.requireAuth
+      : Boolean(config.model_usage.requireAuth),
 })
 
 export function HeaderNavigationSection({
@@ -119,17 +111,15 @@ export function HeaderNavigationSection({
       ...config,
       home: values.home,
       console: values.console,
-      docs: values.docs,
-      about: values.about,
       pricing: {
         ...(config.pricing ?? HEADER_NAV_DEFAULT.pricing),
         enabled: values.pricingEnabled,
         requireAuth: values.pricingRequireAuth,
       },
-      rankings: {
-        ...(config.rankings ?? HEADER_NAV_DEFAULT.rankings),
-        enabled: values.rankingsEnabled,
-        requireAuth: values.rankingsRequireAuth,
+      model_usage: {
+        ...(config.model_usage ?? HEADER_NAV_DEFAULT.model_usage),
+        enabled: values.modelUsageEnabled,
+        requireAuth: values.modelUsageRequireAuth,
       },
     }
 
@@ -163,22 +153,12 @@ export function HeaderNavigationSection({
       title: t('Console'),
       description: t('User dashboard and quota controls.'),
     },
-    {
-      key: 'docs',
-      title: t('Docs'),
-      description: t('Documentation or external knowledge base.'),
-    },
-    {
-      key: 'about',
-      title: t('About'),
-      description: t('Static page describing the platform.'),
-    },
   ]
 
   const accessModules: Array<{
     enabledKey: keyof HeaderNavFormValues
     requireAuthKey: keyof HeaderNavFormValues
-    requireAuthDependsOn: 'pricingEnabled' | 'rankingsEnabled'
+    requireAuthDependsOn: 'pricingEnabled' | 'modelUsageEnabled'
     title: string
     description: string
     requireAuthTitle: string
@@ -196,14 +176,16 @@ export function HeaderNavigationSection({
       ),
     },
     {
-      enabledKey: 'rankingsEnabled',
-      requireAuthKey: 'rankingsRequireAuth',
-      requireAuthDependsOn: 'rankingsEnabled',
-      title: t('Rankings'),
-      description: t('Public rankings page based on live usage data.'),
-      requireAuthTitle: t('Require login to view rankings'),
+      enabledKey: 'modelUsageEnabled',
+      requireAuthKey: 'modelUsageRequireAuth',
+      requireAuthDependsOn: 'modelUsageEnabled',
+      title: t('Model Usage'),
+      description: t(
+        'Model usage landing page for chatting and media generation.'
+      ),
+      requireAuthTitle: t('Require login to view model usage'),
       requireAuthDescription: t(
-        'Visitors must authenticate before accessing the rankings page.'
+        'Visitors must authenticate before accessing the model usage page.'
       ),
     },
   ]

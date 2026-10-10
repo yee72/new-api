@@ -17,7 +17,6 @@ import (
 
 const (
 	LangZhCN    = "zh-CN"
-	LangZhTW    = "zh-TW"
 	LangEn      = "en"
 	DefaultLang = LangEn // Fallback to English if language not supported
 )
@@ -39,8 +38,8 @@ func Init() error {
 		bundle = i18n.NewBundle(language.Chinese)
 		bundle.RegisterUnmarshalFunc("yaml", yaml.Unmarshal)
 
-		// Load embedded translation files
-		files := []string{"locales/zh-CN.yaml", "locales/zh-TW.yaml", "locales/en.yaml"}
+		// Load embedded translation files（仅中英）
+		files := []string{"locales/zh-CN.yaml", "locales/en.yaml"}
 		for _, file := range files {
 			_, err := bundle.LoadMessageFileFS(localeFS, file)
 			if err != nil {
@@ -51,7 +50,6 @@ func Init() error {
 
 		// Pre-create localizers for supported languages
 		localizers[LangZhCN] = i18n.NewLocalizer(bundle, LangZhCN)
-		localizers[LangZhTW] = i18n.NewLocalizer(bundle, LangZhTW)
 		localizers[LangEn] = i18n.NewLocalizer(bundle, LangEn)
 
 		// Set the TranslateMessage function in common package
@@ -201,10 +199,8 @@ func ParseAcceptLanguage(header string) string {
 func normalizeLang(lang string) string {
 	lang = strings.ToLower(strings.TrimSpace(lang))
 
-	// Handle common variations
+	// 各类中文变体（含繁体）统一到简体中文
 	switch {
-	case strings.HasPrefix(lang, "zh-tw"):
-		return LangZhTW
 	case strings.HasPrefix(lang, "zh"):
 		return LangZhCN
 	case strings.HasPrefix(lang, "en"):
@@ -216,7 +212,7 @@ func normalizeLang(lang string) string {
 
 // SupportedLanguages returns a list of supported language codes
 func SupportedLanguages() []string {
-	return []string{LangZhCN, LangZhTW, LangEn}
+	return []string{LangZhCN, LangEn}
 }
 
 // IsSupported checks if a language code is supported

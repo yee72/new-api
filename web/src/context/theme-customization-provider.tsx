@@ -151,11 +151,9 @@ export function ThemeCustomizationProvider(props: {
     )
   }, [radius])
 
+  // 字号刻度始终写入 DOM：默认已是 lg，若按「等于默认则去掉属性」则放大不会生效
   useEffect(() => {
-    applyAttribute(
-      'data-theme-scale',
-      scale === DEFAULT_THEME_CUSTOMIZATION.scale ? null : scale
-    )
+    applyAttribute('data-theme-scale', scale)
   }, [scale])
 
   useEffect(() => {

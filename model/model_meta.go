@@ -32,20 +32,33 @@ type BoundChannel struct {
 	Type int    `json:"type"`
 }
 
+// 模型使用落地页的主类型（单一主类型驱动 Tab / 工作区）
+const (
+	ModelTypeChat  = "chat"
+	ModelTypeImage = "image"
+	ModelTypeVideo = "video"
+)
+
 type Model struct {
-	Id                 int            `json:"id"`
-	ModelName          string         `json:"model_name" gorm:"size:128;not null;uniqueIndex:uk_model_name_delete_at,priority:1"`
-	Description        string         `json:"description,omitempty" gorm:"type:text"`
-	Icon               string         `json:"icon,omitempty" gorm:"type:varchar(128)"`
-	Tags               string         `json:"tags,omitempty" gorm:"type:varchar(255)"`
-	VendorID           int            `json:"vendor_id,omitempty" gorm:"index"`
-	Endpoints          string         `json:"endpoints,omitempty" gorm:"type:text"`
-	SupportedEndpoints []string       `json:"supported_endpoints,omitempty" gorm:"-"`
-	Status             int            `json:"status" gorm:"default:1"`
-	SyncOfficial       int            `json:"sync_official" gorm:"default:1"`
-	CreatedTime        int64          `json:"created_time" gorm:"bigint"`
-	UpdatedTime        int64          `json:"updated_time" gorm:"bigint"`
-	DeletedAt          gorm.DeletedAt `json:"-" gorm:"index;uniqueIndex:uk_model_name_delete_at,priority:2"`
+	Id                 int      `json:"id"`
+	ModelName          string   `json:"model_name" gorm:"size:128;not null;uniqueIndex:uk_model_name_delete_at,priority:1"`
+	Description        string   `json:"description,omitempty" gorm:"type:text"`
+	Icon               string   `json:"icon,omitempty" gorm:"type:varchar(128)"`
+	Tags               string   `json:"tags,omitempty" gorm:"type:varchar(255)"`
+	VendorID           int      `json:"vendor_id,omitempty" gorm:"index"`
+	Endpoints          string   `json:"endpoints,omitempty" gorm:"type:text"`
+	SupportedEndpoints []string `json:"supported_endpoints,omitempty" gorm:"-"`
+	// ModelType 主类型：chat / image / video；空值按 chat 处理
+	ModelType string `json:"model_type,omitempty" gorm:"type:varchar(16);index"`
+	// ManualUsage 运营手动增加的使用量（请求次数）
+	ManualUsage int64 `json:"manual_usage" gorm:"default:0"`
+	// GenerationCapabilities 图片/视频能力矩阵 JSON（可选）；空则使用全局默认集合
+	GenerationCapabilities string         `json:"generation_capabilities,omitempty" gorm:"type:text"`
+	Status                 int            `json:"status" gorm:"default:1"`
+	SyncOfficial           int            `json:"sync_official" gorm:"default:1"`
+	CreatedTime            int64          `json:"created_time" gorm:"bigint"`
+	UpdatedTime            int64          `json:"updated_time" gorm:"bigint"`
+	DeletedAt              gorm.DeletedAt `json:"-" gorm:"index;uniqueIndex:uk_model_name_delete_at,priority:2"`
 
 	BoundChannels []BoundChannel `json:"bound_channels,omitempty" gorm:"-"`
 	EnableGroups  []string       `json:"enable_groups,omitempty" gorm:"-"`
@@ -58,6 +71,27 @@ type Model struct {
 	HasMetadata            bool             `json:"has_metadata" gorm:"-"`
 	ConfiguredChannelCount int              `json:"configured_channel_count" gorm:"-"`
 	SquareState            ModelSquareState `json:"square_state" gorm:"-"`
+	// 运行时用量字段（不落库）
+	ActualUsage7d int64 `json:"actual_usage_7d,omitempty" gorm:"-"`
+	DisplayUsage  int64 `json:"display_usage,omitempty" gorm:"-"`
+}
+
+// NormalizeModelType 将空值规范为 chat，非法值返回错误用空字符串标识需校验
+func NormalizeModelType(raw string) string {
+	switch strings.TrimSpace(strings.ToLower(raw)) {
+	case "", ModelTypeChat:
+		return ModelTypeChat
+	case ModelTypeImage:
+		return ModelTypeImage
+	case ModelTypeVideo:
+		return ModelTypeVideo
+	default:
+		return ""
+	}
+}
+
+func IsValidModelType(raw string) bool {
+	return NormalizeModelType(raw) != "" || strings.TrimSpace(raw) == ""
 }
 
 // MatchesName applies a metadata rule to a concrete channel model name.
@@ -240,6 +274,10 @@ func (mi *Model) Insert() error {
 		}
 		now := common.GetTimestamp()
 		mi.CreatedTime, mi.UpdatedTime = now, now
+		mi.ModelType = NormalizeModelType(mi.ModelType)
+		if mi.ManualUsage < 0 {
+			mi.ManualUsage = 0
+		}
 		status, syncOfficial := mi.Status, mi.SyncOfficial
 		if err := tx.Create(mi).Error; err != nil {
 			return err
@@ -264,8 +302,12 @@ func (mi *Model) Update() error {
 			return err
 		}
 		mi.UpdatedTime = common.GetTimestamp()
+		mi.ModelType = NormalizeModelType(mi.ModelType)
+		if mi.ManualUsage < 0 {
+			mi.ManualUsage = 0
+		}
 		return tx.Model(&Model{}).Where("id = ?", mi.Id).
-			Select("model_name", "description", "icon", "tags", "vendor_id", "endpoints", "status", "sync_official", "name_rule", "updated_time").Updates(mi).Error
+			Select("model_name", "description", "icon", "tags", "vendor_id", "endpoints", "model_type", "manual_usage", "generation_capabilities", "status", "sync_official", "name_rule", "updated_time").Updates(mi).Error
 	})
 }
 

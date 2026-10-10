@@ -36,6 +36,8 @@ import type {
   Login2FAResponse,
   TwoFAPayload,
   RegisterPayload,
+  ConfirmPasswordResetPayload,
+  ImageCaptchaData,
   ApiResponse,
 } from './types'
 
@@ -156,6 +158,24 @@ export async function sendPasswordResetEmail(
   return res.data
 }
 
+export async function confirmPasswordReset(
+  payload: ConfirmPasswordResetPayload
+): Promise<ApiResponse> {
+  const res = await api.post(
+    '/api/user/reset',
+    {
+      email: payload.email,
+      token: payload.token,
+      password: payload.password,
+    },
+    {
+      params: { turnstile: payload.turnstile ?? '' },
+      skipBusinessError: true,
+    }
+  )
+  return res.data
+}
+
 // ----------------------------------------------------------------------------
 // OAuth
 // ----------------------------------------------------------------------------
@@ -251,13 +271,31 @@ export async function register(payload: RegisterPayload): Promise<ApiResponse> {
   return res.data
 }
 
+export async function fetchImageCaptcha(): Promise<
+  ApiResponse<ImageCaptchaData>
+> {
+  const res = await api.get('/api/captcha', {
+    skipBusinessError: true,
+  })
+  return res.data
+}
+
 // Send email verification code
 export async function sendEmailVerification(
   email: string,
-  turnstile?: string
+  options?: {
+    turnstile?: string
+    captchaId?: string
+    captchaCode?: string
+  }
 ): Promise<ApiResponse> {
   const res = await api.get('/api/verification', {
-    params: { email, turnstile },
+    params: {
+      email,
+      turnstile: options?.turnstile,
+      captcha_id: options?.captchaId,
+      captcha_code: options?.captchaCode,
+    },
   })
   return res.data
 }

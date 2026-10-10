@@ -635,6 +635,9 @@ func genBaseRelayInfo(c *gin.Context, request dto.Request) *RelayInfo {
 		info.IsPlayground = true
 		info.RequestURLPath = strings.TrimPrefix(info.RequestURLPath, "/pg")
 		info.RequestURLPath = "/v1" + info.RequestURLPath
+	} else if common.GetContextKeyBool(c, constant.ContextKeyIsPlayground) {
+		// /pg 路由可能已在中间件中改写为 /v1，仍按 playground 计费与临时 Token 处理
+		info.IsPlayground = true
 	}
 
 	userSetting, ok := common.GetContextKeyType[dto.UserSetting](c, constant.ContextKeyUserSetting)

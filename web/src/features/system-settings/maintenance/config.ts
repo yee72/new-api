@@ -25,10 +25,14 @@ export type HeaderNavModulesConfig = {
   home: boolean
   console: boolean
   pricing: HeaderNavAccessConfig
-  rankings: HeaderNavAccessConfig
-  docs: boolean
-  about: boolean
-  [key: string]: boolean | HeaderNavAccessConfig
+  model_usage: HeaderNavAccessConfig
+  /** @deprecated 读取时映射到 model_usage */
+  rankings?: HeaderNavAccessConfig
+  /** @deprecated 顶栏已移除，仅兼容存量 JSON */
+  docs?: boolean
+  /** @deprecated 顶栏已移除，仅兼容存量 JSON */
+  about?: boolean
+  [key: string]: boolean | HeaderNavAccessConfig | undefined
 }
 
 export type SidebarSectionConfig = {
@@ -45,19 +49,19 @@ export const HEADER_NAV_DEFAULT: HeaderNavModulesConfig = {
     enabled: true,
     requireAuth: false,
   },
-  rankings: {
+  model_usage: {
     enabled: true,
     requireAuth: false,
   },
-  docs: true,
-  about: true,
+  docs: false,
+  about: false,
 }
 
 export const SIDEBAR_MODULES_DEFAULT: SidebarModulesAdminConfig = {
   chat: {
     enabled: true,
     playground: true,
-    chat: true,
+    chat: false,
   },
   console: {
     enabled: true,
@@ -99,7 +103,7 @@ const toBoolean = (value: unknown, fallback: boolean): boolean => {
 const cloneHeaderNavDefault = (): HeaderNavModulesConfig => ({
   ...HEADER_NAV_DEFAULT,
   pricing: { ...HEADER_NAV_DEFAULT.pricing },
-  rankings: { ...HEADER_NAV_DEFAULT.rankings },
+  model_usage: { ...HEADER_NAV_DEFAULT.model_usage },
 })
 
 const parseAccessModule = (
@@ -147,7 +151,7 @@ export function parseHeaderNavModules(
     const result: HeaderNavModulesConfig = {
       ...base,
       pricing: { ...base.pricing },
-      rankings: { ...base.rankings },
+      model_usage: { ...base.model_usage },
     }
 
     Object.entries(parsed).forEach(([key, raw]) => {
@@ -155,8 +159,14 @@ export function parseHeaderNavModules(
         result.pricing = parseAccessModule(raw, base.pricing)
         return
       }
+      if (key === 'model_usage') {
+        result.model_usage = parseAccessModule(raw, base.model_usage)
+        return
+      }
       if (key === 'rankings') {
-        result.rankings = parseAccessModule(raw, base.rankings)
+        if (!('model_usage' in parsed)) {
+          result.model_usage = parseAccessModule(raw, base.model_usage)
+        }
         return
       }
 
@@ -179,7 +189,18 @@ export function parseHeaderNavModules(
 export function serializeHeaderNavModules(
   config: HeaderNavModulesConfig
 ): string {
-  return JSON.stringify(config)
+  // 保存时写 model_usage，不再持久化 rankings / 已下线的 docs、about
+  const {
+    rankings: _legacyRankings,
+    docs: _docs,
+    about: _about,
+    ...rest
+  } = config
+  return JSON.stringify({
+    ...rest,
+    pricing: rest.pricing,
+    model_usage: rest.model_usage,
+  })
 }
 
 export function parseSidebarModulesAdmin(

@@ -53,6 +53,8 @@ const (
 	ContextKeyUserGroup   ContextKey = "user_group"
 	ContextKeyUsingGroup  ContextKey = "group"
 	ContextKeyUserName    ContextKey = "username"
+	// ContextKeyIsPlayground 标记浏览器会话试用（/pg → /v1 路径别名后仍需按 playground 结算）
+	ContextKeyIsPlayground ContextKey = "is_playground"
 
 	ContextKeyLocalCountTokens ContextKey = "local_count_tokens"
 

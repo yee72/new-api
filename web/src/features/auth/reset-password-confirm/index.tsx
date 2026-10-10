@@ -17,22 +17,35 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useNavigate } from '@tanstack/react-router'
-import { CheckIcon, CopyIcon } from 'lucide-react'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { Loader2 } from 'lucide-react'
 import { useState } from 'react'
+import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import type { z } from 'zod'
 
+import { PasswordInput } from '@/components/password-input'
+import { Turnstile } from '@/components/turnstile'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useCountdown } from '@/hooks/use-countdown'
-import { api } from '@/lib/api'
-import { copyToClipboard } from '@/lib/copy-to-clipboard'
 import { handleServerError } from '@/lib/handle-server-error'
 import { AuthOperationError } from '@/lib/secure-verification'
 import { createServerError } from '@/lib/server-error-message'
 
+import { confirmPasswordReset } from '../api'
+import { resetPasswordConfirmFormSchema } from '../constants'
+import { useTurnstile } from '../hooks/use-turnstile'
 import { AuthLayout } from '../auth-layout'
 
 export type ResetPasswordSearchParams = {
@@ -48,65 +61,54 @@ export function ResetPasswordConfirm({
 }: ResetPasswordConfirmProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const [newPassword, setNewPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [copied, setCopied] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [succeeded, setSucceeded] = useState(false)
   const {
-    secondsLeft,
-    isActive,
-    start: startCountdown,
-  } = useCountdown({ initialSeconds: 30 })
+    isTurnstileEnabled,
+    turnstileSiteKey,
+    turnstileToken,
+    setTurnstileToken,
+    validateTurnstile,
+  } = useTurnstile()
+
+  const form = useForm<z.infer<typeof resetPasswordConfirmFormSchema>>({
+    resolver: zodResolver(resetPasswordConfirmFormSchema),
+    defaultValues: {
+      password: '',
+      confirmPassword: '',
+    },
+  })
 
   const isValidResetLink = Boolean(email && token)
+  const turnstileReady = !isTurnstileEnabled || Boolean(turnstileToken)
 
-  async function handleSubmit() {
+  async function onSubmit(
+    data: z.infer<typeof resetPasswordConfirmFormSchema>
+  ) {
     if (!isValidResetLink || !email || !token) {
       toast.error(t('Invalid reset link, please request a new password reset'))
       return
     }
+    if (!validateTurnstile()) return
 
-    startCountdown()
-    setLoading(true)
+    setIsLoading(true)
     try {
-      const res = await api.post('/api/user/reset', { email, token }, {
-        skipBusinessError: true,
-      } as Record<string, unknown>)
-
-      if (res?.data?.success) {
-        const password = res.data.data
-        setNewPassword(password)
-        const copySuccess = await copyToClipboard(password)
-        if (copySuccess) {
-          toast.success(
-            t('Password reset and copied to clipboard: {{password}}', {
-              password,
-            })
-          )
-        } else {
-          toast.success(t('Password reset: {{password}}', { password }))
-        }
+      const res = await confirmPasswordReset({
+        email,
+        token,
+        password: data.password,
+        turnstile: turnstileToken,
+      })
+      if (res?.success) {
+        setSucceeded(true)
+        toast.success(t('Your password has been reset successfully'))
       } else {
-        handleServerError(createServerError(res.data, t('Request failed')))
+        handleServerError(createServerError(res, t('Request failed')))
       }
     } catch (error) {
-      handleServerError(AuthOperationError.from(error))
+      handleServerError(AuthOperationError.from(error, t('Request failed')))
     } finally {
-      setLoading(false)
-    }
-  }
-
-  async function handleCopy() {
-    if (!newPassword) return
-
-    const copySuccess = await copyToClipboard(newPassword)
-    if (copySuccess) {
-      setCopied(true)
-      toast.success(
-        t('Password copied to clipboard: {{password}}', {
-          password: newPassword,
-        })
-      )
-      setTimeout(() => setCopied(false), 2000)
+      setIsLoading(false)
     }
   }
 
@@ -118,9 +120,11 @@ export function ResetPasswordConfirm({
             {t('Reset password')}
           </h2>
           <p className='text-muted-foreground text-left text-sm sm:text-base'>
-            {newPassword
-              ? t('auth.resetPasswordConfirm.success')
-              : t('auth.resetPasswordConfirm.description')}
+            {succeeded
+              ? t('Your password has been reset successfully')
+              : t(
+                  'Set a new password using the reset link from your email.'
+                )}
           </p>
         </div>
 
@@ -144,65 +148,83 @@ export function ResetPasswordConfirm({
             />
           </div>
 
-          {newPassword && (
-            <div className='space-y-2'>
-              <Label htmlFor='password'>{t('New password')}</Label>
-              <div className='flex gap-2'>
-                <Input
-                  id='password'
-                  value={newPassword}
-                  disabled
-                  className='font-mono'
-                />
-                <Button
-                  type='button'
-                  size='icon'
-                  variant='outline'
-                  onClick={handleCopy}
-                >
-                  {copied ? (
-                    <CheckIcon className='h-4 w-4' />
-                  ) : (
-                    <CopyIcon className='h-4 w-4' />
-                  )}
-                </Button>
-              </div>
-              <p className='text-muted-foreground text-xs'>
-                {t('Password has been copied to clipboard')}
-              </p>
-            </div>
-          )}
-
-          <Button
-            className='w-full'
-            onClick={
-              newPassword
-                ? () => navigate({ to: '/sign-in', replace: true })
-                : handleSubmit
-            }
-            disabled={
-              newPassword ? false : loading || isActive || !isValidResetLink
-            }
-          >
-            {newPassword && t('auth.resetPasswordConfirm.backToLogin')}
-            {!newPassword &&
-              isActive &&
-              t('auth.resetPasswordConfirm.retry', {
-                seconds: secondsLeft,
-              })}
-            {!newPassword &&
-              !isActive &&
-              t('auth.resetPasswordConfirm.confirm')}
-          </Button>
-
-          {!newPassword && (
+          {succeeded ? (
             <Button
-              variant='link'
               className='w-full'
               onClick={() => navigate({ to: '/sign-in', replace: true })}
             >
               {t('Back to login')}
             </Button>
+          ) : (
+            <Form {...form}>
+              <form
+                onSubmit={form.handleSubmit(onSubmit)}
+                className='space-y-4'
+              >
+                <FormField
+                  control={form.control}
+                  name='password'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('New password')}</FormLabel>
+                      <FormControl>
+                        <PasswordInput
+                          placeholder={t('Enter password (8–128 characters)')}
+                          autoComplete='new-password'
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name='confirmPassword'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('Confirm password')}</FormLabel>
+                      <FormControl>
+                        <PasswordInput
+                          placeholder={t('Confirm password')}
+                          autoComplete='new-password'
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {isTurnstileEnabled && (
+                  <Turnstile
+                    siteKey={turnstileSiteKey}
+                    onVerify={setTurnstileToken}
+                  />
+                )}
+
+                <Button
+                  type='submit'
+                  className='w-full'
+                  disabled={
+                    isLoading || !isValidResetLink || !turnstileReady
+                  }
+                >
+                  {isLoading ? (
+                    <Loader2 className='h-4 w-4 animate-spin' />
+                  ) : null}
+                  {t('Confirm new password')}
+                </Button>
+                <Button
+                  type='button'
+                  variant='link'
+                  className='w-full'
+                  onClick={() => navigate({ to: '/sign-in', replace: true })}
+                >
+                  {t('Back to login')}
+                </Button>
+              </form>
+            </Form>
           )}
         </div>
       </div>

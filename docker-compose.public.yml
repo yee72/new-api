@@ -1,0 +1,64 @@
+# New-API 本机部署 + Cloudflare Tunnel 对外
+#
+# 启动: docker compose -f docker-compose.public.yml up -d
+# 停止: docker compose -f docker-compose.public.yml down
+# 本地访问: http://127.0.0.1:3000
+services:
+  new-api:
+    # image: calciumion/new-api:latest
+    build: .
+    container_name: new-api
+    restart: always
+    command: --log-dir /app/logs
+    # 只监听本机回环地址，公网访问统一走 Cloudflare Tunnel
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - ./data:/data
+      - ./logs:/app/logs
+    environment:
+      - SQL_DSN=postgresql://root:6b3bf1f80ddd502c73cbf3eb8133364d@postgres:5432/new-api
+      - REDIS_CONN_STRING=redis://:e7be9ba53b8ebb14ec8a0ef2cdf841af@redis:6379
+      - TZ=Asia/Shanghai
+      - ERROR_LOG_ENABLED=true
+      - BATCH_UPDATE_ENABLED=true
+      - NODE_NAME=new-api-node-1
+      - SESSION_SECRET=9bf7ac9696ee6a39792f933ac31e793c02aaafed6c3ef792973a4027e79dac1f
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - new-api-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:3000/api/status | grep -o '\"success\":\\s*true' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  redis:
+    image: redis:latest
+    container_name: new-api-redis
+    restart: always
+    command: ["redis-server", "--requirepass", "e7be9ba53b8ebb14ec8a0ef2cdf841af"]
+    networks:
+      - new-api-network
+
+  postgres:
+    image: postgres:15
+    container_name: new-api-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: 6b3bf1f80ddd502c73cbf3eb8133364d
+      POSTGRES_DB: new-api
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    networks:
+      - new-api-network
+
+volumes:
+  pg_data:
+
+networks:
+  new-api-network:
+    driver: bridge

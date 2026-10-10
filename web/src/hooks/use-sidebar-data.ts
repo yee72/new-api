@@ -26,7 +26,6 @@ import {
   Key,
   LayoutDashboard,
   ListTodo,
-  MessageSquare,
   PlugZap,
   Radio,
   ServerCog,
@@ -54,25 +53,14 @@ export function useSidebarData(): SidebarData {
   return {
     navGroups: [
       {
-        id: 'chat',
-        title: t('Chat'),
+        id: 'general',
+        title: t('General'),
         items: [
           {
             title: t('Playground'),
             url: '/playground',
             icon: FlaskConical,
           },
-          {
-            title: t('Chat'),
-            icon: MessageSquare,
-            type: 'chat-presets',
-          },
-        ],
-      },
-      {
-        id: 'general',
-        title: t('General'),
-        items: [
           {
             title: t('Overview'),
             url: '/dashboard/overview',

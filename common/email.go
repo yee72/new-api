@@ -3,7 +3,10 @@ package common
 import (
 	"crypto/tls"
 	"encoding/base64"
+	"errors"
 	"fmt"
+	"io"
+	"net"
 	"net/smtp"
 	"slices"
 	"strings"
@@ -128,9 +131,21 @@ func SendEmail(subject string, receiver string, content string) error {
 	if err != nil {
 		return err
 	}
-	err = client.Quit()
-	if err != nil {
+	// DATA 已成功入队后，部分 SMTP（如 QQ）会直接断开，Quit 常返回 EOF，不应视为发信失败
+	if err = client.Quit(); err != nil && !isBenignSMTPQuitError(err) {
 		SysError(fmt.Sprintf("failed to send email to %s: %v", receiver, err))
+		return err
 	}
-	return err
+	return nil
+}
+
+func isBenignSMTPQuitError(err error) bool {
+	if err == nil {
+		return true
+	}
+	if errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed) {
+		return true
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "eof") || strings.Contains(msg, "connection reset")
 }

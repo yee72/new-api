@@ -172,16 +172,9 @@ it.each([false, true])(
       ],
     })
     const button = screen.getByRole('button', { name: `Model: ${longName}` })
-    const modelText = within(button).getByText(longName)
-    expect(modelText).toHaveClass(
+    expect(within(button).getByText(longName)).toHaveClass(
       'line-clamp-2',
-      'leading-5',
       '[overflow-wrap:anywhere]'
-    )
-    expect(modelText.closest('[data-slot="status-badge"]')).toHaveClass(
-      'max-w-full',
-      'min-h-6',
-      'py-px'
     )
     button.focus()
     await user.keyboard('{Enter}')

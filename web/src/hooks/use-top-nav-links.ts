@@ -38,9 +38,7 @@ export type TopNavLink = {
  *   home: true,
  *   console: true,
  *   pricing: { enabled: true, requireAuth: false },
- *   rankings: { enabled: true, requireAuth: false },
- *   docs: true,
- *   about: true
+ *   model_usage: { enabled: true, requireAuth: false }
  * }
  */
 export function useTopNavLinks(): TopNavLink[] {
@@ -54,9 +52,6 @@ export function useTopNavLinks(): TopNavLink[] {
       status as Record<string, unknown> | null
     )
   }, [status])
-
-  // Documentation link (may be external)
-  const docsLink: string | undefined = status?.docs_link as string | undefined
 
   const isAuthed = !!auth?.user
 
@@ -79,26 +74,18 @@ export function useTopNavLinks(): TopNavLink[] {
     links.push({ title: t('Model Square'), href: '/pricing', requiresAuth })
   }
 
-  // Rankings
-  const rankings = modules?.rankings
-  if (rankings && typeof rankings === 'object' && rankings.enabled) {
-    const requiresAuth = rankings.requireAuth && !isAuthed
-    links.push({ title: t('Rankings'), href: '/rankings', requiresAuth })
+  // 模型使用（原排行榜槽位）
+  const modelUsage = modules?.model_usage
+  if (modelUsage && typeof modelUsage === 'object' && modelUsage.enabled) {
+    const requiresAuth = modelUsage.requireAuth && !isAuthed
+    links.push({
+      title: t('Model Usage'),
+      href: '/model-usage',
+      requiresAuth,
+    })
   }
 
-  // Docs (supports external links)
-  if (modules?.docs !== false) {
-    if (docsLink) {
-      links.push({ title: t('Docs'), href: docsLink, external: true })
-    } else {
-      links.push({ title: t('Docs'), href: '/docs' })
-    }
-  }
-
-  // About
-  if (modules?.about !== false) {
-    links.push({ title: t('About'), href: '/about' })
-  }
+  // 文档 / 关于已从顶栏移除，不再根据 HeaderNavModules 渲染
 
   return links
 }

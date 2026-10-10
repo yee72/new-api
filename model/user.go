@@ -86,12 +86,15 @@ type User struct {
 	Role                 int                        `json:"role" gorm:"type:int;default:1"`   // admin, common
 	Status               int                        `json:"status" gorm:"type:int;default:1"` // enabled, disabled
 	Email                string                     `json:"email" gorm:"index" validate:"max=50"`
+	Phone                string                     `json:"phone" gorm:"type:varchar(20);index" validate:"max=20"`
 	GitHubId             string                     `json:"github_id" gorm:"column:github_id;index"`
 	DiscordId            string                     `json:"discord_id" gorm:"column:discord_id;index"`
 	OidcId               string                     `json:"oidc_id" gorm:"column:oidc_id;index"`
 	WeChatId             string                     `json:"wechat_id" gorm:"column:wechat_id;index"`
 	TelegramId           string                     `json:"telegram_id" gorm:"column:telegram_id;index"`
 	VerificationCode     string                     `json:"verification_code" gorm:"-:all"`                         // this field is only for Email verification, don't save it to database!
+	CaptchaId            string                     `json:"captcha_id" gorm:"-:all"`                               // 图形验证码 ID，不入库
+	CaptchaCode          string                     `json:"captcha_code" gorm:"-:all"`                             // 图形验证码答案，不入库
 	AccessToken          *string                    `json:"-" gorm:"type:char(32);column:access_token;uniqueIndex"` // this token is for system management
 	AccessTokenCreatedAt *int64                     `json:"-" gorm:"type:bigint;column:access_token_created_at"`
 	Quota                int                        `json:"quota" gorm:"type:int;default:0"`
@@ -326,6 +329,37 @@ func NormalizeEmail(email string) string {
 	return strings.ToLower(strings.TrimSpace(email))
 }
 
+var ErrInvalidContactPhone = errors.New("invalid phone")
+
+// NormalizeContactPhone 仅规范化选填联系电话，不做短信验证或绑定。
+func NormalizeContactPhone(phone string) (string, error) {
+	trimmed := strings.TrimSpace(phone)
+	if trimmed == "" {
+		return "", nil
+	}
+	var builder strings.Builder
+	for i, r := range trimmed {
+		if i == 0 && r == '+' {
+			builder.WriteRune(r)
+			continue
+		}
+		if r >= '0' && r <= '9' {
+			builder.WriteRune(r)
+			continue
+		}
+		if r == ' ' || r == '-' || r == '(' || r == ')' {
+			continue
+		}
+		return "", ErrInvalidContactPhone
+	}
+	normalized := builder.String()
+	digits := strings.TrimPrefix(normalized, "+")
+	if len(digits) < 8 || len(digits) > 15 {
+		return "", ErrInvalidContactPhone
+	}
+	return normalized, nil
+}
+
 func emailQuery(tx *gorm.DB, email string) *gorm.DB {
 	if tx == nil {
 		tx = DB
@@ -543,7 +577,7 @@ func GetSelfUserById(id int) (*User, error) {
 		HasPassword bool `gorm:"column:has_password"`
 	}
 	err := DB.Model(&User{}).Select([]string{
-		"id", "username", "display_name", "role", "status", "email",
+		"id", "username", "display_name", "role", "status", "email", "phone",
 		"github_id", "discord_id", "oidc_id", "wechat_id", "telegram_id",
 		"group", "quota", "used_quota", "request_count", "aff_code", "aff_count",
 		"aff_quota", "aff_history", "inviter_id", "linux_do_id", "setting",

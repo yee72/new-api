@@ -1,0 +1,185 @@
+/*
+Copyright (C) 2023-2026 QuantumNous
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+For commercial licensing, please contact support@quantumnous.com
+*/
+import { Loader2, RefreshCw, Trash2 } from 'lucide-react'
+import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
+
+import type { ModelUsageMessage } from '../types'
+import { ModelUsageMediaPreview } from './model-usage-media-preview'
+
+type ModelUsageMessageListProps = {
+  messages: ModelUsageMessage[]
+  emptyHint: string
+  busy: boolean
+  onDelete: (turnId: string) => void
+  onRegenerate: (message: ModelUsageMessage) => void
+}
+
+export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
+  const { t } = useTranslation()
+  const [preview, setPreview] = useState<{
+    items: { url: string; kind: 'image' | 'video' }[]
+    index: number
+  } | null>(null)
+
+  if (props.messages.length === 0) {
+    return (
+      <p className='text-muted-foreground py-8 text-center text-sm'>
+        {props.emptyHint}
+      </p>
+    )
+  }
+
+  return (
+    <>
+      <div className='mx-auto flex w-full max-w-4xl flex-col gap-5'>
+        {props.messages.map((message) => {
+          const isUser = message.role === 'user'
+          const canAct = message.status !== 'pending'
+          const images = message.images?.filter(Boolean) ?? []
+          const hasImages = images.length > 0
+          const hasText =
+            message.status === 'pending' || Boolean(message.content)
+
+          return (
+            <div
+              key={message.id}
+              className={cn(
+                'group flex w-full flex-col gap-1.5',
+                isUser ? 'items-end' : 'items-start'
+              )}
+            >
+              {hasText && (
+                <div
+                  className={cn(
+                    'max-w-[min(100%,36rem)] rounded-2xl px-3.5 py-2 text-sm whitespace-pre-wrap',
+                    isUser
+                      ? 'bg-primary text-primary-foreground'
+                      : message.status === 'error'
+                        ? 'bg-destructive/10 text-destructive'
+                        : 'bg-muted'
+                  )}
+                >
+                  {message.status === 'pending' ? (
+                    <span className='inline-flex items-center gap-2'>
+                      <Loader2 className='size-3.5 shrink-0 animate-spin' />
+                      {message.content || t('Your work is being generated...')}
+                    </span>
+                  ) : (
+                    message.content
+                  )}
+                </div>
+              )}
+
+              {hasImages && (
+                <div
+                  className={cn(
+                    'bg-muted w-full max-w-[min(100%,36rem)] overflow-hidden rounded-2xl p-2',
+                    images.length === 1
+                      ? 'flex'
+                      : 'grid grid-cols-2 gap-2'
+                  )}
+                >
+                  {images.map((url, index) => (
+                    <button
+                      key={`${message.id}-${index}`}
+                      type='button'
+                      className='bg-background/40 hover:ring-primary/50 focus-visible:ring-ring block overflow-hidden rounded-xl text-left transition hover:ring-2 focus-visible:ring-2 focus-visible:outline-none'
+                      onClick={() =>
+                        setPreview({
+                          items: images.map((url) => ({
+                            url,
+                            kind: 'image' as const,
+                          })),
+                          index,
+                        })
+                      }
+                      aria-label={t('Image Preview')}
+                    >
+                      <img
+                        src={url}
+                        alt={t('Generated image')}
+                        className={cn(
+                          'max-h-80 bg-black/20 object-contain',
+                          images.length === 1 ? 'max-w-full' : 'w-full'
+                        )}
+                        loading='lazy'
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {canAct && (
+                <div
+                  className={cn(
+                    'flex gap-1 opacity-70 transition-opacity group-hover:opacity-100',
+                    isUser ? 'justify-end' : 'justify-start'
+                  )}
+                >
+                  {!isUser && message.prompt && (
+                    <Button
+                      type='button'
+                      variant='ghost'
+                      size='sm'
+                      className='h-7 px-2 text-xs'
+                      disabled={props.busy}
+                      onClick={() => props.onRegenerate(message)}
+                    >
+                      <RefreshCw className='mr-1 size-3' />
+                      {t('Regenerate')}
+                    </Button>
+                  )}
+                  <Button
+                    type='button'
+                    variant='ghost'
+                    size='sm'
+                    className='text-destructive h-7 px-2 text-xs'
+                    disabled={props.busy}
+                    onClick={() => props.onDelete(message.turnId)}
+                  >
+                    <Trash2 className='mr-1 size-3' />
+                    {t('Delete')}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      <ModelUsageMediaPreview
+        items={preview?.items ?? []}
+        index={preview?.index ?? 0}
+        open={Boolean(preview)}
+        onOpenChange={(open) => {
+          if (!open) setPreview(null)
+        }}
+        onIndexChange={(index) =>
+          setPreview((current) =>
+            current ? { ...current, index } : current
+          )
+        }
+      />
+    </>
+  )
+}

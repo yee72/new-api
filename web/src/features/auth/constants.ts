@@ -33,6 +33,29 @@ export const registerFormSchema = z
   .object({
     username: z.string().min(1, 'Please enter your username'),
     email: z.string().optional(),
+    phone: z.string().optional(),
+    password: accountPasswordSchema,
+    confirmPassword: z.string().min(1, 'Please confirm your password'),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords don't match.",
+    path: ['confirmPassword'],
+  })
+  .refine(
+    (data) => {
+      const phone = data.phone?.trim() ?? ''
+      if (!phone) return true
+      const compact = phone.replace(/[\s()-]/g, '')
+      return /^\+?[0-9]{8,15}$/.test(compact)
+    },
+    {
+      message: 'Please enter a valid phone number',
+      path: ['phone'],
+    }
+  )
+
+export const resetPasswordConfirmFormSchema = z
+  .object({
     password: accountPasswordSchema,
     confirmPassword: z.string().min(1, 'Please confirm your password'),
   })

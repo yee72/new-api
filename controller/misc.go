@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -93,6 +92,7 @@ func GetStatus(c *gin.Context) {
 		"register_enabled":              common.RegisterEnabled,
 		"password_login_enabled":        common.PasswordLoginEnabled,
 		"password_register_enabled":     common.PasswordRegisterEnabled,
+		"image_captcha_enabled":         true,
 		"default_use_auto_group":        setting.DefaultUseAutoGroup,
 
 		"password_login_encryption_enabled": common.PasswordLoginEncryptionEnabled,
@@ -221,9 +221,17 @@ func SendEmailVerification(c *gin.Context) {
 		writeSecurityOperationError(c, err)
 		return
 	}
+	// 发邮箱验证码前必须先通过图形验证码
+	if !requireImageCaptcha(c, c.Query("captcha_id"), c.Query("captcha_code")) {
+		return
+	}
 
 	if model.IsEmailAlreadyTaken(email) {
-		common.ApiErrorI18n(c, i18n.MsgUserEmailAlreadyTaken)
+		// 已占用邮箱也返回成功，避免通过发码接口枚举账户
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"message": "",
+		})
 		return
 	}
 	code := common.GenerateVerificationCode(6)
@@ -273,15 +281,16 @@ func SendPasswordResetEmail(c *gin.Context) {
 }
 
 type PasswordResetRequest struct {
-	Email string `json:"email"`
-	Token string `json:"token"`
+	Email    string `json:"email"`
+	Token    string `json:"token"`
+	Password string `json:"password"`
 }
 
 func ResetPassword(c *gin.Context) {
 	var req PasswordResetRequest
-	err := json.NewDecoder(c.Request.Body).Decode(&req)
+	err := common.DecodeJson(c.Request.Body, &req)
 	if err != nil {
-		common.ApiError(c, err)
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 		return
 	}
 	req.Email = model.NormalizeEmail(req.Email)
@@ -289,12 +298,15 @@ func ResetPassword(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 		return
 	}
-	if !common.VerifyCodeWithKey(req.Email, req.Token, common.PasswordResetPurpose) {
+	if err := common.ValidateNewAccountPassword(req.Password); err != nil {
+		common.ApiErrorI18n(c, i18n.MsgUserInputInvalid, map[string]any{"Error": err.Error()})
+		return
+	}
+	if !common.ConsumeCodeWithKey(req.Email, req.Token, common.PasswordResetPurpose) {
 		common.ApiErrorI18n(c, i18n.MsgUserPasswordResetLinkInvalid)
 		return
 	}
-	password := common.GenerateVerificationCode(12)
-	err = model.ResetUserPasswordByEmail(req.Email, password)
+	err = model.ResetUserPasswordByEmail(req.Email, req.Password)
 	if err != nil {
 		if errors.Is(err, model.ErrEmailNotFound) || errors.Is(err, model.ErrEmailAmbiguous) {
 			common.ApiErrorI18n(c, i18n.MsgUserPasswordResetLinkInvalid)
@@ -303,11 +315,8 @@ func ResetPassword(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	common.DeleteKey(req.Email, common.PasswordResetPurpose)
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
-		"data":    password,
 	})
-	return
 }

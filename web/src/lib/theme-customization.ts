@@ -119,7 +119,7 @@ export const DEFAULT_THEME_CUSTOMIZATION: ThemeCustomization = {
   preset: 'default',
   font: 'default',
   radius: 'default',
-  scale: 'default',
+  scale: 'lg', // 默认略放大一号，提升全局可读性
   contentLayout: 'full',
 }
 

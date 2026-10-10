@@ -8,6 +8,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/service"
 
 	"github.com/gin-gonic/gin"
 )
@@ -118,6 +119,15 @@ func CreateModelMeta(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	if !model.IsValidModelType(m.ModelType) {
+		common.ApiErrorMsg(c, "invalid model_type")
+		return
+	}
+	m.ModelType = model.NormalizeModelType(m.ModelType)
+	if m.ManualUsage < 0 {
+		common.ApiErrorMsg(c, "manual_usage must be >= 0")
+		return
+	}
 	// 名称冲突检查
 	if dup, err := model.IsModelNameDuplicated(0, m.ModelName); err != nil {
 		common.ApiError(c, err)
@@ -132,6 +142,7 @@ func CreateModelMeta(c *gin.Context) {
 		return
 	}
 	model.RefreshPricing()
+	service.InvalidateModelUsageCache()
 	m.HasMetadata = m.Id > 0
 	common.ApiSuccess(c, &m)
 }
@@ -160,6 +171,7 @@ func UpdateModelMeta(c *gin.Context) {
 			common.ApiError(c, err)
 			return
 		}
+		service.InvalidateModelUsageCache()
 	} else {
 		if strings.TrimSpace(m.ModelName) == "" {
 			common.ApiErrorMsg(c, "模型名称不能为空")
@@ -167,6 +179,15 @@ func UpdateModelMeta(c *gin.Context) {
 		}
 		if err := model.ValidateMetadataValues(model.MetadataValues{Endpoints: m.Endpoints, Status: m.Status, NameRule: m.NameRule}); err != nil {
 			common.ApiError(c, err)
+			return
+		}
+		if !model.IsValidModelType(m.ModelType) {
+			common.ApiErrorMsg(c, "invalid model_type")
+			return
+		}
+		m.ModelType = model.NormalizeModelType(m.ModelType)
+		if m.ManualUsage < 0 {
+			common.ApiErrorMsg(c, "manual_usage must be >= 0")
 			return
 		}
 		// 名称冲突检查
@@ -184,6 +205,7 @@ func UpdateModelMeta(c *gin.Context) {
 		}
 	}
 	model.RefreshPricing()
+	service.InvalidateModelUsageCache()
 	m.HasMetadata = m.Id > 0
 	common.ApiSuccess(c, &m)
 }
@@ -215,6 +237,8 @@ func DeleteModelMeta(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	model.RefreshPricing()
+	service.InvalidateModelUsageCache()
 	recordManageAudit(c, "model.delete", map[string]any{"model_ids": []int{id}, "remove_from_channels": removeFromChannels, "remove_pricing": removePricing, "updated_channels": result.UpdatedChannels})
 	common.ApiSuccess(c, result)
 }
@@ -238,6 +262,8 @@ func BatchDeleteModelMeta(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	model.RefreshPricing()
+	service.InvalidateModelUsageCache()
 	recordManageAudit(c, "model.delete_batch", map[string]any{"model_ids": request.ModelIDs, "remove_from_channels": request.RemoveFromChannels, "remove_pricing": request.RemovePricing, "updated_channels": result.UpdatedChannels})
 	common.ApiSuccess(c, result)
 }

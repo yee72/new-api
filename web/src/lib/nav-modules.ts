@@ -22,37 +22,41 @@ import { readCachedStatus, statusQueryOptions } from '@/lib/status-query'
 
 export type ModuleAccess = { enabled: boolean; requireAuth: boolean }
 
-export type HeaderNavModule = 'rankings' | 'pricing'
+export type HeaderNavModule = 'model_usage' | 'pricing'
 
 export type HeaderNavModules = {
   home: boolean
   console: boolean
   pricing: ModuleAccess
-  rankings: ModuleAccess
-  docs: boolean
-  about: boolean
-  [key: string]: boolean | ModuleAccess
+  model_usage: ModuleAccess
+  /** @deprecated 存量配置兼容，读取时映射到 model_usage */
+  rankings?: ModuleAccess
+  /** @deprecated 顶栏已移除，仅兼容存量 JSON */
+  docs?: boolean
+  /** @deprecated 顶栏已移除，仅兼容存量 JSON */
+  about?: boolean
+  [key: string]: boolean | ModuleAccess | undefined
 }
 
 const DEFAULT_HEADER_NAV_MODULES: HeaderNavModules = {
   home: true,
   console: true,
   pricing: { enabled: true, requireAuth: false },
-  rankings: { enabled: true, requireAuth: false },
-  docs: true,
-  about: true,
+  model_usage: { enabled: true, requireAuth: false },
+  docs: false,
+  about: false,
 }
 
 const DEFAULTS: Record<HeaderNavModule, ModuleAccess> = {
   pricing: DEFAULT_HEADER_NAV_MODULES.pricing,
-  rankings: DEFAULT_HEADER_NAV_MODULES.rankings,
+  model_usage: DEFAULT_HEADER_NAV_MODULES.model_usage,
 }
 
 function cloneHeaderNavDefaults(): HeaderNavModules {
   return {
     ...DEFAULT_HEADER_NAV_MODULES,
     pricing: { ...DEFAULT_HEADER_NAV_MODULES.pricing },
-    rankings: { ...DEFAULT_HEADER_NAV_MODULES.rankings },
+    model_usage: { ...DEFAULT_HEADER_NAV_MODULES.model_usage },
   }
 }
 
@@ -116,8 +120,15 @@ export function parseHeaderNavModules(raw: unknown): HeaderNavModules {
       result.pricing = parseAccess(value, result.pricing)
       return
     }
+    if (key === 'model_usage') {
+      result.model_usage = parseAccess(value, result.model_usage)
+      return
+    }
     if (key === 'rankings') {
-      result.rankings = parseAccess(value, result.rankings)
+      // 仅在未显式配置 model_usage 时回退
+      if (!('model_usage' in parsed)) {
+        result.model_usage = parseAccess(value, result.model_usage)
+      }
       return
     }
 

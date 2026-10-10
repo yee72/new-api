@@ -40,8 +40,23 @@ export interface RegisterPayload {
   username: string
   password: string
   email?: string
+  phone?: string
   verification_code?: string
+  captcha_id?: string
+  captcha_code?: string
   aff_code?: string
+  turnstile?: string
+}
+
+export interface ImageCaptchaData {
+  captcha_id: string
+  captcha_image: string
+}
+
+export interface ConfirmPasswordResetPayload {
+  email: string
+  token: string
+  password: string
   turnstile?: string
 }
 
@@ -134,6 +149,7 @@ export interface SystemStatus {
     password_login_enabled?: boolean
     password_login_encryption_enabled?: boolean
     password_register_enabled?: boolean
+    image_captcha_enabled?: boolean
     custom_oauth_providers?: CustomOAuthProviderInfo[]
     [key: string]: unknown
   }
@@ -181,6 +197,7 @@ export interface SystemStatus {
   password_login_enabled?: boolean
   password_login_encryption_enabled?: boolean
   password_register_enabled?: boolean
+  image_captcha_enabled?: boolean
   custom_oauth_providers?: CustomOAuthProviderInfo[]
   [key: string]: unknown
 }

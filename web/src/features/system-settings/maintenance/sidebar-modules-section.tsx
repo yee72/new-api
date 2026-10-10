@@ -67,7 +67,7 @@ export function SidebarModulesSection({
   const sectionMeta: Record<string, { title: string; description: string }> = {
     chat: {
       title: t('Chat area'),
-      description: t('Playground experiments and live conversations.'),
+      description: t('Playground experiments.'),
     },
     console: {
       title: t('Console area'),
@@ -91,10 +91,6 @@ export function SidebarModulesSection({
       playground: {
         title: t('Playground'),
         description: t('Experiment with prompts and models in real time.'),
-      },
-      chat: {
-        title: t('Chat'),
-        description: t('Access previous conversations and start new ones.'),
       },
     },
     console: {
@@ -209,7 +205,9 @@ export function SidebarModulesSection({
               description: t('Custom sidebar section'),
             }
             const modules = Object.entries(sectionConfig).filter(
-              ([moduleKey]) => moduleKey !== 'enabled'
+              ([moduleKey]) =>
+                moduleKey !== 'enabled' &&
+                Boolean(moduleMeta[sectionKey]?.[moduleKey])
             )
 
             return (

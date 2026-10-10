@@ -21,15 +21,16 @@ import (
 )
 
 type fakeSMTPServer struct {
-	listener          net.Listener
-	host              string
-	port              int
-	cert              tls.Certificate
-	advertiseSTARTTLS bool
-	authMechanisms    []string
-	messages          chan string
-	authCommands      chan string
-	startTLSCommands  chan string
+	listener               net.Listener
+	host                   string
+	port                   int
+	cert                   tls.Certificate
+	advertiseSTARTTLS      bool
+	authMechanisms         []string
+	closeAfterDataAccepted bool // 模拟 QQ 等发信成功后直接断开
+	messages               chan string
+	authCommands           chan string
+	startTLSCommands       chan string
 }
 
 func newFakeSMTPServer(t *testing.T) *fakeSMTPServer {
@@ -193,6 +194,9 @@ func (s *fakeSMTPServer) serve() {
 			if err := writeSMTPLine(rw, "250 2.0.0 Queued"); err != nil {
 				return
 			}
+			if s.closeAfterDataAccepted {
+				return
+			}
 		case upperCommand == "QUIT":
 			_ = writeSMTPLine(rw, "221 2.0.0 Bye")
 			return
@@ -289,6 +293,34 @@ func TestSendEmailUsesExplicitStartTLSWithInsecureCertificate(t *testing.T) {
 	select {
 	case message := <-server.messages:
 		require.Contains(t, message, "Subject: =?UTF-8?B?")
+		require.Contains(t, message, "<p>123456</p>")
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for SMTP DATA")
+	}
+}
+
+func TestSendEmailTreatsQuitEOFAsSuccess(t *testing.T) {
+	server := newFakeSMTPServer(t)
+	server.closeAfterDataAccepted = true
+	defer server.close()
+	withSMTPSettings(t)
+
+	SMTPServer = server.host
+	SMTPPort = server.port
+	SMTPSSLEnabled = false
+	SMTPStartTLSEnabled = true
+	SMTPInsecureSkipVerify = true
+	SMTPForceAuthLogin = false
+	SMTPAccount = "sender@example.com"
+	SMTPFrom = "sender@example.com"
+	SMTPToken = "secret"
+	SystemName = "New API"
+
+	err := SendEmail("Verification", "receiver@example.com", "<p>123456</p>")
+	require.NoError(t, err)
+
+	select {
+	case message := <-server.messages:
 		require.Contains(t, message, "<p>123456</p>")
 	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for SMTP DATA")

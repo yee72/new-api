@@ -105,11 +105,20 @@ func TestHeaderNavModuleAuthRequiresLoginForPricing(t *testing.T) {
 	require.Equal(t, http.StatusUnauthorized, recorder.Code)
 }
 
-func TestHeaderNavModuleAuthRequiresLoginForRankings(t *testing.T) {
+func TestHeaderNavModuleAuthRequiresLoginForModelUsage(t *testing.T) {
+	raw := `{"model_usage":{"enabled":true,"requireAuth":true}}`
+	withHeaderNavModules(t, raw)
+
+	recorder := performHeaderNavRequest(t, HeaderNavModuleAuth("model_usage"), false)
+
+	require.Equal(t, http.StatusUnauthorized, recorder.Code)
+}
+
+func TestHeaderNavModuleAuthFallsBackToLegacyRankingsConfig(t *testing.T) {
 	raw := `{"rankings":{"enabled":true,"requireAuth":true}}`
 	withHeaderNavModules(t, raw)
 
-	recorder := performHeaderNavRequest(t, HeaderNavModuleAuth("rankings"), false)
+	recorder := performHeaderNavRequest(t, HeaderNavModuleAuth("model_usage"), false)
 
 	require.Equal(t, http.StatusUnauthorized, recorder.Code)
 }
@@ -118,7 +127,7 @@ func TestHeaderNavModuleAuthRejectsLegacyDisabledModule(t *testing.T) {
 	raw := `{"rankings":false}`
 	withHeaderNavModules(t, raw)
 
-	recorder := performHeaderNavRequest(t, HeaderNavModuleAuth("rankings"), false)
+	recorder := performHeaderNavRequest(t, HeaderNavModuleAuth("model_usage"), false)
 
 	require.Equal(t, http.StatusForbidden, recorder.Code)
 }

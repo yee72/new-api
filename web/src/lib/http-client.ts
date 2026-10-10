@@ -118,8 +118,8 @@ api.interceptors.response.use(
               [safeServerErrorMessage]: true,
               cause: error,
             })
+            redirectToSignIn()
           }
-          redirectToSignIn()
         }
       } else if (config?.authRetry) {
         clearAuthentication(false)
@@ -129,8 +129,8 @@ api.interceptors.response.use(
             [safeServerErrorMessage]: true,
             cause: error,
           })
+          redirectToSignIn()
         }
-        redirectToSignIn()
       } else if (!skipErrorHandler) {
         handleServerError({
           message: t('Session expired!'),

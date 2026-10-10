@@ -22,13 +22,12 @@ import {
   Edit,
   Power,
   PowerOff,
-  ExternalLink,
   ArrowRightLeft,
   Copy,
   Link,
   Loader2,
 } from 'lucide-react'
-import { useCallback, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -37,9 +36,6 @@ import { Button } from '@/components/ui/button'
 import {
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuShortcut,
 } from '@/components/ui/dropdown-menu'
 import {
@@ -47,9 +43,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { useChatPresets } from '@/features/chat/hooks/use-chat-presets'
-import { resolveChatUrl, type ChatPreset } from '@/features/chat/lib/chat-links'
-import { sendToFluent } from '@/features/chat/lib/send-to-fluent'
 import { encodeChannelConnectionInfo } from '@/lib/channel-connection-info'
 import { copyToClipboard } from '@/lib/copy-to-clipboard'
 import { handleServerError } from '@/lib/handle-server-error'
@@ -90,53 +83,10 @@ export function DataTableRowActions<TData>({
     loadingKeys,
   } = useApiKeys()
   const isEnabled = apiKey.status === API_KEY_STATUS.ENABLED
-  const { chatPresets, serverAddress } = useChatPresets()
   const [isTogglingStatus, setIsTogglingStatus] = useState(false)
   const isRealKeyLoading = Boolean(loadingKeys[apiKey.id])
 
-  const hasChatPresets = chatPresets.length > 0
   const toggleLabel = isEnabled ? t('Disable') : t('Enable')
-
-  const handleOpenChatPreset = useCallback(
-    async (preset: ChatPreset) => {
-      const realKey = await resolveRealKey(apiKey.id)
-      if (!realKey) return
-
-      if (preset.type === 'fluent') {
-        const success = sendToFluent(realKey, serverAddress)
-        if (success) {
-          toast.success(t('Sent the API key to FluentRead.'))
-        } else {
-          toast.info(
-            t(
-              'FluentRead extension not detected. Please ensure it is installed and active.'
-            )
-          )
-        }
-        return
-      }
-
-      const resolvedUrl = resolveChatUrl({
-        template: preset.url,
-        apiKey: realKey,
-        serverAddress,
-      })
-
-      if (!resolvedUrl) {
-        toast.error(t('Invalid chat link. Please contact your administrator.'))
-        return
-      }
-
-      if (typeof window === 'undefined') return
-
-      try {
-        window.open(resolvedUrl, '_blank', 'noopener')
-      } catch {
-        window.location.href = resolvedUrl
-      }
-    },
-    [resolveRealKey, apiKey.id, serverAddress, t]
-  )
 
   const handleToggleStatus = async (
     event?: React.MouseEvent<HTMLButtonElement>
@@ -150,102 +100,92 @@ export function DataTableRowActions<TData>({
     try {
       const result = await updateApiKeyStatus(apiKey.id, newStatus)
       if (result.success) {
-        const message = isEnabled
-          ? t(SUCCESS_MESSAGES.API_KEY_DISABLED)
-          : t(SUCCESS_MESSAGES.API_KEY_ENABLED)
-        toast.success(message)
+        toast.success(
+          t(
+            isEnabled
+              ? SUCCESS_MESSAGES.API_KEY_DISABLED
+              : SUCCESS_MESSAGES.API_KEY_ENABLED
+          )
+        )
         triggerRefresh()
       } else {
-        handleServerError(result, t(ERROR_MESSAGES.STATUS_UPDATE_FAILED))
+        toast.error(result.message || t(ERROR_MESSAGES.UNEXPECTED))
       }
     } catch (error) {
-      handleServerError(error, t(ERROR_MESSAGES.UNEXPECTED))
+      handleServerError(error)
     } finally {
       setIsTogglingStatus(false)
     }
   }
 
-  let statusIcon = <Power className='size-4' />
-  if (isTogglingStatus) {
-    statusIcon = <Loader2 className='size-4 animate-spin' />
-  } else if (isEnabled) {
-    statusIcon = <PowerOff className='size-4' />
-  }
-
   return (
-    <div className='-ml-1.5 flex items-center gap-1'>
+    <div className='flex items-center justify-end gap-1'>
       <Tooltip>
         <TooltipTrigger
           render={
             <Button
               variant='ghost'
-              size='icon-sm'
-              onClick={handleToggleStatus}
+              size='icon'
+              className='data-[state=open]:bg-muted h-8 w-8'
               disabled={isTogglingStatus}
+              onClick={handleToggleStatus}
               aria-label={toggleLabel}
-              className={
-                isEnabled
-                  ? 'text-destructive hover:text-destructive'
-                  : 'text-emerald-600 hover:text-emerald-600 dark:text-emerald-400 dark:hover:text-emerald-400'
-              }
             />
           }
         >
-          {statusIcon}
+          {isTogglingStatus ? (
+            <Loader2 className='h-4 w-4 animate-spin' />
+          ) : isEnabled ? (
+            <PowerOff className='h-4 w-4' />
+          ) : (
+            <Power className='h-4 w-4' />
+          )}
         </TooltipTrigger>
         <TooltipContent>{toggleLabel}</TooltipContent>
       </Tooltip>
 
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <Button
-              variant='ghost'
-              size='icon-sm'
-              onClick={() => {
-                setCurrentRow(apiKey)
-                setOpen('update')
-              }}
-              aria-label={t('Edit')}
-            />
-          }
-        >
-          <Edit />
-        </TooltipTrigger>
-        <TooltipContent>{t('Edit')}</TooltipContent>
-      </Tooltip>
-
-      <DataTableRowActionMenu
-        ariaLabel={t('Open menu')}
-        contentClassName='w-[200px]'
-        modal={false}
-      >
+      <DataTableRowActionMenu>
         <DropdownMenuItem
-          disabled={isRealKeyLoading}
-          onClick={async () => {
-            const realKey = await resolveRealKey(apiKey.id)
-            if (!realKey) return
-            const ok = await copyToClipboard(realKey)
-            if (ok) toast.success(t('Copied'))
+          onClick={() => {
+            setCurrentRow(apiKey)
+            setOpen('edit')
           }}
         >
-          {t('Copy Key')}
+          {t('Edit')}
           <DropdownMenuShortcut>
-            <Copy size={16} />
+            <Edit size={16} />
           </DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuItem
-          disabled={isRealKeyLoading}
           onClick={async () => {
             const realKey = await resolveRealKey(apiKey.id)
             if (!realKey) return
-            const connStr = encodeChannelConnectionInfo(
+            await copyToClipboard(realKey)
+            toast.success(t('API key copied'))
+          }}
+          disabled={isRealKeyLoading}
+        >
+          {t('Copy Key')}
+          <DropdownMenuShortcut>
+            {isRealKeyLoading ? (
+              <Loader2 size={16} className='animate-spin' />
+            ) : (
+              <Copy size={16} />
+            )}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={async () => {
+            const realKey = await resolveRealKey(apiKey.id)
+            if (!realKey) return
+            const info = encodeChannelConnectionInfo(
               realKey,
               getServerAddress()
             )
-            const ok = await copyToClipboard(connStr)
-            if (ok) toast.success(t('Copied'))
+            await copyToClipboard(info)
+            toast.success(t('Connection info copied'))
           }}
+          disabled={isRealKeyLoading}
         >
           {t('Copy Connection Info')}
           <DropdownMenuShortcut>
@@ -267,26 +207,6 @@ export function DataTableRowActions<TData>({
             <ArrowRightLeft size={16} />
           </DropdownMenuShortcut>
         </DropdownMenuItem>
-        {hasChatPresets && (
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>{t('Chat')}</DropdownMenuSubTrigger>
-            <DropdownMenuSubContent>
-              {chatPresets.map((preset) => (
-                <DropdownMenuItem
-                  key={preset.id}
-                  onClick={() => handleOpenChatPreset(preset)}
-                >
-                  {preset.name}
-                  {preset.type !== 'web' && (
-                    <DropdownMenuShortcut>
-                      <ExternalLink size={16} />
-                    </DropdownMenuShortcut>
-                  )}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
-        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={() => {

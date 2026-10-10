@@ -86,12 +86,8 @@ export function resolveLegacyRoute(rawHref: string): string | null {
     const target = legacySettingsTabs[tab] ?? '/system-settings'
     return buildTargetHref(target, source)
   }
-  if (pathname === '/console/chat') {
+  if (pathname === '/console/chat' || pathname.startsWith('/console/chat/')) {
     return buildTargetHref('/dashboard', source)
-  }
-  if (pathname.startsWith('/console/chat/')) {
-    const chatID = pathname.slice('/console/chat/'.length)
-    return buildTargetHref(chatID ? `/chat/${chatID}` : '/dashboard', source)
   }
 
   const target = legacyConsoleRoutes[pathname]

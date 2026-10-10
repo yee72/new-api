@@ -36,6 +36,9 @@ export const modelFormSchema = z.object({
   tags: z.array(z.string()).default([]),
   vendor_id: z.number().optional(),
   endpoints: z.string().default(''),
+  model_type: z.enum(['chat', 'image', 'video']).default('chat'),
+  manual_usage: z.number().int().min(0).default(0),
+  generation_capabilities: z.string().default(''),
   name_rule: z.number().min(0).max(3).default(0),
   status: z.boolean().default(true),
   sync_official: z.boolean().default(true),
@@ -70,6 +73,10 @@ export type VendorFormValues = z.infer<typeof vendorFormSchema>
  * Transform model to form default values
  */
 export function transformModelToFormDefaults(model: Model): ModelFormValues {
+  const modelType =
+    model.model_type === 'image' || model.model_type === 'video'
+      ? model.model_type
+      : 'chat'
   return {
     id: model.id,
     model_name: model.model_name,
@@ -78,6 +85,9 @@ export function transformModelToFormDefaults(model: Model): ModelFormValues {
     tags: parseTagsFromUtils(model.tags),
     vendor_id: model.vendor_id,
     endpoints: model.endpoints || '',
+    model_type: modelType,
+    manual_usage: model.manual_usage ?? 0,
+    generation_capabilities: model.generation_capabilities || '',
     name_rule: model.name_rule || 0,
     status: model.status === 1,
     sync_official: model.sync_official === 1,
@@ -100,6 +110,9 @@ export function transformFormDataToModelPayload(
     tags: formatTagsArray(formData.tags),
     vendor_id: formData.vendor_id,
     endpoints: formData.endpoints || '',
+    model_type: formData.model_type,
+    manual_usage: formData.manual_usage,
+    generation_capabilities: formData.generation_capabilities || '',
     name_rule: formData.name_rule,
     status: formData.status ? 1 : 0,
     sync_official: formData.sync_official ? 1 : 0,

@@ -64,9 +64,27 @@ func SetRelayRouter(router *gin.Engine) {
 	playgroundRouter := router.Group("/pg")
 	playgroundRouter.Use(middleware.RouteTag("relay"))
 	playgroundRouter.Use(middleware.SystemPerformanceCheck())
-	playgroundRouter.Use(middleware.UserAuth(), middleware.Distribute())
+	playgroundRouter.Use(middleware.UserAuth())
 	{
-		playgroundRouter.POST("/chat/completions", controller.Playground)
+		// 对话：与历史行为一致（路径保持 /pg，由 GenRelayInfo 改写）
+		playgroundRouter.POST("/chat/completions", middleware.Distribute(), controller.Playground)
+		// 图片 / 视频：先把 /pg 映射到 /v1，以便任务插件认领路径命中；浏览器会话无需 API Token
+		playgroundRouter.POST("/images/generations",
+			middleware.PlaygroundPathAlias(),
+			middleware.ModelRequestRateLimit(),
+			middleware.PinTaskPluginEndpoint(),
+			middleware.PrepareTaskPluginEndpoint(),
+			middleware.Distribute(),
+			controller.PlaygroundImage,
+		)
+		playgroundRouter.POST("/videos",
+			middleware.PlaygroundPathAlias(),
+			middleware.PinTaskPluginEndpoint(),
+			middleware.TaskPluginEndpointOnly(middleware.ModelRequestRateLimit()),
+			middleware.PrepareTaskPluginEndpoint(),
+			middleware.Distribute(),
+			controller.PlaygroundVideo,
+		)
 	}
 	relayV1Router := router.Group("/v1")
 	relayV1Router.Use(middleware.RouteTag("relay"))

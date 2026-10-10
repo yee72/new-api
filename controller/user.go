@@ -231,6 +231,12 @@ func Register(c *gin.Context) {
 	}
 	user.Username = strings.TrimSpace(user.Username)
 	user.Email = model.NormalizeEmail(user.Email)
+	phone, err := model.NormalizeContactPhone(user.Phone)
+	if err != nil {
+		common.ApiErrorI18n(c, i18n.MsgUserPhoneInvalid)
+		return
+	}
+	user.Phone = phone
 	if user.Username == "" {
 		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 		return
@@ -244,7 +250,7 @@ func Register(c *gin.Context) {
 			common.ApiErrorI18n(c, i18n.MsgUserEmailVerificationRequired)
 			return
 		}
-		if !common.VerifyCodeWithKey(user.Email, user.VerificationCode, common.EmailVerificationPurpose) {
+		if !common.ConsumeCodeWithKey(user.Email, user.VerificationCode, common.EmailVerificationPurpose) {
 			common.ApiErrorI18n(c, i18n.MsgUserVerificationCodeError)
 			return
 		}
@@ -256,10 +262,23 @@ func Register(c *gin.Context) {
 			common.ApiErrorI18n(c, i18n.MsgDatabaseError)
 			return
 		}
+	} else if !requireImageCaptcha(c, user.CaptchaId, user.CaptchaCode) {
+		// 未开启邮箱验证时，注册提交必须通过图形验证码
+		return
 	}
 	emailForExistCheck := ""
-	if common.EmailVerificationEnabled {
+	if user.Email != "" {
 		emailForExistCheck = user.Email
+		if !common.EmailVerificationEnabled {
+			if err := model.EnsureEmailAvailable(user.Email, 0); err != nil {
+				if errors.Is(err, model.ErrEmailAlreadyTaken) {
+					common.ApiErrorI18n(c, i18n.MsgUserEmailAlreadyTaken)
+					return
+				}
+				common.ApiErrorI18n(c, i18n.MsgDatabaseError)
+				return
+			}
+		}
 	}
 	exist, err := model.CheckUserExistOrDeleted(user.Username, emailForExistCheck)
 	if err != nil {
@@ -279,8 +298,9 @@ func Register(c *gin.Context) {
 		DisplayName: user.Username,
 		InviterId:   inviterId,
 		Role:        common.RoleCommonUser, // 明确设置角色为普通用户
+		Phone:       user.Phone,            // 选填联系电话，仅记录
 	}
-	if common.EmailVerificationEnabled {
+	if user.Email != "" {
 		cleanUser.Email = user.Email
 	}
 	if err := cleanUser.Insert(inviterId); err != nil {
@@ -500,6 +520,7 @@ func buildSelfUserData(user *model.User) map[string]any {
 		"role":              user.Role,
 		"status":            user.Status,
 		"email":             user.Email,
+		"phone":             user.Phone,
 		"github_id":         user.GitHubId,
 		"discord_id":        user.DiscordId,
 		"oidc_id":           user.OidcId,

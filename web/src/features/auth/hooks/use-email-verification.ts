@@ -31,6 +31,10 @@ import { EMAIL_VERIFICATION_COUNTDOWN } from '../constants'
 interface UseEmailVerificationOptions {
   turnstileToken?: string
   validateTurnstile?: () => boolean
+  captchaId?: string
+  captchaCode?: string
+  validateCaptcha?: () => boolean
+  onCaptchaConsumed?: () => void
 }
 
 /**
@@ -53,6 +57,10 @@ export function useEmailVerification(options?: UseEmailVerificationOptions) {
       return false
     }
 
+    if (options?.validateCaptcha && !options.validateCaptcha()) {
+      return false
+    }
+
     // Validate turnstile if validation function is provided
     if (options?.validateTurnstile && !options.validateTurnstile()) {
       return false
@@ -60,7 +68,13 @@ export function useEmailVerification(options?: UseEmailVerificationOptions) {
 
     setIsSending(true)
     try {
-      const res = await sendEmailVerification(email, options?.turnstileToken)
+      const res = await sendEmailVerification(email, {
+        turnstile: options?.turnstileToken,
+        captchaId: options?.captchaId,
+        captchaCode: options?.captchaCode,
+      })
+      // 图形码无论对错都会在服务端作废，发信后需刷新
+      options?.onCaptchaConsumed?.()
       if (res?.success) {
         startCountdown()
         toast.success(i18next.t('Verification email sent'))
@@ -71,6 +85,7 @@ export function useEmailVerification(options?: UseEmailVerificationOptions) {
       )
       return false
     } catch (_error) {
+      options?.onCaptchaConsumed?.()
       handleServerError(
         AuthOperationError.from(
           _error,

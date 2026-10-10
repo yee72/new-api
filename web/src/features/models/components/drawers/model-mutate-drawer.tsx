@@ -434,6 +434,108 @@ export function ModelMutateDrawer(props: {
                           </FormItem>
                         )}
                       />
+
+                      <FormField
+                        control={form.control}
+                        name='model_type'
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t('Model type')}</FormLabel>
+                            <FormControl>
+                              <RadioGroup
+                                onValueChange={field.onChange}
+                                value={field.value}
+                                className='grid grid-cols-3 gap-3'
+                              >
+                                {(
+                                  [
+                                    ['chat', 'Chat'],
+                                    ['image', 'Image'],
+                                    ['video', 'Video'],
+                                  ] as const
+                                ).map(([value, label]) => (
+                                  <div
+                                    key={value}
+                                    className='flex items-center space-x-2'
+                                  >
+                                    <RadioGroupItem
+                                      value={value}
+                                      id={`model-type-${value}`}
+                                    />
+                                    <Label htmlFor={`model-type-${value}`}>
+                                      {t(label)}
+                                    </Label>
+                                  </div>
+                                ))}
+                              </RadioGroup>
+                            </FormControl>
+                            <FormDescription>
+                              {t(
+                                'Primary type for the model usage landing page.'
+                              )}
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name='manual_usage'
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t('Manual usage boost')}</FormLabel>
+                            <FormControl>
+                              <Input
+                                type='number'
+                                min={0}
+                                step={1}
+                                value={field.value}
+                                onChange={(event) =>
+                                  field.onChange(
+                                    Math.max(
+                                      0,
+                                      Number.parseInt(event.target.value, 10) ||
+                                        0
+                                    )
+                                  )
+                                }
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              {t(
+                                'Added to the last 7 days request count for hot ranking.'
+                              )}
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name='generation_capabilities'
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>
+                              {t('Generation capabilities JSON')}
+                            </FormLabel>
+                            <FormControl>
+                              <Textarea
+                                rows={4}
+                                placeholder='{"counts":[1,2,4],"aspectRatios":["16:9"],"qualities":["auto","720p"],"secondsMin":1,"secondsMax":15}'
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              {t(
+                                'Optional capability matrix for image/video models. Leave empty to use defaults.'
+                              )}
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </SideDrawerSection>
 
                     {/* Matching Configuration */}

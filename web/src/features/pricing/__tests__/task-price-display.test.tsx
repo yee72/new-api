@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { act, render, screen, cleanup, within } from '@testing-library/react'
+import { act, cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import i18next from 'i18next'
 import { afterEach, expect, it, vi } from 'vitest'
@@ -243,9 +243,7 @@ it('updates count unit labels across cards, table cells and breakdowns with loca
   )
   for (const [language, unit] of [
     ['en', 'image'],
-    ['zhTW', '張'],
     ['zhCN', '张'],
-    ['fr', 'image'],
   ]) {
     await act(() => i18next.changeLanguage(language))
     for (const surface of ['card', 'cell', 'breakdown']) {

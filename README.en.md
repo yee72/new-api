@@ -8,10 +8,7 @@
 
 <p align="center">
   <a href="./README.zh_CN.md">简体中文</a> |
-  <a href="./README.zh_TW.md">繁體中文</a> |
-  <strong>English</strong> |
-  <a href="./README.fr.md">Français</a> |
-  <a href="./README.ja.md">日本語</a>
+  <strong>English</strong>
 </p>
 
 <p align="center">
@@ -132,7 +129,7 @@ Use it to share authorized model access across a team, switch providers without 
 | Usage and costs | Manage quotas, subscriptions, usage logs, cache accounting, and expression-based pricing for different usage tiers |
 | Access control | Manage users, groups, fine-grained permissions, and API key restrictions; use OAuth/OIDC, passkeys, two-factor authentication, and login session management |
 | Asynchronous tasks | Extend image, video, and other task APIs with JavaScript plugins, including task status and output retrieval |
-| Web console | Configure channels and models, inspect usage and audit logs, and try models in the playground; available in English, Simplified Chinese, Traditional Chinese, French, Japanese, Russian, and Vietnamese |
+| Web console | Configure channels and models, inspect usage and audit logs, and try models in the playground; available in English and Simplified Chinese |
 
 ### Protocols and endpoints
 

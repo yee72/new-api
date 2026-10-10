@@ -113,7 +113,7 @@ describe('theme preference persistence', () => {
     expect(document.body).not.toHaveAttribute('data-theme-preset')
     expect(document.body).toHaveAttribute('data-theme-font', 'sans')
     expect(document.body).not.toHaveAttribute('data-theme-radius')
-    expect(document.body).not.toHaveAttribute('data-theme-scale')
+    expect(document.body).toHaveAttribute('data-theme-scale', 'lg')
     expect(document.body).toHaveAttribute('data-theme-content-layout', 'full')
   })
 
@@ -159,7 +159,7 @@ describe('theme preference persistence', () => {
     expect(document.body).not.toHaveAttribute('data-theme-preset')
     expect(document.body).toHaveAttribute('data-theme-font', 'sans')
     expect(document.body).not.toHaveAttribute('data-theme-radius')
-    expect(document.body).not.toHaveAttribute('data-theme-scale')
+    expect(document.body).toHaveAttribute('data-theme-scale', 'lg')
     expect(document.body).toHaveAttribute('data-theme-content-layout', 'full')
     for (const key of Object.keys(savedPreferences)) {
       expect(localStorage.getItem(key)).toBeNull()
@@ -181,7 +181,7 @@ describe('theme preference persistence', () => {
       expect(document.body).not.toHaveAttribute('data-theme-preset')
       expect(document.body).toHaveAttribute('data-theme-font', 'sans')
       expect(document.body).not.toHaveAttribute('data-theme-radius')
-      expect(document.body).not.toHaveAttribute('data-theme-scale')
+      expect(document.body).toHaveAttribute('data-theme-scale', 'lg')
       expect(document.body).toHaveAttribute('data-theme-content-layout', 'full')
     }
   )

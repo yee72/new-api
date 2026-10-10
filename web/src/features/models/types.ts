@@ -47,6 +47,9 @@ export interface Model {
   vendor_id?: number
   endpoints?: string
   supported_endpoints?: string[]
+  model_type?: 'chat' | 'image' | 'video'
+  manual_usage?: number
+  generation_capabilities?: string
   status: number
   sync_official: number
   created_time: number
@@ -273,6 +276,9 @@ export const modelFormSchema = z.object({
   tags: z.array(z.string()).default([]),
   vendor_id: z.number().optional(),
   endpoints: z.string().default(''),
+  model_type: z.enum(['chat', 'image', 'video']).default('chat'),
+  manual_usage: z.number().int().min(0).default(0),
+  generation_capabilities: z.string().default(''),
   name_rule: z.number().min(0).max(3).default(0),
   status: z.boolean().default(true),
   sync_official: z.boolean().default(true),
