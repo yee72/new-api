@@ -64,6 +64,11 @@ export function usePricingData(enabled = true) {
     })
   }, [data])
 
+  const pricingGroupFilterEnabled =
+    status?.pricing_group_filter_enabled !== false
+  const pricingEndpointFilterEnabled =
+    status?.pricing_endpoint_filter_enabled !== false
+
   return {
     models,
     vendors: data?.vendors ?? [],
@@ -76,5 +81,7 @@ export function usePricingData(enabled = true) {
     refetch,
     priceRate,
     usdExchangeRate,
+    pricingGroupFilterEnabled,
+    pricingEndpointFilterEnabled,
   }
 }

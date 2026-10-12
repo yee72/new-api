@@ -78,6 +78,8 @@ export interface PricingToolbarProps {
   hasActiveFilters: boolean
   activeFilterCount: number
   onClearFilters: () => void
+  showGroupFilter?: boolean
+  showEndpointFilter?: boolean
 }
 
 export function PricingToolbar(props: PricingToolbarProps) {
@@ -221,6 +223,8 @@ export function PricingToolbar(props: PricingToolbarProps) {
               models={props.models}
               hasActiveFilters={props.hasActiveFilters}
               onClearFilters={props.onClearFilters}
+              showGroupFilter={props.showGroupFilter}
+              showEndpointFilter={props.showEndpointFilter}
               className='border-0 bg-transparent p-0 shadow-none'
             />
           </div>

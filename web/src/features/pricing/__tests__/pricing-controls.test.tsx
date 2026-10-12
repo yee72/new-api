@@ -223,4 +223,43 @@ describe('pricing controls', () => {
     await user.keyboard('{Escape}')
     expect(await screen.findByRole('button', { name: /Filter/ })).toHaveFocus()
   })
+
+  it('hides the groups filter when disabled by admin and clears an active group', () => {
+    const props = toolbarProps()
+    const { rerender } = render(
+      <PricingSidebar {...props} groupFilter='premium' showGroupFilter />
+    )
+    expect(screen.getByRole('button', { name: /premium/ })).toBeVisible()
+    rerender(
+      <PricingSidebar
+        {...props}
+        groupFilter='premium'
+        showGroupFilter={false}
+      />
+    )
+    expect(props.onGroupChange).toHaveBeenCalledWith('all')
+    expect(screen.queryByText('Groups')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /premium/ })).toBeNull()
+  })
+
+  it('hides the endpoint type filter when disabled by admin and clears an active type', () => {
+    const props = toolbarProps()
+    const { rerender } = render(
+      <PricingSidebar
+        {...props}
+        endpointTypeFilter='openai'
+        showEndpointFilter
+      />
+    )
+    expect(screen.getByText('Endpoint Type')).toBeVisible()
+    rerender(
+      <PricingSidebar
+        {...props}
+        endpointTypeFilter='openai'
+        showEndpointFilter={false}
+      />
+    )
+    expect(props.onEndpointTypeChange).toHaveBeenCalledWith('all')
+    expect(screen.queryByText('Endpoint Type')).not.toBeInTheDocument()
+  })
 })

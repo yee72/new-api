@@ -52,6 +52,8 @@ export function Pricing() {
     isLoading,
     priceRate,
     usdExchangeRate,
+    pricingGroupFilterEnabled,
+    pricingEndpointFilterEnabled,
   } = usePricingData()
 
   const {
@@ -163,18 +165,7 @@ export function Pricing() {
       <div className='relative'>
         <div
           aria-hidden
-          className='pointer-events-none absolute inset-x-0 top-0 h-[600px] opacity-20 dark:opacity-[0.10]'
-          style={{
-            background: [
-              'radial-gradient(ellipse 60% 50% at 20% 20%, oklch(0.72 0.18 250 / 80%) 0%, transparent 70%)',
-              'radial-gradient(ellipse 50% 40% at 80% 15%, oklch(0.65 0.15 200 / 60%) 0%, transparent 70%)',
-              'radial-gradient(ellipse 40% 35% at 50% 70%, oklch(0.70 0.12 280 / 40%) 0%, transparent 70%)',
-            ].join(', '),
-            maskImage:
-              'linear-gradient(to bottom, black 40%, transparent 100%)',
-            WebkitMaskImage:
-              'linear-gradient(to bottom, black 40%, transparent 100%)',
-          }}
+          className='landing-aurora pointer-events-none absolute inset-x-0 top-0 h-[600px] opacity-20 [mask-image:linear-gradient(to_bottom,black_40%,transparent_100%)] dark:opacity-[0.10]'
         />
         <PageTransition className='relative mx-auto w-full max-w-[1800px] px-3 pt-16 pb-8 sm:px-6 sm:pt-20 sm:pb-10 xl:px-8'>
           {/* 去掉大标题与说明，搜索直接置顶以节省首屏空间 */}
@@ -209,6 +200,8 @@ export function Pricing() {
               models={models || []}
               hasActiveFilters={hasActiveFilters}
               onClearFilters={clearFilters}
+              showGroupFilter={pricingGroupFilterEnabled}
+              showEndpointFilter={pricingEndpointFilterEnabled}
               className='hover-scrollbar sticky top-20 hidden max-h-[calc(100dvh-6rem)] self-start overflow-y-auto xl:block'
             />
 
@@ -242,6 +235,8 @@ export function Pricing() {
                 hasActiveFilters={hasActiveFilters}
                 activeFilterCount={activeFilterCount}
                 onClearFilters={clearFilters}
+                showGroupFilter={pricingGroupFilterEnabled}
+                showEndpointFilter={pricingEndpointFilterEnabled}
               />
 
               {renderPricingContent()}

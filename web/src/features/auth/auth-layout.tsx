@@ -31,7 +31,12 @@ export function AuthLayout({ children }: AuthLayoutProps) {
   const { systemName, logo, loading } = useSystemConfig()
 
   return (
-    <div className='relative grid h-svh max-w-none'>
+    <div className='bg-background relative grid h-svh max-w-none'>
+      {/* 登录/注册壳层光晕，跟随主题 token */}
+      <div
+        aria-hidden
+        className='landing-aurora pointer-events-none absolute inset-0 opacity-20 dark:opacity-[0.08]'
+      />
       <Link
         to='/'
         className='absolute top-4 left-4 z-10 flex items-center gap-2 transition-opacity hover:opacity-80 sm:top-8 sm:left-8'

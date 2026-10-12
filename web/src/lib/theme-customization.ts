@@ -25,9 +25,10 @@ For commercial licensing, please contact support@quantumnous.com
 
 export const THEME_PRESETS = [
   {
+    // 默认即暖色 editorial（奶油画布 + clay）；与 theme.css :root 一致
     value: 'default',
     name: 'Default',
-    swatches: ['oklch(0.72 0.18 250)', 'oklch(0.7 0.12 280)'],
+    swatches: ['oklch(0.984 0.004 95)', 'oklch(0.685 0.142 38)'],
   },
   {
     // Inspired by Anthropic's official brand language: warm cream canvas
@@ -160,15 +161,15 @@ export const CONTENT_LAYOUT_VALUES: ReadonlySet<ContentLayout> = new Set([
  *
  * Co-located with the preset registry so a preset's signature typography
  * is declared in one place. Presets not listed here fall back to the
- * `resolveThemeFont` default of `sans`. The shipped `default` preset
- * opts into serif so the editorial Lora voice is the out-of-the-box
- * experience; vivid color presets stay on the humanist sans so their
- * accents read clearly without competing with the body type.
+ * `resolveThemeFont` default of `sans`. The shipped `default` and
+ * `anthropic` presets opt into serif so the editorial Lora voice is the
+ * out-of-the-box experience; vivid color presets stay on the humanist
+ * sans so their accents read clearly without competing with the body type.
  */
 export const PRESET_DEFAULT_FONT: Partial<
   Record<ThemePreset, ResolvedThemeFont>
 > = {
-  default: 'sans',
+  default: 'serif',
   anthropic: 'serif',
 }
 

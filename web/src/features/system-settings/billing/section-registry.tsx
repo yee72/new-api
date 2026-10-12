@@ -97,6 +97,12 @@ const BILLING_SECTIONS = [
               settings['general_setting.custom_currency_symbol'] ?? '¤',
             custom_currency_exchange_rate:
               settings['general_setting.custom_currency_exchange_rate'] ?? 1,
+            pricing_group_filter_enabled:
+              settings['general_setting.pricing_group_filter_enabled'] !==
+              false,
+            pricing_endpoint_filter_enabled:
+              settings['general_setting.pricing_endpoint_filter_enabled'] !==
+              false,
           },
         }}
       />

@@ -71,6 +71,8 @@ const createPricingSchema = (t: (key: string) => string) =>
           .number()
           .min(0.0001, t('Exchange rate must be greater than 0'))
           .optional(),
+        pricing_group_filter_enabled: z.boolean(),
+        pricing_endpoint_filter_enabled: z.boolean(),
       }),
     })
     .superRefine((data, ctx) => {
@@ -357,6 +359,52 @@ export function PricingSection({ defaultValues }: PricingSectionProps) {
                     <FormLabel>{t('Display Token Statistics')}</FormLabel>
                     <FormDescription>
                       {t('Show token usage statistics in the UI')}
+                    </FormDescription>
+                  </SettingsSwitchContent>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </SettingsSwitchItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name='general_setting.pricing_group_filter_enabled'
+              render={({ field }) => (
+                <SettingsSwitchItem>
+                  <SettingsSwitchContent>
+                    <FormLabel>{t('Show group filter')}</FormLabel>
+                    <FormDescription>
+                      {t(
+                        'Allow users to filter models by group on the model plaza'
+                      )}
+                    </FormDescription>
+                  </SettingsSwitchContent>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </SettingsSwitchItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name='general_setting.pricing_endpoint_filter_enabled'
+              render={({ field }) => (
+                <SettingsSwitchItem>
+                  <SettingsSwitchContent>
+                    <FormLabel>{t('Show endpoint type filter')}</FormLabel>
+                    <FormDescription>
+                      {t(
+                        'Allow users to filter models by endpoint type on the model plaza'
+                      )}
                     </FormDescription>
                   </SettingsSwitchContent>
                   <FormControl>

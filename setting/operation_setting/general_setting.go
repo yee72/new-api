@@ -20,16 +20,22 @@ type GeneralSetting struct {
 	CustomCurrencySymbol string `json:"custom_currency_symbol"`
 	// 自定义货币与美元汇率（1 USD = X Custom）
 	CustomCurrencyExchangeRate float64 `json:"custom_currency_exchange_rate"`
+	// 是否在模型广场向用户展示分组筛选
+	PricingGroupFilterEnabled bool `json:"pricing_group_filter_enabled"`
+	// 是否在模型广场向用户展示端点类型筛选
+	PricingEndpointFilterEnabled bool `json:"pricing_endpoint_filter_enabled"`
 }
 
 // 默认配置
 var generalSetting = GeneralSetting{
-	DocsLink:                   "https://docs.newapi.pro",
-	PingIntervalEnabled:        false,
-	PingIntervalSeconds:        60,
-	QuotaDisplayType:           QuotaDisplayTypeUSD,
-	CustomCurrencySymbol:       "¤",
-	CustomCurrencyExchangeRate: 1.0,
+	DocsLink:                     "https://docs.newapi.pro",
+	PingIntervalEnabled:          false,
+	PingIntervalSeconds:          60,
+	QuotaDisplayType:             QuotaDisplayTypeUSD,
+	CustomCurrencySymbol:         "¤",
+	CustomCurrencyExchangeRate:   1.0,
+	PricingGroupFilterEnabled:    true,
+	PricingEndpointFilterEnabled: true,
 }
 
 func init() {

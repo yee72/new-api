@@ -51,22 +51,19 @@ const ACCENT_CLASSES: Record<
       'bg-emerald-500/10 text-emerald-600 dark:bg-emerald-400/10 dark:text-emerald-400',
   },
   amber: {
-    activeText: 'text-amber-600 dark:text-amber-400',
-    activeBorder: 'border-amber-500 dark:border-amber-400',
-    badge:
-      'bg-amber-500/10 text-amber-600 dark:bg-amber-400/10 dark:text-amber-400',
+    activeText: 'text-warning',
+    activeBorder: 'border-warning',
+    badge: 'bg-warning/10 text-warning',
   },
   blue: {
-    activeText: 'text-blue-600 dark:text-blue-400',
-    activeBorder: 'border-blue-500 dark:border-blue-400',
-    badge:
-      'bg-blue-500/10 text-blue-600 dark:bg-blue-400/10 dark:text-blue-400',
+    activeText: 'text-primary',
+    activeBorder: 'border-primary',
+    badge: 'bg-primary/10 text-primary',
   },
   violet: {
-    activeText: 'text-violet-600 dark:text-violet-400',
-    activeBorder: 'border-violet-500 dark:border-violet-400',
-    badge:
-      'bg-violet-500/10 text-violet-600 dark:bg-violet-400/10 dark:text-violet-400',
+    activeText: 'text-chart-3',
+    activeBorder: 'border-chart-3',
+    badge: 'bg-chart-3/10 text-chart-3',
   },
 }
 
@@ -211,8 +208,8 @@ export function HeroTerminalDemo(props: HeroTerminalDemoProps) {
       <div
         className={cn(
           'overflow-hidden rounded-2xl border backdrop-blur-sm',
-          'border-border/60 bg-white/95 shadow-[0_20px_50px_-25px_rgba(15,23,42,0.18)]',
-          'dark:border-white/[0.06] dark:bg-[#0b0f17]/95 dark:shadow-[0_20px_60px_-25px_rgba(0,0,0,0.7)]'
+          'border-border/60 bg-card/95 shadow-[0_20px_50px_-25px_color-mix(in_oklch,var(--foreground)_18%,transparent)]',
+          'dark:border-border/60 dark:bg-card/95 dark:shadow-[0_20px_60px_-25px_rgba(0,0,0,0.7)]'
         )}
       >
         {/* Tab strip */}
@@ -511,15 +508,11 @@ function Command(props: { children: ReactNode }) {
 }
 
 function Flag(props: { children: ReactNode }) {
-  return (
-    <span className='text-blue-600 dark:text-blue-400'>{props.children}</span>
-  )
+  return <span className='text-primary'>{props.children}</span>
 }
 
 function Key(props: { children: ReactNode }) {
-  return (
-    <span className='text-sky-700 dark:text-sky-300'>{props.children}</span>
-  )
+  return <span className='text-chart-3'>{props.children}</span>
 }
 
 function StringText(props: { children: ReactNode }) {
@@ -530,9 +523,7 @@ function StringText(props: { children: ReactNode }) {
 
 function NumberText(props: { children: ReactNode }) {
   return (
-    <span className='font-medium text-violet-600 dark:text-violet-300'>
-      {props.children}
-    </span>
+    <span className='text-chart-4 font-medium'>{props.children}</span>
   )
 }
 

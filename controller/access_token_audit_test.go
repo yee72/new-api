@@ -332,6 +332,34 @@ func TestAuditRoleSnapshotSurvivesActorChanges(t *testing.T) {
 	}
 }
 
+func TestRecordLoginAuditOnlyForAdministrators(t *testing.T) {
+	admin, _ := setupAccessTokenAudit(t)
+	commonUser := &model.User{
+		Username: "login-audit-user", Password: "placeholder",
+		Role: common.RoleCommonUser, Status: common.UserStatusEnabled, Group: "default", AffCode: "login-user",
+	}
+	require.NoError(t, model.DB.Create(commonUser).Error)
+
+	userCtx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	userCtx.Request = httptest.NewRequest(http.MethodPost, "/api/user/login", nil)
+	userCtx.Request.RemoteAddr = "192.0.2.10:1234"
+	recordLoginAudit(commonUser, userCtx)
+
+	adminCtx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	adminCtx.Request = httptest.NewRequest(http.MethodPost, "/api/user/login", nil)
+	adminCtx.Request.RemoteAddr = "192.0.2.11:1234"
+	adminCtx.Set(common.RequestIdKey, "admin-login-audit")
+	recordLoginAudit(admin, adminCtx)
+
+	var audits []model.AuditLog
+	require.NoError(t, model.LOG_DB.Find(&audits).Error)
+	require.Len(t, audits, 1)
+	assert.Equal(t, admin.Id, audits[0].UserId)
+	assert.Equal(t, common.RoleAdminUser, audits[0].ActorRole)
+	assert.Equal(t, model.AuditCategoryLogin, audits[0].Category)
+	assert.Equal(t, "login", audits[0].Action)
+}
+
 func TestSecurityAndOperationEventsUseAuditTable(t *testing.T) {
 	user, _ := setupAccessTokenAudit(t)
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())

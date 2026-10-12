@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { ChevronDown, RotateCcw } from 'lucide-react'
-import { memo, useMemo, type ReactNode } from 'react'
+import { memo, useEffect, useMemo, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Badge } from '@/components/ui/badge'
@@ -74,6 +74,10 @@ export interface PricingSidebarProps {
   models: PricingModel[]
   hasActiveFilters: boolean
   onClearFilters: () => void
+  /** 由管理员后台控制是否向用户展示分组筛选 */
+  showGroupFilter?: boolean
+  /** 由管理员后台控制是否向用户展示端点类型筛选 */
+  showEndpointFilter?: boolean
   className?: string
 }
 
@@ -152,6 +156,22 @@ export const PricingSidebar = memo(function PricingSidebar(
   props: PricingSidebarProps
 ) {
   const { t } = useTranslation()
+  const showGroupFilter = props.showGroupFilter !== false
+  const showEndpointFilter = props.showEndpointFilter !== false
+
+  // 管理员关闭筛选区块时清掉对应条件，避免 URL 残留仍生效
+  useEffect(() => {
+    if (!showGroupFilter && props.groupFilter !== FILTER_ALL) {
+      props.onGroupChange(FILTER_ALL)
+    }
+  }, [showGroupFilter, props.groupFilter, props.onGroupChange])
+
+  useEffect(() => {
+    if (!showEndpointFilter && props.endpointTypeFilter !== ENDPOINT_TYPES.ALL) {
+      props.onEndpointTypeChange(ENDPOINT_TYPES.ALL)
+    }
+  }, [showEndpointFilter, props.endpointTypeFilter, props.onEndpointTypeChange])
+
   const counts = useMemo(() => {
     const vendors = new Map<string, number>()
     const tags = new Map<string, number>()
@@ -293,12 +313,14 @@ export const PricingSidebar = memo(function PricingSidebar(
       )}
 
       <div className='space-y-1'>
-        <FilterSection
-          title={t('Groups')}
-          value={props.groupFilter}
-          options={groupOptions}
-          onChange={props.onGroupChange}
-        />
+        {showGroupFilter && (
+          <FilterSection
+            title={t('Groups')}
+            value={props.groupFilter}
+            options={groupOptions}
+            onChange={props.onGroupChange}
+          />
+        )}
         <FilterSection
           title={t('All Vendors')}
           value={props.vendorFilter}
@@ -317,12 +339,14 @@ export const PricingSidebar = memo(function PricingSidebar(
           options={quotaOptions}
           onChange={props.onQuotaTypeChange}
         />
-        <FilterSection
-          title={t('Endpoint Type')}
-          value={props.endpointTypeFilter}
-          options={endpointOptions}
-          onChange={props.onEndpointTypeChange}
-        />
+        {showEndpointFilter && (
+          <FilterSection
+            title={t('Endpoint Type')}
+            value={props.endpointTypeFilter}
+            options={endpointOptions}
+            onChange={props.onEndpointTypeChange}
+          />
+        )}
       </div>
     </aside>
   )

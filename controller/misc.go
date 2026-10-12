@@ -75,25 +75,27 @@ func GetStatus(c *gin.Context) {
 		"docs_link":                   operation_setting.GetGeneralSetting().DocsLink,
 		"quota_per_unit":              common.QuotaPerUnit,
 		// 兼容旧前端：保留 display_in_currency，同时提供新的 quota_display_type
-		"display_in_currency":           operation_setting.IsCurrencyDisplay(),
-		"quota_display_type":            operation_setting.GetQuotaDisplayType(),
-		"custom_currency_symbol":        operation_setting.GetGeneralSetting().CustomCurrencySymbol,
-		"custom_currency_exchange_rate": operation_setting.GetGeneralSetting().CustomCurrencyExchangeRate,
-		"enable_batch_update":           common.BatchUpdateEnabled,
-		"enable_drawing":                common.DrawingEnabled,
-		"enable_task":                   common.TaskEnabled,
-		"enable_data_export":            common.DataExportEnabled,
-		"data_export_default_time":      common.DataExportDefaultTime,
-		"default_collapse_sidebar":      common.DefaultCollapseSidebar,
-		"mj_notify_enabled":             setting.MjNotifyEnabled,
-		"chats":                         setting.Chats,
-		"demo_site_enabled":             operation_setting.DemoSiteEnabled,
-		"self_use_mode_enabled":         operation_setting.SelfUseModeEnabled,
-		"register_enabled":              common.RegisterEnabled,
-		"password_login_enabled":        common.PasswordLoginEnabled,
-		"password_register_enabled":     common.PasswordRegisterEnabled,
-		"image_captcha_enabled":         true,
-		"default_use_auto_group":        setting.DefaultUseAutoGroup,
+		"display_in_currency":             operation_setting.IsCurrencyDisplay(),
+		"quota_display_type":              operation_setting.GetQuotaDisplayType(),
+		"custom_currency_symbol":          operation_setting.GetGeneralSetting().CustomCurrencySymbol,
+		"custom_currency_exchange_rate":   operation_setting.GetGeneralSetting().CustomCurrencyExchangeRate,
+		"pricing_group_filter_enabled":    operation_setting.GetGeneralSetting().PricingGroupFilterEnabled,
+		"pricing_endpoint_filter_enabled": operation_setting.GetGeneralSetting().PricingEndpointFilterEnabled,
+		"enable_batch_update":             common.BatchUpdateEnabled,
+		"enable_drawing":                  common.DrawingEnabled,
+		"enable_task":                     common.TaskEnabled,
+		"enable_data_export":              common.DataExportEnabled,
+		"data_export_default_time":        common.DataExportDefaultTime,
+		"default_collapse_sidebar":        common.DefaultCollapseSidebar,
+		"mj_notify_enabled":               setting.MjNotifyEnabled,
+		"chats":                           setting.Chats,
+		"demo_site_enabled":               operation_setting.DemoSiteEnabled,
+		"self_use_mode_enabled":           operation_setting.SelfUseModeEnabled,
+		"register_enabled":                common.RegisterEnabled,
+		"password_login_enabled":          common.PasswordLoginEnabled,
+		"password_register_enabled":       common.PasswordRegisterEnabled,
+		"image_captcha_enabled":           true,
+		"default_use_auto_group":          setting.DefaultUseAutoGroup,
 
 		"password_login_encryption_enabled": common.PasswordLoginEncryptionEnabled,
 
@@ -216,13 +218,14 @@ func GetHomePageContent(c *gin.Context) {
 }
 
 func SendEmailVerification(c *gin.Context) {
+	// OWASP ASVS V2.2 / Authentication Cheat Sheet：先消耗图形验证码，再做邮箱校验与占用探测，
+	// 避免未解题即可反复撞格式校验或触发后续处理。
+	if !requireImageCaptcha(c, c.Query("captcha_id"), c.Query("captcha_code")) {
+		return
+	}
 	email, err := service.ValidateAccountEmail(c.Query("email"))
 	if err != nil {
 		writeSecurityOperationError(c, err)
-		return
-	}
-	// 发邮箱验证码前必须先通过图形验证码
-	if !requireImageCaptcha(c, c.Query("captcha_id"), c.Query("captcha_code")) {
 		return
 	}
 
@@ -294,10 +297,11 @@ func ResetPassword(c *gin.Context) {
 		return
 	}
 	req.Email = model.NormalizeEmail(req.Email)
-	if req.Email == "" || req.Token == "" {
+	if req.Email == "" || req.Token == "" || req.Password == "" {
 		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 		return
 	}
+	// OWASP ASVS V2.1.1：新密码须满足长度策略；空串在此已拦截，策略函数再校验 8–128 字符
 	if err := common.ValidateNewAccountPassword(req.Password); err != nil {
 		common.ApiErrorI18n(c, i18n.MsgUserInputInvalid, map[string]any{"Error": err.Error()})
 		return

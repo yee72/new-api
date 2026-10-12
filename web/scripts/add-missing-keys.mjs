@@ -9,18 +9,14 @@ function stableStringify(obj) {
 
 const newKeys = {
   en: {
-    Captcha: 'Captcha',
-    'Enter captcha': 'Enter captcha',
-    'Failed to load captcha': 'Failed to load captcha',
-    'Please enter the captcha': 'Please enter the captcha',
-    'Refresh captcha': 'Refresh captcha',
+    'Show endpoint type filter': 'Show endpoint type filter',
+    'Allow users to filter models by endpoint type on the model plaza':
+      'Allow users to filter models by endpoint type on the model plaza',
   },
   zh: {
-    Captcha: '图形验证码',
-    'Enter captcha': '请输入图形验证码',
-    'Failed to load captcha': '加载图形验证码失败',
-    'Please enter the captcha': '请输入图形验证码',
-    'Refresh captcha': '刷新图形验证码',
+    'Show endpoint type filter': '显示端点类型筛选',
+    'Allow users to filter models by endpoint type on the model plaza':
+      '允许用户在模型广场按端点类型筛选模型',
   },
 }
 

@@ -644,6 +644,40 @@ For commercial licensing, please contact support@quantumnous.com
   contain-intrinsic-size: 0 80px;
 }
 
+/* ── 营销页光晕：跟随时主题 primary / chart，避免硬编码蓝紫 ── */
+.landing-aurora {
+  background:
+    radial-gradient(
+      ellipse 60% 50% at 20% 20%,
+      color-mix(in oklch, var(--primary) 80%, transparent) 0%,
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 50% 40% at 80% 15%,
+      color-mix(in oklch, var(--chart-2) 60%, transparent) 0%,
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 40% 35% at 50% 70%,
+      color-mix(in oklch, var(--chart-3) 40%, transparent) 0%,
+      transparent 70%
+    );
+}
+
+.landing-aurora-cta {
+  background:
+    radial-gradient(
+      ellipse 50% 50% at 30% 50%,
+      color-mix(in oklch, var(--primary) 70%, transparent) 0%,
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 40% 40% at 70% 40%,
+      color-mix(in oklch, var(--chart-2) 50%, transparent) 0%,
+      transparent 70%
+    );
+}
+
 /* ── Hero terminal demo animations ── */
 @keyframes terminal-demo-blink {
   0%,

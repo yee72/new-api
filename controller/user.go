@@ -125,8 +125,13 @@ func loginMethodFromContext(c *gin.Context) string {
 	}
 }
 
-// recordLoginAudit 记录登录成功审计日志（对所有用户启用，仅记录成功，不记录失败）。
+// recordLoginAudit 仅记录管理员/根用户的登录成功审计（普通用户登录不写审计表）。
+// OWASP ASVS V7.1 / Logging Cheat Sheet：高权限账户的认证成功事件仍须留痕，便于追查；
+// 普通用户登录成功按产品要求不落审计，失败路径本函数本就不记录。
 func recordLoginAudit(user *model.User, c *gin.Context) {
+	if user == nil || user.Role < common.RoleAdminUser {
+		return
+	}
 	method := loginMethodFromContext(c)
 	ip := c.ClientIP()
 	extra := model.AuditOther{

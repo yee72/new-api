@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
@@ -151,6 +152,50 @@ func TestSendEmailVerificationRequiresCaptcha(t *testing.T) {
 	assert.False(t, response.Success)
 }
 
+func TestSendEmailVerificationChecksCaptchaBeforeEmailValidation(t *testing.T) {
+	setupRegisterResetTest(t)
+
+	// 非法邮箱且无验证码：必须先因验证码失败，不能暴露邮箱格式错误
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/verification?email=not-an-email", nil)
+	SendEmailVerification(c)
+
+	var denied struct {
+		Success bool   `json:"success"`
+		Message string `json:"message"`
+	}
+	require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &denied))
+	assert.False(t, denied.Success)
+	assert.True(t,
+		strings.Contains(strings.ToLower(denied.Message), "captcha") ||
+			strings.Contains(denied.Message, "图形验证码"),
+		"expected captcha failure message, got %q", denied.Message,
+	)
+
+	common.SeedCaptchaForTest("cap-email-order", "EF56")
+	okRecorder := httptest.NewRecorder()
+	okCtx, _ := gin.CreateTestContext(okRecorder)
+	okCtx.Request = httptest.NewRequest(
+		http.MethodGet,
+		"/api/verification?email=not-an-email&captcha_id=cap-email-order&captcha_code=EF56",
+		nil,
+	)
+	SendEmailVerification(okCtx)
+
+	var afterCaptcha struct {
+		Success bool   `json:"success"`
+		Message string `json:"message"`
+	}
+	require.NoError(t, common.Unmarshal(okRecorder.Body.Bytes(), &afterCaptcha))
+	assert.False(t, afterCaptcha.Success)
+	assert.False(t,
+		strings.Contains(strings.ToLower(afterCaptcha.Message), "captcha") ||
+			strings.Contains(afterCaptcha.Message, "图形验证码"),
+		"after captcha, expected email validation error, got %q", afterCaptcha.Message,
+	)
+}
+
 func TestSendEmailVerificationHidesExistingAccounts(t *testing.T) {
 	setupRegisterResetTest(t)
 	user := &model.User{
@@ -203,6 +248,34 @@ func TestRegisterWithoutEmailVerificationRequiresCaptcha(t *testing.T) {
 	}
 	require.NoError(t, common.Unmarshal(ok.Body.Bytes(), &okBody))
 	assert.True(t, okBody.Success)
+}
+
+func TestResetPasswordRejectsEmptyPassword(t *testing.T) {
+	setupRegisterResetTest(t)
+	user := &model.User{
+		Username: "empty-pass-user", Password: "OldPassword123", Email: "empty-pass@example.com",
+		Role: common.RoleCommonUser, Status: common.UserStatusEnabled, Group: "default",
+	}
+	require.NoError(t, user.Insert(0))
+	token := "empty-pass-token"
+	common.RegisterVerificationCodeWithKey("empty-pass@example.com", token, common.PasswordResetPurpose)
+
+	recorder := postJSON(t, ResetPassword, "/api/user/reset", `{
+		"email":"empty-pass@example.com",
+		"token":"empty-pass-token",
+		"password":""
+	}`)
+	var response struct {
+		Success bool `json:"success"`
+	}
+	require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &response))
+	assert.False(t, response.Success)
+	// 空密码不得消耗重置令牌
+	assert.True(t, common.VerifyCodeWithKey("empty-pass@example.com", token, common.PasswordResetPurpose))
+
+	stored, err := model.GetUserById(user.Id, true)
+	require.NoError(t, err)
+	assert.True(t, common.ValidatePasswordAndHash("OldPassword123", stored.Password))
 }
 
 func TestResetPasswordUsesCallerChosenPasswordOnce(t *testing.T) {
