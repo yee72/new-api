@@ -211,8 +211,8 @@ export function useModelSessions() {
       const mediaType = mediaTypeOf(model)
 
       const invokeProtocolEarly = resolveInvokeProtocol(model)
-      // Images API 才校验 size/quality；chat 协议生图只用提示词
-      if (model.model_type === 'image' && invokeProtocolEarly === 'images') {
+      // 模型类型为图片即按能力矩阵校验（含 chat 协议生图）
+      if (model.model_type === 'image') {
         const errorKey = validateImageConfig(
           imageConfig,
           model.generation_capabilities
@@ -310,32 +310,46 @@ export function useModelSessions() {
 
       try {
         if (invokeProtocol === 'chat') {
-          const response = await sendChatCompletion({
-            model: modelName,
-            messages: [
-              ...chatHistory,
-              { role: 'user' as const, content: prompt },
-            ],
-            stream: false,
-          })
-          const rawContent = response.choices?.[0]?.message?.content
-          const contentText =
-            typeof rawContent === 'string'
-              ? rawContent
-              : rawContent == null
-                ? ''
-                : String(rawContent)
-          const chatImages =
+          // chat 协议生图：按配置张数多次请求；比例/质量写入当次调用提示（不改用户气泡原文）
+          const chatImage =
             model.model_type === 'image'
-              ? extractImagesFromChatContent(contentText)
-              : []
+          const requestCount = chatImage
+            ? Math.max(1, imageConfig.n || 1)
+            : 1
+          const requestPrompt = chatImage
+            ? `${prompt}\n\n[image settings: aspect_ratio=${imageConfig.aspectRatio}, quality=${imageConfig.quality}]`
+            : prompt
+
+          const chatImages: string[] = []
+          let contentText = ''
+          for (let i = 0; i < requestCount; i += 1) {
+            const response = await sendChatCompletion({
+              model: modelName,
+              messages: [
+                ...chatHistory,
+                { role: 'user' as const, content: requestPrompt },
+              ],
+              stream: false,
+            })
+            const rawContent = response.choices?.[0]?.message?.content
+            contentText =
+              typeof rawContent === 'string'
+                ? rawContent
+                : rawContent == null
+                  ? ''
+                  : String(rawContent)
+            if (chatImage) {
+              for (const src of extractImagesFromChatContent(contentText)) {
+                if (!chatImages.includes(src)) chatImages.push(src)
+              }
+            }
+          }
+
           // 网关已把 data: 换成短链；本地不再保留大段 base64 文本
           const displayContent =
-            model.model_type === 'image' && chatImages.length > 0
-              ? ''
-              : contentText
+            chatImage && chatImages.length > 0 ? '' : contentText
 
-          if (model.model_type === 'image') {
+          if (chatImage) {
             if (!userId) {
               failAssistant(t('Please sign in to save generated works'))
               return

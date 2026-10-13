@@ -63,7 +63,6 @@ import {
   resolveImageCapabilities,
   resolveVideoCapabilities,
 } from '../lib/capabilities'
-import { resolveInvokeProtocol } from '../lib/invoke-protocol'
 import type {
   ImageGenerationConfig,
   LocalAttachment,
@@ -156,10 +155,6 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
   attachmentsRef.current = attachments
 
   const model = props.model
-  const invokeProtocol = useMemo(
-    () => (model ? resolveInvokeProtocol(model) : 'chat'),
-    [model]
-  )
   const imageCaps = useMemo(
     () => resolveImageCapabilities(model?.generation_capabilities),
     [model?.generation_capabilities]
@@ -475,8 +470,8 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
             </div>
           </div>
 
-          {/* Images API 才展示张数/比例/质量；chat 协议生图仅用提示词 */}
-          {model.model_type === 'image' && invokeProtocol === 'images' && (
+          {/* 模型类型为图片即展示（含 chat 协议生图，如 Gemini image） */}
+          {model.model_type === 'image' && (
             <div className='mt-2 flex flex-wrap gap-1.5'>
               <SettingPill
                 label={t('Image count')}
