@@ -97,6 +97,21 @@ func TryUserAuth() func(c *gin.Context) {
 	}
 }
 
+// SoftUserAuth 尽力解析仪表盘凭证，失败也不中断请求。
+// 用于 <img>/<video> 同源媒体：可带 Bearer，也可仅靠 access 查询参数放行。
+func SoftUserAuth() func(c *gin.Context) {
+	return func(c *gin.Context) {
+		if _, started := c.Get(accessTokenAuditContextKey); !started {
+			defer finishAccessTokenAudit(c)
+		}
+		user, identity, credentialKind, err := classifyDashboardCredential(c)
+		if err == nil && credentialKind != dashboardCredentialUnmatched {
+			setDashboardAuthContext(c, user, identity, credentialKind == dashboardCredentialPAT)
+		}
+		c.Next()
+	}
+}
+
 func UserAuth() func(c *gin.Context) {
 	return func(c *gin.Context) {
 		authHelper(c, common.RoleCommonUser)

@@ -2433,6 +2433,7 @@
     "Failed to load users": "Không thể tải người dùng",
     "Failed to load vendor": "Không thể tải nhà cung cấp",
     "Failed to load vendors": "Không thể tải nhà cung cấp",
+    "Failed to load video": "Failed to load video",
     "Failed to load vLLM status": "Không thể tải trạng thái vLLM",
     "Failed to parse group items": "Thất bại khi phân tích các mục nhóm",
     "Failed to parse JSON file: {{name}}": "Không thể phân tích cú pháp tệp JSON: {{name}}",

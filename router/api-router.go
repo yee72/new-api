@@ -49,8 +49,8 @@ func SetApiRouter(router *gin.Engine) {
 			modelUsageSessionRoute.PUT("/sessions/:model", middleware.UserAuth(), controller.PutModelUsageSession)
 			modelUsageSessionRoute.POST("/sessions/:model/turns", middleware.UserAuth(), controller.PostModelUsageTurn)
 			modelUsageSessionRoute.POST("/sessions/:model/turns/:turnId/refresh-video", middleware.UserAuth(), controller.PostModelUsageRefreshVideo)
-			// 媒体靠 HMAC access 查询参数，便于 <img>/<video> 同源加载
-			modelUsageSessionRoute.GET("/media/*objectKey", middleware.TryUserAuth(), controller.GetModelUsageMedia)
+			// 媒体：access HMAC 或本人 Bearer；SoftUserAuth 避免过期 Bearer 挡住 access
+			modelUsageSessionRoute.GET("/media/*objectKey", middleware.SoftUserAuth(), controller.GetModelUsageMedia)
 		}
 		apiRouter.GET("/captcha", middleware.CriticalRateLimit(), middleware.DisableCache(), controller.GetCaptcha)
 		apiRouter.GET("/verification", middleware.EmailVerificationRateLimit(), middleware.TurnstileCheck(), controller.SendEmailVerification)

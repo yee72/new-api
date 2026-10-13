@@ -2433,6 +2433,7 @@
     "Failed to load users": "Failed to load users",
     "Failed to load vendor": "Failed to load vendor",
     "Failed to load vendors": "Failed to load vendors",
+    "Failed to load video": "Failed to load video",
     "Failed to load vLLM status": "Failed to load vLLM status",
     "Failed to parse group items": "Failed to parse group items",
     "Failed to parse JSON file: {{name}}": "Failed to parse JSON file: {{name}}",

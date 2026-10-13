@@ -175,6 +175,20 @@ func TestTryUserAuthCredentialClassification(t *testing.T) {
 			"use_access_token": c.GetBool("use_access_token"),
 		})
 	})
+	softRouter := gin.New()
+	softRouter.GET("/soft", SoftUserAuth(), func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"id": c.GetInt("id")})
+	})
+	softExpired := httptest.NewRequest(http.MethodGet, "/soft", nil)
+	softExpired.Header.Set("Authorization", "Bearer "+issueExpiredDashboardAccessToken(t, identity))
+	softResponse := httptest.NewRecorder()
+	softRouter.ServeHTTP(softResponse, softExpired)
+	assert.Equal(t, http.StatusOK, softResponse.Code, "SoftUserAuth must not abort on expired bearer")
+	var softBody struct {
+		ID int `json:"id"`
+	}
+	require.NoError(t, common.Unmarshal(softResponse.Body.Bytes(), &softBody))
+	assert.Equal(t, 0, softBody.ID)
 
 	tests := []struct {
 		name          string

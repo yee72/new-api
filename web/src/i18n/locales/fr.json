@@ -2433,6 +2433,7 @@
     "Failed to load users": "Échec du chargement des utilisateurs",
     "Failed to load vendor": "Impossible de charger le fournisseur",
     "Failed to load vendors": "Échec du chargement des fournisseurs",
+    "Failed to load video": "Failed to load video",
     "Failed to load vLLM status": "Échec du chargement de l’état vLLM",
     "Failed to parse group items": "Échec de l'analyse des éléments de groupe",
     "Failed to parse JSON file: {{name}}": "Échec de l'analyse du fichier JSON : {{name}}",

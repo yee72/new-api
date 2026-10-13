@@ -24,6 +24,10 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 import type { ModelUsageMessage } from '../types'
+import {
+  ModelUsageAuthImage,
+  ModelUsageAuthVideo,
+} from './model-usage-auth-media'
 import { ModelUsageMediaPreview } from './model-usage-media-preview'
 
 type ModelUsageMessageListProps = {
@@ -127,14 +131,13 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
                       }
                       aria-label={t('Image Preview')}
                     >
-                      <img
-                        src={url}
+                      <ModelUsageAuthImage
+                        url={url}
                         alt={t('Generated image')}
                         className={cn(
                           'max-h-80 bg-black/20 object-contain',
                           images.length === 1 ? 'max-w-full' : 'w-full'
                         )}
-                        loading='lazy'
                       />
                     </button>
                   ))}
@@ -166,15 +169,14 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
                       }
                       aria-label={t('Video Preview')}
                     >
-                      <video
-                        src={video.url}
+                      <ModelUsageAuthVideo
+                        url={video.url!}
                         className={cn(
                           'max-h-80 bg-black/20 object-contain',
                           videos.length === 1 ? 'max-w-full' : 'w-full'
                         )}
+                        controls={false}
                         muted
-                        playsInline
-                        preload='metadata'
                       />
                     </button>
                   ))}

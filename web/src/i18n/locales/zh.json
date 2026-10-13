@@ -2433,6 +2433,7 @@
     "Failed to load users": "加载用户失败",
     "Failed to load vendor": "加载供应商失败",
     "Failed to load vendors": "加载供应商失败",
+    "Failed to load video": "无法加载视频",
     "Failed to load vLLM status": "vLLM 状态加载失败",
     "Failed to parse group items": "解析组项目失败",
     "Failed to parse JSON file: {{name}}": "解析 JSON 文件失败：{{name}}",

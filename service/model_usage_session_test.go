@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"io"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -147,6 +148,40 @@ func TestModelUsageMediaAccessBoundToOwner(t *testing.T) {
 
 	_, err = ResolveModelUsageMediaObjectKey(8, relative, "")
 	require.ErrorIs(t, err, ErrModelUsageMediaForbidden)
+
+	// 旧 access 失效时，资源所有者本人仍可通过 Bearer 访问
+	common.CryptoSecret = "rotated-secret-for-model-usage"
+	assert.False(t, VerifyModelUsageMediaAccess(access, 7, relative))
+	key, err = ResolveModelUsageMediaObjectKey(7, relative, access)
+	require.NoError(t, err)
+	assert.Equal(t, "test/model-usage/7/flux/a1/0.png", key)
+	_, err = ResolveModelUsageMediaObjectKey(0, relative, access)
+	require.ErrorIs(t, err, ErrModelUsageMediaForbidden)
+}
+
+func TestSessionToDTORefreshesMediaAccess(t *testing.T) {
+	common.CryptoSecret = "test-secret-for-model-usage"
+	relative := "model-usage/3/flux/a1/0.png"
+	stale := modelUsageMediaURLPrefix + relative + "?access=stale-token-not-valid-hmac-value!!"
+	dto := sessionToDTO(&model.ModelUsageSession{
+		ModelName: "flux",
+		Messages: []model.ModelUsageMessage{{
+			ID: "a1", TurnID: "t1", Role: "assistant", Status: "done", MediaType: "image",
+			Images: []string{stale},
+			Videos: []model.ModelUsageVideo{{TaskID: "task1", URL: stale}},
+		}},
+	})
+	require.Len(t, dto.Messages, 1)
+	require.NotEmpty(t, dto.Messages[0].Images)
+	assert.True(t, strings.HasPrefix(dto.Messages[0].Images[0], modelUsageMediaURLPrefix))
+	assert.Contains(t, dto.Messages[0].Images[0], "access=")
+	assert.NotEqual(t, stale, dto.Messages[0].Images[0])
+	assert.NotEqual(t, stale, dto.Messages[0].Videos[0].URL)
+	relativeKey, ok := modelUsageMediaRelativeKey(dto.Messages[0].Images[0])
+	require.True(t, ok)
+	parsed, err := url.Parse(dto.Messages[0].Images[0])
+	require.NoError(t, err)
+	assert.True(t, VerifyModelUsageMediaAccess(parsed.Query().Get("access"), 3, relativeKey))
 }
 
 func TestReplaceModelUsageSessionRejectsDataURLs(t *testing.T) {

@@ -2433,6 +2433,7 @@
     "Failed to load users": "Не удалось загрузить пользователей",
     "Failed to load vendor": "Не удалось загрузить поставщика",
     "Failed to load vendors": "Не удалось загрузить поставщиков",
+    "Failed to load video": "Failed to load video",
     "Failed to load vLLM status": "Не удалось загрузить состояние vLLM",
     "Failed to parse group items": "Не удалось разобрать элементы группы",
     "Failed to parse JSON file: {{name}}": "Не удалось проанализировать файл JSON: {{name}}",

@@ -72,12 +72,12 @@ func GetModelUsageMedia(c *gin.Context) {
 	rawKey := strings.TrimPrefix(c.Param("objectKey"), "/")
 	objectKey, err := service.ResolveModelUsageMediaObjectKey(userId, rawKey, c.Query("access"))
 	if err != nil {
-		writeModelUsageSessionError(c, err)
+		writeModelUsageMediaError(c, err)
 		return
 	}
 	store := service.GetObjectBlobStore()
 	if err := store.ServeObject(c, objectKey, ""); err != nil {
-		writeModelUsageSessionError(c, err)
+		writeModelUsageMediaError(c, err)
 	}
 }
 
@@ -95,5 +95,21 @@ func writeModelUsageSessionError(c *gin.Context, err error) {
 		common.ApiErrorMsg(c, service.ErrModelUsageObjectStoreRequired.Error())
 	default:
 		common.ApiError(c, err)
+	}
+}
+
+// writeModelUsageMediaError：媒体响应不能用 200 JSON，否则 <img>/<video> 会当成损坏文件。
+func writeModelUsageMediaError(c *gin.Context, err error) {
+	c.Header("Cache-Control", "private, no-store")
+	switch {
+	case errors.Is(err, service.ErrModelUsageMediaForbidden):
+		c.AbortWithStatus(http.StatusForbidden)
+	case errors.Is(err, service.ErrModelUsageInvalidRequest):
+		c.AbortWithStatus(http.StatusBadRequest)
+	case errors.Is(err, service.ErrModelUsageObjectStoreRequired),
+		errors.Is(err, service.ErrTaskArtifactStoreDisabled):
+		c.AbortWithStatus(http.StatusServiceUnavailable)
+	default:
+		c.AbortWithStatus(http.StatusNotFound)
 	}
 }

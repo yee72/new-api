@@ -233,8 +233,9 @@ func RefreshModelUsageVideoTurn(ctx context.Context, userId int, modelName, turn
 	return sessionToDTO(session), nil
 }
 
-// ResolveModelUsageMediaObjectKey validates an HMAC access token (or matching
-// user id) and returns the full S3 object key for streaming.
+// ResolveModelUsageMediaObjectKey validates an HMAC access token or matching
+// owner session, then returns the full S3 object key for streaming.
+// 失效/跨节点不一致的 access 不得挡住资源所有者本人（Bearer）访问。
 func ResolveModelUsageMediaObjectKey(userId int, rawKey, access string) (string, error) {
 	relativeKey, err := decodeModelUsageMediaKey(rawKey)
 	if err != nil {
@@ -244,11 +245,9 @@ func ResolveModelUsageMediaObjectKey(userId int, rawKey, access string) (string,
 	if !ok {
 		return "", ErrModelUsageMediaForbidden
 	}
-	if access != "" {
-		if !VerifyModelUsageMediaAccess(access, ownerID, relativeKey) {
-			return "", ErrModelUsageMediaForbidden
-		}
-	} else if userId <= 0 || userId != ownerID {
+	accessOK := access != "" && VerifyModelUsageMediaAccess(access, ownerID, relativeKey)
+	ownerOK := userId > 0 && userId == ownerID
+	if !accessOK && !ownerOK {
 		return "", ErrModelUsageMediaForbidden
 	}
 	store := GetObjectBlobStore()
@@ -665,8 +664,49 @@ func sessionToDTO(session *model.ModelUsageSession) *ModelUsageSessionDTO {
 	}
 	return &ModelUsageSessionDTO{
 		ModelName:   session.ModelName,
-		Messages:    messages,
+		Messages:    refreshModelUsageMediaURLs(messages),
 		ImageConfig: session.ImageConfig,
 		VideoConfig: session.VideoConfig,
 	}
+}
+
+// refreshModelUsageMediaURLs 用当前 CryptoSecret 重签短链，避免换号/重启后旧 access 失效。
+func refreshModelUsageMediaURLs(messages []model.ModelUsageMessage) []model.ModelUsageMessage {
+	if len(messages) == 0 {
+		return messages
+	}
+	out := make([]model.ModelUsageMessage, len(messages))
+	copy(out, messages)
+	for i := range out {
+		if len(out[i].Images) > 0 {
+			images := make([]string, len(out[i].Images))
+			for j, src := range out[i].Images {
+				images[j] = resignModelUsageMediaURL(src)
+			}
+			out[i].Images = images
+		}
+		if len(out[i].Videos) > 0 {
+			videos := make([]model.ModelUsageVideo, len(out[i].Videos))
+			copy(videos, out[i].Videos)
+			for j := range videos {
+				if videos[j].URL != "" {
+					videos[j].URL = resignModelUsageMediaURL(videos[j].URL)
+				}
+			}
+			out[i].Videos = videos
+		}
+	}
+	return out
+}
+
+func resignModelUsageMediaURL(source string) string {
+	relative, ok := modelUsageMediaRelativeKey(source)
+	if !ok {
+		return source
+	}
+	owner, ownerOK := modelUsageOwnerID(relative)
+	if !ownerOK {
+		return source
+	}
+	return BuildModelUsageMediaURL(owner, relative)
 }

@@ -2433,6 +2433,7 @@
     "Failed to load users": "ユーザーの読み込みに失敗しました",
     "Failed to load vendor": "プロバイダーを読み込めませんでした",
     "Failed to load vendors": "ベンダーの読み込みに失敗しました",
+    "Failed to load video": "Failed to load video",
     "Failed to load vLLM status": "vLLM の状態を読み込めませんでした",
     "Failed to parse group items": "グループアイテムの解析に失敗しました",
     "Failed to parse JSON file: {{name}}": "JSONファイルの解析に失敗しました： __ PH_0 __",
