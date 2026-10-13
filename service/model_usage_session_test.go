@@ -106,6 +106,29 @@ func TestCommitModelUsageTurnImagePersistsToObjectStore(t *testing.T) {
 	assert.NotEmpty(t, store.objects)
 }
 
+func TestCommitModelUsageTurnImageStripsDataURLContent(t *testing.T) {
+	common.CryptoSecret = "test-secret-for-model-usage"
+	setupModelUsageSessionTestDB(t)
+	withMemoryBlobStore(t)
+
+	dto, err := CommitModelUsageTurn(context.Background(), 42, "gemini-flash-image", ModelUsageTurnRequest{
+		UserMessage: model.ModelUsageMessage{
+			ID: "u1", TurnID: "t1", Role: "user", Content: "一只猪在奔跑", Status: "done", MediaType: "image",
+		},
+		AssistantMessage: model.ModelUsageMessage{
+			ID: "a1", TurnID: "t1", Role: "assistant",
+			Content:   "![image](data:image/png;base64,aGVsbG8=)",
+			Status:    "pending",
+			MediaType: "image",
+		},
+		ImageSources: []string{"data:image/png;base64,aGVsbG8="},
+	})
+	require.NoError(t, err)
+	require.Len(t, dto.Messages, 2)
+	assert.Empty(t, dto.Messages[1].Content)
+	require.NotEmpty(t, dto.Messages[1].Images)
+}
+
 func TestModelUsageMediaAccessBoundToOwner(t *testing.T) {
 	common.CryptoSecret = "test-secret-for-model-usage"
 	relative := "model-usage/7/flux/a1/0.png"

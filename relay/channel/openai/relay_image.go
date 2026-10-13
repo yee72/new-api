@@ -43,6 +43,16 @@ func OpenaiImageHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.
 
 	info.UpdateImageCount(openaiImageResponseCount(responseBody))
 
+	if info.IsPlayground {
+		if rewritten, rewriteErr := service.RewritePlaygroundInlineImages(
+			c.Request.Context(), info.UserId, info.OriginModelName, info.RequestId, responseBody,
+		); rewriteErr != nil {
+			logger.LogWarn(c, "playground inline image rewrite failed: "+rewriteErr.Error())
+		} else {
+			responseBody = rewritten
+		}
+	}
+
 	// 写入新的 response body
 	service.IOCopyBytesGracefully(c, resp, responseBody)
 

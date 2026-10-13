@@ -449,6 +449,16 @@ func GeminiChatHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.R
 		break
 	}
 
+	if info.IsPlayground && info.RelayFormat == types.RelayFormatOpenAI {
+		if rewritten, rewriteErr := service.RewritePlaygroundInlineImages(
+			c.Request.Context(), info.UserId, info.OriginModelName, info.RequestId, responseBody,
+		); rewriteErr != nil {
+			logger.LogWarn(c, "playground inline image rewrite failed: "+rewriteErr.Error())
+		} else {
+			responseBody = rewritten
+		}
+	}
+
 	service.IOCopyBytesGracefully(c, resp, responseBody)
 
 	return &usage, nil

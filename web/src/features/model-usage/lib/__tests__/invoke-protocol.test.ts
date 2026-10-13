@@ -72,4 +72,12 @@ describe('extractImagesFromChatContent', () => {
       extractImagesFromChatContent('见文档 https://example.com/docs/guide')
     ).toEqual([])
   })
+
+  it('extracts model-usage media short links', () => {
+    const content =
+      '![image](/api/model-usage/media/model-usage/1/gemini/req/0.png?access=abc)'
+    expect(extractImagesFromChatContent(content)).toEqual([
+      '/api/model-usage/media/model-usage/1/gemini/req/0.png?access=abc',
+    ])
+  })
 })

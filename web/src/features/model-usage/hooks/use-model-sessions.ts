@@ -329,6 +329,11 @@ export function useModelSessions() {
             model.model_type === 'image'
               ? extractImagesFromChatContent(contentText)
               : []
+          // 网关已把 data: 换成短链；本地不再保留大段 base64 文本
+          const displayContent =
+            model.model_type === 'image' && chatImages.length > 0
+              ? ''
+              : contentText
 
           if (model.model_type === 'image') {
             if (!userId) {
@@ -341,11 +346,12 @@ export function useModelSessions() {
               )
               return
             }
+            // 优先提交短链/URL；若仍有 data: 则由后端落库
             const dto = await commitModelUsageTurn(modelName, {
               user_message: userMessage,
               assistant_message: {
                 ...pendingAssistant,
-                content: contentText,
+                content: '',
                 status: 'done',
               },
               image_sources: chatImages,
@@ -359,7 +365,7 @@ export function useModelSessions() {
           const assistantMessage: ModelUsageMessage = {
             ...pendingAssistant,
             status: 'done',
-            content: contentText || t('Empty response from model'),
+            content: displayContent || t('Empty response from model'),
           }
           if (userId) {
             const dto = await commitModelUsageTurn(modelName, {

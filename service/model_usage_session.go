@@ -123,6 +123,10 @@ func CommitModelUsageTurn(ctx context.Context, userId int, modelName string, req
 		}
 		assistant.Images = urls
 		assistant.Status = "done"
+		// chat 生图常把 data: 写在 content；入库只保留对象存储 URL
+		if containsDataURL(assistant.Content) {
+			assistant.Content = ""
+		}
 	case "video":
 		videos, status, err := persistOrTrackModelUsageVideos(ctx, userId, modelName, assistant.ID, req.VideoTaskIDs)
 		if err != nil {
@@ -306,24 +310,77 @@ func decodeModelUsageMediaKey(raw string) (string, error) {
 }
 
 func persistModelUsageImages(ctx context.Context, userId int, modelName, messageID string, sources []string) ([]string, error) {
-	store := GetObjectBlobStore()
-	if !store.Enabled() {
+	if !GetObjectBlobStore().Enabled() {
 		return nil, ErrModelUsageObjectStoreRequired
 	}
 	urls := make([]string, 0, len(sources))
 	for index, source := range sources {
-		body, contentType, size, ext, err := loadModelUsageMediaBytes(source, true)
+		url, err := persistModelUsageImageAt(ctx, userId, modelName, messageID, index, source)
 		if err != nil {
 			return nil, err
 		}
-		relative := fmt.Sprintf("model-usage/%d/%s/%s/%d.%s", userId, sanitizeModelUsagePath(modelName), sanitizeModelUsagePath(messageID), index, ext)
-		fullKey := store.Prefix() + relative
-		if _, err := store.PutObject(ctx, fullKey, contentType, bytes.NewReader(body), size); err != nil {
-			return nil, err
-		}
-		urls = append(urls, BuildModelUsageMediaURL(userId, relative))
+		urls = append(urls, url)
 	}
 	return urls, nil
+}
+
+// persistModelUsageImageAt 写入单张图；若 source 已是本用户 media 短链则直接复用，不再重传。
+func persistModelUsageImageAt(ctx context.Context, userId int, modelName, messageID string, index int, source string) (string, error) {
+	source = strings.TrimSpace(source)
+	if source == "" {
+		return "", ErrModelUsageInvalidRequest
+	}
+	if relative, ok := modelUsageMediaRelativeKey(source); ok {
+		owner, ownerOK := modelUsageOwnerID(relative)
+		if !ownerOK || owner != userId {
+			return "", ErrModelUsageInvalidRequest
+		}
+		return BuildModelUsageMediaURL(userId, relative), nil
+	}
+	store := GetObjectBlobStore()
+	if !store.Enabled() {
+		return "", ErrModelUsageObjectStoreRequired
+	}
+	body, contentType, size, ext, err := loadModelUsageMediaBytes(source, true)
+	if err != nil {
+		return "", err
+	}
+	relative := fmt.Sprintf(
+		"model-usage/%d/%s/%s/%d.%s",
+		userId,
+		sanitizeModelUsagePath(modelName),
+		sanitizeModelUsagePath(messageID),
+		index,
+		ext,
+	)
+	fullKey := store.Prefix() + relative
+	if _, err := store.PutObject(ctx, fullKey, contentType, bytes.NewReader(body), size); err != nil {
+		return "", err
+	}
+	return BuildModelUsageMediaURL(userId, relative), nil
+}
+
+func modelUsageMediaRelativeKey(source string) (string, bool) {
+	source = strings.TrimSpace(source)
+	if source == "" {
+		return "", false
+	}
+	if strings.HasPrefix(source, "http://") || strings.HasPrefix(source, "https://") {
+		parsed, err := url.Parse(source)
+		if err != nil {
+			return "", false
+		}
+		source = parsed.Path
+	}
+	pathOnly, _, _ := strings.Cut(source, "?")
+	if after, ok := strings.CutPrefix(pathOnly, modelUsageMediaURLPrefix); ok {
+		relative, err := decodeModelUsageMediaKey(after)
+		if err != nil {
+			return "", false
+		}
+		return relative, true
+	}
+	return "", false
 }
 
 func persistOrTrackModelUsageVideos(ctx context.Context, userId int, modelName, messageID string, taskIDs []string) ([]model.ModelUsageVideo, string, error) {

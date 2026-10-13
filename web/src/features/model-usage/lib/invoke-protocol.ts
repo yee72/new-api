@@ -44,8 +44,11 @@ function looksLikeImageUrl(url: string): boolean {
   const trimmed = url.trim()
   if (!trimmed) return false
   if (trimmed.startsWith('data:image/')) return true
+  // playground 网关已落库的短链
+  if (trimmed.startsWith('/api/model-usage/media/')) return true
   try {
-    const parsed = new URL(trimmed)
+    const parsed = new URL(trimmed, 'http://localhost')
+    if (parsed.pathname.startsWith('/api/model-usage/media/')) return true
     if (!['http:', 'https:'].includes(parsed.protocol)) return false
     if (/\.(png|jpe?g|gif|webp|bmp|svg)(\?|#|$)/i.test(parsed.pathname)) {
       return true
