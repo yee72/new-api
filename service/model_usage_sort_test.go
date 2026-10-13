@@ -34,7 +34,7 @@ func TestResolveInvokeProtocol(t *testing.T) {
 	assert.Equal(t, "/v1/chat/completions", endpointPathForProtocol(InvokeProtocolChat))
 }
 
-func TestSortModelUsageItems_Top3ByDisplayUsageThenRestByCreatedTime(t *testing.T) {
+func TestSortModelUsageItems_ByDisplayUsageThenCreatedTime(t *testing.T) {
 	items := []ModelUsageItem{
 		{ModelName: "a", DisplayUsage: 1, CreatedTime: 100},
 		{ModelName: "b", DisplayUsage: 50, CreatedTime: 10},
@@ -45,7 +45,7 @@ func TestSortModelUsageItems_Top3ByDisplayUsageThenRestByCreatedTime(t *testing.
 
 	sortModelUsageItems(items)
 
-	assert.Equal(t, []string{"b", "c", "d", "a", "e"}, []string{
+	assert.Equal(t, []string{"b", "c", "d", "e", "a"}, []string{
 		items[0].ModelName,
 		items[1].ModelName,
 		items[2].ModelName,

@@ -10,8 +10,20 @@ type ModelUsageRequestTotal struct {
 	TotalCount int64  `json:"total_count"`
 }
 
-// GetModelUsageRequestTotals 按成功请求次数汇总（模型使用落地页热度）
+// GetModelUsageRequestTotals 按成功请求次数汇总全站热度（管理/分析用）。
 func GetModelUsageRequestTotals(startTime int64, endTime int64) ([]ModelUsageRequestTotal, error) {
+	return getModelUsageRequestTotals(0, startTime, endTime)
+}
+
+// GetModelUsageRequestTotalsByUser 按用户近窗口请求次数汇总（模型使用页个人排序）。
+func GetModelUsageRequestTotalsByUser(userId int, startTime int64, endTime int64) ([]ModelUsageRequestTotal, error) {
+	if userId <= 0 {
+		return nil, nil
+	}
+	return getModelUsageRequestTotals(userId, startTime, endTime)
+}
+
+func getModelUsageRequestTotals(userId int, startTime int64, endTime int64) ([]ModelUsageRequestTotal, error) {
 	var rows []ModelUsageRequestTotal
 	query := DB.Table("quota_data").
 		Select("model_name, sum(count) as total_count").
@@ -19,6 +31,9 @@ func GetModelUsageRequestTotals(startTime int64, endTime int64) ([]ModelUsageReq
 		Group("model_name").
 		Having("sum(count) > 0").
 		Order("total_count DESC")
+	if userId > 0 {
+		query = query.Where("user_id = ?", userId)
+	}
 	query = applyModelUsageTimeRange(query, startTime, endTime)
 	err := query.Find(&rows).Error
 	return rows, err

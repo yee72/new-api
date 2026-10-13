@@ -62,7 +62,7 @@ var (
 	modelUsageCache   *modelUsageCacheEntry
 )
 
-func GetModelUsageCatalog(typeFilter, keyword, rawVendorIDs string) (*ModelUsageListResponse, error) {
+func GetModelUsageCatalog(userId int, typeFilter, keyword, rawVendorIDs string) (*ModelUsageListResponse, error) {
 	var vendorIDs []int
 	for part := range strings.SplitSeq(strings.TrimSpace(rawVendorIDs), ",") {
 		part = strings.TrimSpace(part)
@@ -76,9 +76,24 @@ func GetModelUsageCatalog(typeFilter, keyword, rawVendorIDs string) (*ModelUsage
 		vendorIDs = append(vendorIDs, id)
 	}
 
-	items, vendors, err := loadModelUsageCatalog()
+	baseItems, vendors, err := loadModelUsageCatalog()
 	if err != nil {
 		return nil, err
+	}
+
+	// 个人近 7 天用量；未登录仅用管理员手动增量排序
+	usageByName := map[string]int64{}
+	if userId > 0 {
+		end := time.Now().Unix()
+		start := end - 7*24*3600
+		totals, usageErr := model.GetModelUsageRequestTotalsByUser(userId, start, end)
+		if usageErr != nil {
+			return nil, usageErr
+		}
+		usageByName = make(map[string]int64, len(totals))
+		for _, row := range totals {
+			usageByName[row.ModelName] = row.TotalCount
+		}
 	}
 
 	normalizedType := strings.TrimSpace(strings.ToLower(typeFilter))
@@ -93,8 +108,8 @@ func GetModelUsageCatalog(typeFilter, keyword, rawVendorIDs string) (*ModelUsage
 
 	// 搜索与厂商互斥：有 keyword 时忽略厂商
 	useSearch := keyword != ""
-	filtered := make([]ModelUsageItem, 0, len(items))
-	for _, item := range items {
+	filtered := make([]ModelUsageItem, 0, len(baseItems))
+	for _, item := range baseItems {
 		if normalizedType != "all" && item.ModelType != normalizedType {
 			continue
 		}
@@ -107,6 +122,8 @@ func GetModelUsageCatalog(typeFilter, keyword, rawVendorIDs string) (*ModelUsage
 				continue
 			}
 		}
+		item.ActualUsage7d = usageByName[item.ModelName]
+		item.DisplayUsage = item.ActualUsage7d + item.ManualUsage
 		filtered = append(filtered, item)
 	}
 
@@ -161,17 +178,7 @@ func loadModelUsageCatalog() ([]ModelUsageItem, []model.PricingVendor, error) {
 		}
 	}
 
-	end := time.Now().Unix()
-	start := end - 7*24*3600
-	totals, err := model.GetModelUsageRequestTotals(start, end)
-	if err != nil {
-		return nil, nil, err
-	}
-	usageByName := make(map[string]int64, len(totals))
-	for _, row := range totals {
-		usageByName[row.ModelName] = row.TotalCount
-	}
-
+	// 缓存仅存元数据与管理员手动增量；个人用量在 GetModelUsageCatalog 按用户叠加
 	items := make([]ModelUsageItem, 0, len(pricing))
 	for _, p := range pricing {
 		meta := metaByName[p.ModelName]
@@ -212,8 +219,6 @@ func loadModelUsageCatalog() ([]ModelUsageItem, []model.PricingVendor, error) {
 		// 调用协议：endpoint 优先，其次按产品类型（任务视频常无 openai-video）
 		item.InvokeProtocol = resolveInvokeProtocol(p.SupportedEndpointTypes, item.ModelType)
 		item.EndpointPath = endpointPathForProtocol(item.InvokeProtocol)
-		item.ActualUsage7d = usageByName[p.ModelName]
-		item.DisplayUsage = item.ActualUsage7d + item.ManualUsage
 		items = append(items, item)
 	}
 
@@ -225,32 +230,20 @@ func loadModelUsageCatalog() ([]ModelUsageItem, []model.PricingVendor, error) {
 	return items, vendors, nil
 }
 
+// sortModelUsageItems：display_usage（个人用量+管理员增量）降序，其次创建 时间、名称。
 func sortModelUsageItems(items []ModelUsageItem) {
 	if len(items) <= 1 {
 		return
 	}
-	indexed := make([]ModelUsageItem, len(items))
-	copy(indexed, items)
-	sort.SliceStable(indexed, func(i, j int) bool {
-		if indexed[i].DisplayUsage != indexed[j].DisplayUsage {
-			return indexed[i].DisplayUsage > indexed[j].DisplayUsage
+	sort.SliceStable(items, func(i, j int) bool {
+		if items[i].DisplayUsage != items[j].DisplayUsage {
+			return items[i].DisplayUsage > items[j].DisplayUsage
 		}
-		if indexed[i].CreatedTime != indexed[j].CreatedTime {
-			return indexed[i].CreatedTime > indexed[j].CreatedTime
+		if items[i].CreatedTime != items[j].CreatedTime {
+			return items[i].CreatedTime > items[j].CreatedTime
 		}
-		return indexed[i].ModelName < indexed[j].ModelName
+		return items[i].ModelName < items[j].ModelName
 	})
-
-	topN := min(3, len(indexed))
-	top := indexed[:topN]
-	rest := append([]ModelUsageItem(nil), indexed[topN:]...)
-	sort.SliceStable(rest, func(i, j int) bool {
-		if rest[i].CreatedTime != rest[j].CreatedTime {
-			return rest[i].CreatedTime > rest[j].CreatedTime
-		}
-		return rest[i].ModelName < rest[j].ModelName
-	})
-	copy(items, append(top, rest...))
 }
 
 func inferModelTypeFromEndpoints(endpoints []constant.EndpointType) string {
