@@ -2,6 +2,7 @@ package helper
 
 import (
 	"fmt"
+	"maps"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
@@ -364,6 +365,13 @@ func modelPriceHelperTiered(c *gin.Context, info *relaycommon.RelayInfo, billing
 			return hosttypes.PriceData{}, err
 		}
 	}
+	usageKeys := billingexpr.UsedUsageKeys(exprStr)
+	taskUsageBilling := len(usageKeys) > 0
+	if taskUsageBilling {
+		if err := ensureBillingUsageFacts(&requestInput, usageKeys, info.IsChannelTest); err != nil {
+			return hosttypes.PriceData{}, fmt.Errorf("model %s tiered expr run failed: %w", billingModelName, err)
+		}
+	}
 
 	rawCost, trace, err := billingexpr.RunExprByHashWithRequest(exprStr, exprHash, billingexpr.TokenParams{
 		P:   float64(promptTokens),
@@ -374,12 +382,18 @@ func modelPriceHelperTiered(c *gin.Context, info *relaycommon.RelayInfo, billing
 		return hosttypes.PriceData{}, fmt.Errorf("model %s tiered expr run failed: %w", billingModelName, err)
 	}
 
-	// Expression coefficients are $/1M tokens prices; convert to quota the same way per-call billing does.
-	quotaBeforeGroup := rawCost / 1_000_000 * common.QuotaPerUnit
-	// Scale the reservation, preserving the expression's context-length tier
-	// and leaving actual settlement and fixed request prices unchanged.
-	if trace.BillingUnit != billingexpr.BillingUnitRequest {
-		quotaBeforeGroup *= preConsumeMultiplier
+	var quotaBeforeGroup float64
+	if taskUsageBilling {
+		// 任务用量表达式直接返回美元成本，不按 $/1M tokens 缩放
+		quotaBeforeGroup = rawCost * common.QuotaPerUnit
+	} else {
+		// Expression coefficients are $/1M tokens prices; convert to quota the same way per-call billing does.
+		quotaBeforeGroup = rawCost / 1_000_000 * common.QuotaPerUnit
+		// Scale the reservation, preserving the expression's context-length tier
+		// and leaving actual settlement and fixed request prices unchanged.
+		if trace.BillingUnit != billingexpr.BillingUnitRequest {
+			quotaBeforeGroup *= preConsumeMultiplier
+		}
 	}
 	preConsumedQuota, err := billingexpr.QuotaRoundStrict(quotaBeforeGroup * groupRatioInfo.GroupRatio)
 	if err != nil {
@@ -411,6 +425,8 @@ func modelPriceHelperTiered(c *gin.Context, info *relaycommon.RelayInfo, billing
 		EstimatedFixedPrice:       trace.FixedPrice,
 		QuotaPerUnit:              common.QuotaPerUnit,
 		ExprVersion:               billingexpr.ExprVersion(exprStr),
+		TaskUsageBilling:          taskUsageBilling,
+		UsageFacts:                maps.Clone(requestInput.Usage),
 	}
 	info.TieredBillingSnapshot = snapshot
 	info.BillingRequestInput = &requestInput

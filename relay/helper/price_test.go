@@ -737,6 +737,71 @@ func TestInputPreConsumeMultiplierLegacyAndRequestPrices(t *testing.T) {
 	}
 }
 
+func TestModelPriceHelperTaskUsageOnChannelTestInjectsSeconds(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	saved := map[string]string{}
+	require.NoError(t, config.GlobalConfig.SaveToDB(func(key, value string) error {
+		saved[key] = value
+		return nil
+	}))
+	t.Cleanup(func() {
+		require.NoError(t, config.GlobalConfig.LoadFromDB(saved))
+	})
+
+	require.NoError(t, config.GlobalConfig.LoadFromDB(map[string]string{
+		"billing_setting.billing_mode":    `{"wan-test":"tiered_expr"}`,
+		"billing_setting.billing_expr":    `{"wan-test":"tier(\"base\", 1 + u(\"seconds\") * 1)"}`,
+		"group_ratio_setting.group_ratio": `{"default":1}`,
+	}))
+
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/channel/test/1", nil)
+	info := &relaycommon.RelayInfo{
+		OriginModelName:     "wan-test",
+		UserGroup:           "default",
+		UsingGroup:          "default",
+		IsChannelTest:       true,
+		BillingRequestInput: &billingexpr.RequestInput{Body: []byte(`{"model":"wan-test","messages":[{"role":"user","content":"hi"}]}`)},
+	}
+	price, err := ModelPriceHelper(ctx, info, 0, &types.TokenCountMeta{})
+	require.NoError(t, err)
+	// 任务用量：1 + 5*1 = 6 USD → 6 * QuotaPerUnit
+	assert.Equal(t, int(6*common.QuotaPerUnit), price.QuotaToPreConsume)
+	require.NotNil(t, info.TieredBillingSnapshot)
+	assert.True(t, info.TieredBillingSnapshot.TaskUsageBilling)
+	assert.Equal(t, channelTestDefaultUsageSeconds, info.TieredBillingSnapshot.UsageFacts["seconds"])
+}
+
+func TestModelPriceHelperTaskUsageWithoutSecondsFailsOutsideChannelTest(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	saved := map[string]string{}
+	require.NoError(t, config.GlobalConfig.SaveToDB(func(key, value string) error {
+		saved[key] = value
+		return nil
+	}))
+	t.Cleanup(func() {
+		require.NoError(t, config.GlobalConfig.LoadFromDB(saved))
+	})
+
+	require.NoError(t, config.GlobalConfig.LoadFromDB(map[string]string{
+		"billing_setting.billing_mode": `{"wan-live":"tiered_expr"}`,
+		"billing_setting.billing_expr": `{"wan-live":"tier(\"base\", u(\"seconds\") * 1)"}`,
+	}))
+
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	info := &relaycommon.RelayInfo{
+		OriginModelName:     "wan-live",
+		UserGroup:           "default",
+		UsingGroup:          "default",
+		BillingRequestInput: &billingexpr.RequestInput{},
+	}
+	_, err := ModelPriceHelper(ctx, info, 0, &types.TokenCountMeta{})
+	require.ErrorContains(t, err, "missing usage facts")
+}
+
 // priceTestReservation observes the reservation requested before image submission.
 type priceTestReservation struct{ held int }
 

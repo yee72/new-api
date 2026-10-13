@@ -1,7 +1,9 @@
 package helper
 
 import (
+	"fmt"
 	"maps"
+	"slices"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
@@ -10,6 +12,9 @@ import (
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/gin-gonic/gin"
 )
+
+// 渠道测试在无请求时长时用于任务用量表达式的默认秒数（落在合法时长范围内）。
+const channelTestDefaultUsageSeconds = 5.0
 
 func ResolveIncomingBillingExprRequestInput(c *gin.Context, info *relaycommon.RelayInfo) (billingexpr.RequestInput, error) {
 	if info != nil && info.BillingRequestInput != nil {
@@ -96,7 +101,84 @@ func cloneRequestInput(src billingexpr.RequestInput) billingexpr.RequestInput {
 	if len(src.Body) > 0 {
 		input.Body = append([]byte(nil), src.Body...)
 	}
+	if len(src.Usage) > 0 {
+		input.Usage = maps.Clone(src.Usage)
+	}
 	return input
+}
+
+// ensureBillingUsageFacts 为含 u("…") 的任务用量表达式补齐 Usage。
+// 渠道测试可在缺失时填默认秒数；正式请求仍要求调用方提供用量事实。
+func ensureBillingUsageFacts(input *billingexpr.RequestInput, usageKeys map[string]bool, allowChannelTestDefaults bool) error {
+	if input == nil || len(usageKeys) == 0 {
+		return nil
+	}
+	if input.Usage == nil {
+		input.Usage = map[string]any{}
+	}
+	fillUsageFactsFromBody(input.Body, input.Usage, usageKeys)
+
+	var missing []string
+	for key := range usageKeys {
+		if _, ok := input.Usage[key]; ok {
+			continue
+		}
+		if allowChannelTestDefaults {
+			switch key {
+			case "seconds", "duration":
+				input.Usage[key] = channelTestDefaultUsageSeconds
+				continue
+			case "clips", "image_count", "n":
+				input.Usage[key] = float64(1)
+				continue
+			}
+		}
+		missing = append(missing, key)
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+	slices.Sort(missing)
+	return fmt.Errorf("missing usage facts %v (task/video models require these via the task API, not chat completions)", missing)
+}
+
+func fillUsageFactsFromBody(body []byte, usage map[string]any, usageKeys map[string]bool) {
+	if len(body) == 0 || usage == nil || len(usageKeys) == 0 {
+		return
+	}
+	var root map[string]any
+	if err := common.Unmarshal(body, &root); err != nil || len(root) == 0 {
+		return
+	}
+	parameters, _ := root["parameters"].(map[string]any)
+	for key := range usageKeys {
+		if _, ok := usage[key]; ok {
+			continue
+		}
+		if value, ok := root[key]; ok && value != nil {
+			usage[key] = value
+			continue
+		}
+		if parameters != nil {
+			if value, ok := parameters[key]; ok && value != nil {
+				usage[key] = value
+			}
+		}
+	}
+	if usageKeys["seconds"] {
+		if _, ok := usage["seconds"]; ok {
+			return
+		}
+		if value, ok := root["duration"]; ok && value != nil {
+			usage["seconds"] = value
+			return
+		}
+		if parameters != nil {
+			if value, ok := parameters["duration"]; ok && value != nil {
+				usage["seconds"] = value
+			}
+		}
+	}
 }
 
 func isJSONContentType(contentType string) bool {
