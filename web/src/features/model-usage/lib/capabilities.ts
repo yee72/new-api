@@ -202,7 +202,7 @@ export function clampVideoConfigToMatrix(
   }
 }
 
-/** 将比例映射为 OpenAI 常见 size 字符串 */
+/** 将比例映射为 OpenAI 图片常见 size 字符串 */
 export function aspectRatioToSize(ratio: string): string {
   switch (ratio) {
     case '1:1':
@@ -215,4 +215,42 @@ export function aspectRatioToSize(ratio: string): string {
     default:
       return '1792x1024'
   }
+}
+
+/** Wan 等任务视频认的像素表（与 alibaba 插件 LEGACY/MODERN_SIZES 对齐，x 会被转成 *） */
+const VIDEO_SIZE_BY_RESOLUTION: Record<string, Record<string, string>> = {
+  '480P': {
+    '16:9': '832x480',
+    '9:16': '480x832',
+    '1:1': '624x624',
+  },
+  '720P': {
+    '16:9': '1280x720',
+    '9:16': '720x1280',
+    '1:1': '960x960',
+    '4:3': '1088x832',
+    '3:4': '832x1088',
+  },
+  '1080P': {
+    '16:9': '1920x1080',
+    '9:16': '1080x1920',
+    '1:1': '1440x1440',
+    '4:3': '1632x1248',
+    '3:4': '1248x1632',
+  },
+}
+
+function normalizeVideoResolution(quality: string): string {
+  const q = quality.trim().toLowerCase()
+  if (!q || q === 'auto') return '720P'
+  if (q.endsWith('p')) return q.toUpperCase()
+  return `${q.toUpperCase()}P`
+}
+
+/** 将比例 + 质量映射为任务视频可接受的 size（如 1280x720） */
+export function aspectRatioToVideoSize(ratio: string, quality: string): string {
+  const resolution = normalizeVideoResolution(quality)
+  const byRatio =
+    VIDEO_SIZE_BY_RESOLUTION[resolution] ?? VIDEO_SIZE_BY_RESOLUTION['720P']
+  return byRatio[ratio] ?? byRatio['16:9'] ?? '1280x720'
 }

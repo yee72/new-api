@@ -34,6 +34,7 @@ import {
 } from '../api'
 import {
   aspectRatioToSize,
+  aspectRatioToVideoSize,
   validateImageConfig,
   validateVideoConfig,
 } from '../lib/capabilities'
@@ -440,7 +441,11 @@ export function useModelSessions() {
             model: modelName,
             prompt,
             seconds: videoConfig.seconds,
-            size: aspectRatioToSize(videoConfig.aspectRatio),
+            // Wan 等插件不认 OpenAI 图片 size（如 1792x1024），需按分辨率像素表
+            size: aspectRatioToVideoSize(
+              videoConfig.aspectRatio,
+              videoConfig.quality
+            ),
           })) as { id?: string }
           if (result?.id) taskIds.push(result.id)
         }

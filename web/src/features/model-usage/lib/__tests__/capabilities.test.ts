@@ -19,6 +19,8 @@ For commercial licensing, please contact support@quantumnous.com
 import { describe, expect, it } from 'vitest'
 
 import {
+  aspectRatioToSize,
+  aspectRatioToVideoSize,
   validateImageConfig,
   validateVideoConfig,
 } from '../capabilities'
@@ -40,5 +42,14 @@ describe('generation capability validation', () => {
       seconds: 5,
     })
     expect(error).toBeNull()
+  })
+})
+
+describe('aspectRatioToVideoSize', () => {
+  it('maps to Wan pixel sizes instead of OpenAI image sizes', () => {
+    expect(aspectRatioToSize('16:9')).toBe('1792x1024')
+    expect(aspectRatioToVideoSize('16:9', '720p')).toBe('1280x720')
+    expect(aspectRatioToVideoSize('16:9', '1080p')).toBe('1920x1080')
+    expect(aspectRatioToVideoSize('9:16', 'auto')).toBe('720x1280')
   })
 })
