@@ -18,10 +18,18 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import type { ModelUsageItem, ModelUsageInvokeProtocol } from '../types'
 
-/** 与后端 resolveInvokeProtocol 一致：video > image-generation > chat */
+/** 与后端一致：endpoint 优先，其次产品类型（任务视频常无 openai-video） */
 export function resolveInvokeProtocol(
-  model: Pick<ModelUsageItem, 'invoke_protocol' | 'supported_endpoint_types'>
+  model: Pick<
+    ModelUsageItem,
+    'invoke_protocol' | 'supported_endpoint_types' | 'model_type'
+  >
 ): ModelUsageInvokeProtocol {
+  const endpoints = model.supported_endpoint_types ?? []
+  if (endpoints.includes('openai-video')) return 'videos'
+  if (endpoints.includes('image-generation')) return 'images'
+  if (model.model_type === 'video') return 'videos'
+  if (model.model_type === 'image') return 'chat'
   if (
     model.invoke_protocol === 'chat' ||
     model.invoke_protocol === 'images' ||
@@ -29,9 +37,6 @@ export function resolveInvokeProtocol(
   ) {
     return model.invoke_protocol
   }
-  const endpoints = model.supported_endpoint_types ?? []
-  if (endpoints.includes('openai-video')) return 'videos'
-  if (endpoints.includes('image-generation')) return 'images'
   return 'chat'
 }
 

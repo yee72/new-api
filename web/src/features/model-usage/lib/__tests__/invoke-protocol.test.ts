@@ -24,23 +24,10 @@ import {
 } from '../invoke-protocol'
 
 describe('resolveInvokeProtocol', () => {
-  it('prefers explicit invoke_protocol', () => {
+  it('prefers image-generation / openai-video endpoints', () => {
     expect(
       resolveInvokeProtocol({
-        invoke_protocol: 'images',
-        supported_endpoint_types: ['openai'],
-      })
-    ).toBe('images')
-  })
-
-  it('falls back to endpoints', () => {
-    expect(
-      resolveInvokeProtocol({
-        supported_endpoint_types: ['openai'],
-      })
-    ).toBe('chat')
-    expect(
-      resolveInvokeProtocol({
+        invoke_protocol: 'chat',
         supported_endpoint_types: ['image-generation', 'openai'],
       })
     ).toBe('images')
@@ -49,6 +36,27 @@ describe('resolveInvokeProtocol', () => {
         supported_endpoint_types: ['openai-video', 'image-generation'],
       })
     ).toBe('videos')
+  })
+
+  it('uses model_type when endpoints lack media APIs', () => {
+    expect(
+      resolveInvokeProtocol({
+        model_type: 'video',
+        invoke_protocol: 'chat',
+        supported_endpoint_types: ['openai'],
+      })
+    ).toBe('videos')
+    expect(
+      resolveInvokeProtocol({
+        model_type: 'image',
+        supported_endpoint_types: ['openai'],
+      })
+    ).toBe('chat')
+    expect(
+      resolveInvokeProtocol({
+        supported_endpoint_types: ['openai'],
+      })
+    ).toBe('chat')
   })
 })
 

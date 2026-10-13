@@ -10,16 +10,23 @@ import (
 
 func TestResolveInvokeProtocol(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, InvokeProtocolChat, resolveInvokeProtocol(nil))
-	assert.Equal(t, InvokeProtocolChat, resolveInvokeProtocol([]constant.EndpointType{constant.EndpointTypeOpenAI}))
+	assert.Equal(t, InvokeProtocolChat, resolveInvokeProtocol(nil, ""))
+	assert.Equal(t, InvokeProtocolChat, resolveInvokeProtocol([]constant.EndpointType{constant.EndpointTypeOpenAI}, ""))
 	assert.Equal(t, InvokeProtocolImages, resolveInvokeProtocol([]constant.EndpointType{
 		constant.EndpointTypeImageGeneration,
 		constant.EndpointTypeOpenAI,
-	}))
+	}, ""))
 	assert.Equal(t, InvokeProtocolVideos, resolveInvokeProtocol([]constant.EndpointType{
 		constant.EndpointTypeOpenAIVideo,
 		constant.EndpointTypeImageGeneration,
-	}))
+	}, ""))
+	// 任务视频常无 openai-video，按产品类型走视频 API
+	assert.Equal(t, InvokeProtocolVideos, resolveInvokeProtocol(
+		[]constant.EndpointType{constant.EndpointTypeOpenAI}, model.ModelTypeVideo,
+	))
+	assert.Equal(t, InvokeProtocolChat, resolveInvokeProtocol(
+		[]constant.EndpointType{constant.EndpointTypeOpenAI}, model.ModelTypeImage,
+	))
 	assert.Equal(t, model.ModelTypeChat, inferModelTypeFromEndpoints([]constant.EndpointType{constant.EndpointTypeOpenAI}))
 	assert.Equal(t, model.ModelTypeImage, inferModelTypeFromEndpoints([]constant.EndpointType{constant.EndpointTypeImageGeneration}))
 	assert.Equal(t, "/v1/images/generations", endpointPathForProtocol(InvokeProtocolImages))

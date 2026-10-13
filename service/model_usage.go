@@ -175,17 +175,14 @@ func loadModelUsageCatalog() ([]ModelUsageItem, []model.PricingVendor, error) {
 	items := make([]ModelUsageItem, 0, len(pricing))
 	for _, p := range pricing {
 		meta := metaByName[p.ModelName]
-		invokeProtocol := resolveInvokeProtocol(p.SupportedEndpointTypes)
 		item := ModelUsageItem{
 			ModelName:              p.ModelName,
 			Description:            p.Description,
 			Icon:                   p.Icon,
 			ModelType:              model.ModelTypeChat,
-			InvokeProtocol:         invokeProtocol,
 			VendorID:               p.VendorID,
 			Status:                 1,
 			SupportedEndpointTypes: p.SupportedEndpointTypes,
-			EndpointPath:           endpointPathForProtocol(invokeProtocol),
 		}
 		if vendor, ok := vendorByID[p.VendorID]; ok {
 			item.VendorName = vendor.Name
@@ -196,7 +193,7 @@ func loadModelUsageCatalog() ([]ModelUsageItem, []model.PricingVendor, error) {
 		}
 		if meta != nil {
 			item.ID = meta.Id
-			// 产品类型以元数据为准（可把 chat 协议模型标成 image Tab）
+			// 产品类型以元数据为准（可把 chat 协议模型标成 image/video Tab）
 			item.ModelType = model.NormalizeModelType(meta.ModelType)
 			item.ManualUsage = meta.ManualUsage
 			item.CreatedTime = meta.CreatedTime
@@ -212,6 +209,9 @@ func loadModelUsageCatalog() ([]ModelUsageItem, []model.PricingVendor, error) {
 			// 无元数据时按 endpoint 启发式类型
 			item.ModelType = inferModelTypeFromEndpoints(p.SupportedEndpointTypes)
 		}
+		// 调用协议：endpoint 优先，其次按产品类型（任务视频常无 openai-video）
+		item.InvokeProtocol = resolveInvokeProtocol(p.SupportedEndpointTypes, item.ModelType)
+		item.EndpointPath = endpointPathForProtocol(item.InvokeProtocol)
 		item.ActualUsage7d = usageByName[p.ModelName]
 		item.DisplayUsage = item.ActualUsage7d + item.ManualUsage
 		items = append(items, item)
@@ -254,7 +254,7 @@ func sortModelUsageItems(items []ModelUsageItem) {
 }
 
 func inferModelTypeFromEndpoints(endpoints []constant.EndpointType) string {
-	switch resolveInvokeProtocol(endpoints) {
+	switch resolveInvokeProtocol(endpoints, "") {
 	case InvokeProtocolVideos:
 		return model.ModelTypeVideo
 	case InvokeProtocolImages:
@@ -264,15 +264,24 @@ func inferModelTypeFromEndpoints(endpoints []constant.EndpointType) string {
 	}
 }
 
-// resolveInvokeProtocol 按 endpoint 决定实际调用协议（与 model_type Tab 解耦）。
-func resolveInvokeProtocol(endpoints []constant.EndpointType) string {
+// resolveInvokeProtocol 决定模型使用页的实际调用协议。
+// endpoint 有明确能力时优先；否则用 model_type（例如 Wan 任务视频标成 video 但无 openai-video）。
+func resolveInvokeProtocol(endpoints []constant.EndpointType, modelType string) string {
 	if slices.Contains(endpoints, constant.EndpointTypeOpenAIVideo) {
 		return InvokeProtocolVideos
 	}
 	if slices.Contains(endpoints, constant.EndpointTypeImageGeneration) {
 		return InvokeProtocolImages
 	}
-	return InvokeProtocolChat
+	switch model.NormalizeModelType(modelType) {
+	case model.ModelTypeVideo:
+		return InvokeProtocolVideos
+	case model.ModelTypeImage:
+		// 无 image-generation 端点时走 chat 生图（如 Gemini image）
+		return InvokeProtocolChat
+	default:
+		return InvokeProtocolChat
+	}
 }
 
 func endpointPathForProtocol(protocol string) string {
