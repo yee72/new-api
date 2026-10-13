@@ -55,6 +55,8 @@ function sanitizeSessions(
         .slice(-MAX_PERSISTED_MESSAGES)
         .map((message) => {
           if (message.status !== 'pending') return message
+          // 视频仍可能在服务端续拉，保留 pending
+          if (message.mediaType === 'video') return message
           return {
             ...message,
             status: 'error' as const,
@@ -66,7 +68,7 @@ function sanitizeSessions(
   return next
 }
 
-/** data URL 体积过大，持久化时丢弃，保留其它历史 */
+/** data URL 体积过大，本地草稿持久化时丢弃 */
 function stripHeavyImages(
   sessions: Record<string, ModelUsageSession>
 ): Record<string, ModelUsageSession> {
@@ -88,10 +90,17 @@ function stripHeavyImages(
 }
 
 type ModelUsageSessionsState = {
+  ownerUserId: number | null
   sessions: Record<string, ModelUsageSession>
   lastModelName: string
+  setOwnerUserId: (userId: number | null) => void
   setLastModelName: (modelName: string) => void
   ensureSession: (model: ModelUsageItem) => void
+  hydrateSession: (
+    modelName: string,
+    session: ModelUsageSession,
+    model?: ModelUsageItem
+  ) => void
   patchSession: (
     modelName: string,
     updater: (current: ModelUsageSession) => ModelUsageSession,
@@ -100,14 +109,28 @@ type ModelUsageSessionsState = {
   setImageConfig: (model: ModelUsageItem, config: ImageGenerationConfig) => void
   setVideoConfig: (model: ModelUsageItem, config: VideoGenerationConfig) => void
   deleteTurn: (model: ModelUsageItem, turnId: string) => void
-  getSessionSnapshot: (modelName: string, model?: ModelUsageItem) => ModelUsageSession
+  getSessionSnapshot: (
+    modelName: string,
+    model?: ModelUsageItem
+  ) => ModelUsageSession
 }
 
 export const useModelUsageSessionsStore = create<ModelUsageSessionsState>()(
   persist(
     (set, get) => ({
+      ownerUserId: null,
       sessions: {},
       lastModelName: '',
+      setOwnerUserId: (userId) => {
+        const current = get().ownerUserId
+        if (current === userId) return
+        // 切换账号时清空内存会话，避免串号；未登录草稿单独保留在 null 桶
+        if (current !== null && userId !== current) {
+          set({ ownerUserId: userId, sessions: {}, lastModelName: '' })
+          return
+        }
+        set({ ownerUserId: userId })
+      },
       setLastModelName: (modelName) =>
         set((state) =>
           state.lastModelName === modelName
@@ -121,6 +144,19 @@ export const useModelUsageSessionsStore = create<ModelUsageSessionsState>()(
           sessions: {
             ...sessions,
             [model.model_name]: createEmptySession(model),
+          },
+        })
+      },
+      hydrateSession: (modelName, session, model) => {
+        const { sessions } = get()
+        const previous = sessions[modelName] ?? createEmptySession(model)
+        set({
+          sessions: {
+            ...sessions,
+            [modelName]: {
+              ...previous,
+              ...session,
+            },
           },
         })
       },
@@ -167,14 +203,18 @@ export const useModelUsageSessionsStore = create<ModelUsageSessionsState>()(
     {
       name: 'model-usage-sessions',
       partialize: (state) => ({
-        sessions: stripHeavyImages(state.sessions),
-        lastModelName: state.lastModelName,
+        // 仅缓存未登录草稿；登录会话以服务端为准
+        ownerUserId: state.ownerUserId,
+        sessions:
+          state.ownerUserId == null ? stripHeavyImages(state.sessions) : {},
+        lastModelName: state.ownerUserId == null ? state.lastModelName : '',
       }),
       merge: (persisted, current) => {
         const raw = (persisted ?? {}) as Partial<ModelUsageSessionsState>
         return {
           ...current,
           ...raw,
+          ownerUserId: raw.ownerUserId ?? null,
           sessions: sanitizeSessions(raw.sessions ?? {}),
           lastModelName: raw.lastModelName ?? '',
         }

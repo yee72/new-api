@@ -78,6 +78,11 @@ export type LocalAttachment = {
   previewUrl?: string
 }
 
+export type ModelUsageVideo = {
+  task_id?: string
+  url?: string
+}
+
 /** 单轮对话气泡（chat / image / video 共用） */
 export type ModelUsageMessage = {
   id: string
@@ -87,10 +92,18 @@ export type ModelUsageMessage = {
   status: 'pending' | 'done' | 'error'
   mediaType: 'text' | 'image' | 'video'
   images?: string[]
+  videos?: ModelUsageVideo[]
   /** 用户输入，供删除后重生成 */
   prompt?: string
   imageConfig?: ImageGenerationConfig
   videoConfig?: VideoGenerationConfig
+}
+
+export type ModelUsageSessionDTO = {
+  model_name: string
+  messages: ModelUsageMessage[]
+  image_config?: Partial<ImageGenerationConfig> | Record<string, unknown>
+  video_config?: Partial<VideoGenerationConfig> | Record<string, unknown>
 }
 
 /** 每个模型一份独立会话，互不影响进行中的请求 */

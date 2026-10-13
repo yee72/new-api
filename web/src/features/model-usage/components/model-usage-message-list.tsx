@@ -56,7 +56,10 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
           const isUser = message.role === 'user'
           const canAct = message.status !== 'pending'
           const images = message.images?.filter(Boolean) ?? []
+          const videos =
+            message.videos?.filter((item) => Boolean(item.url)) ?? []
           const hasImages = images.length > 0
+          const hasVideos = videos.length > 0
           const hasText =
             message.status === 'pending' || Boolean(message.content)
 
@@ -123,6 +126,46 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
                           images.length === 1 ? 'max-w-full' : 'w-full'
                         )}
                         loading='lazy'
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {hasVideos && (
+                <div
+                  className={cn(
+                    'bg-muted w-full max-w-[min(100%,36rem)] overflow-hidden rounded-2xl p-2',
+                    videos.length === 1
+                      ? 'flex'
+                      : 'grid grid-cols-2 gap-2'
+                  )}
+                >
+                  {videos.map((video, index) => (
+                    <button
+                      key={`${message.id}-video-${index}`}
+                      type='button'
+                      className='bg-background/40 hover:ring-primary/50 focus-visible:ring-ring block overflow-hidden rounded-xl text-left transition hover:ring-2 focus-visible:ring-2 focus-visible:outline-none'
+                      onClick={() =>
+                        setPreview({
+                          items: videos.map((item) => ({
+                            url: item.url!,
+                            kind: 'video' as const,
+                          })),
+                          index,
+                        })
+                      }
+                      aria-label={t('Video Preview')}
+                    >
+                      <video
+                        src={video.url}
+                        className={cn(
+                          'max-h-80 bg-black/20 object-contain',
+                          videos.length === 1 ? 'max-w-full' : 'w-full'
+                        )}
+                        muted
+                        playsInline
+                        preload='metadata'
                       />
                     </button>
                   ))}

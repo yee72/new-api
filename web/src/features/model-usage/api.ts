@@ -19,7 +19,12 @@ For commercial licensing, please contact support@quantumnous.com
 import { api } from '@/lib/api'
 import { requireServerSuccess } from '@/lib/server-error-message'
 
-import type { ModelUsageListData, ModelUsageTab } from './types'
+import type {
+  ModelUsageListData,
+  ModelUsageMessage,
+  ModelUsageSessionDTO,
+  ModelUsageTab,
+} from './types'
 
 export async function fetchModelUsageModels(params: {
   type: ModelUsageTab
@@ -38,6 +43,58 @@ export async function fetchModelUsageModels(params: {
   } as Record<string, unknown>)
   requireServerSuccess(res.data)
   return res.data.data as ModelUsageListData
+}
+
+export async function fetchModelUsageSession(
+  modelName: string
+): Promise<ModelUsageSessionDTO> {
+  const res = await api.get(
+    `/api/model-usage/sessions/${encodeURIComponent(modelName)}`
+  )
+  requireServerSuccess(res.data)
+  return res.data.data as ModelUsageSessionDTO
+}
+
+export async function replaceModelUsageSession(
+  modelName: string,
+  payload: ModelUsageSessionDTO
+): Promise<ModelUsageSessionDTO> {
+  const res = await api.put(
+    `/api/model-usage/sessions/${encodeURIComponent(modelName)}`,
+    payload
+  )
+  requireServerSuccess(res.data)
+  return res.data.data as ModelUsageSessionDTO
+}
+
+export async function commitModelUsageTurn(
+  modelName: string,
+  payload: {
+    user_message: ModelUsageMessage
+    assistant_message: ModelUsageMessage
+    image_sources?: string[]
+    video_task_ids?: string[]
+    image_config?: Record<string, unknown>
+    video_config?: Record<string, unknown>
+  }
+): Promise<ModelUsageSessionDTO> {
+  const res = await api.post(
+    `/api/model-usage/sessions/${encodeURIComponent(modelName)}/turns`,
+    payload
+  )
+  requireServerSuccess(res.data)
+  return res.data.data as ModelUsageSessionDTO
+}
+
+export async function refreshModelUsageVideoTurn(
+  modelName: string,
+  turnId: string
+): Promise<ModelUsageSessionDTO> {
+  const res = await api.post(
+    `/api/model-usage/sessions/${encodeURIComponent(modelName)}/turns/${encodeURIComponent(turnId)}/refresh-video`
+  )
+  requireServerSuccess(res.data)
+  return res.data.data as ModelUsageSessionDTO
 }
 
 export async function generateImages(payload: {

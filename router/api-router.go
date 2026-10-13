@@ -42,6 +42,16 @@ func SetApiRouter(router *gin.Engine) {
 		}
 		// model_usage 列表按请求次数热度排序；HeaderNav 仍兼容存量 rankings 开关
 		apiRouter.GET("/model-usage/models", middleware.HeaderNavModuleAuth("model_usage"), controller.GetModelUsageModels)
+		modelUsageSessionRoute := apiRouter.Group("/model-usage")
+		modelUsageSessionRoute.Use(middleware.DisableCache())
+		{
+			modelUsageSessionRoute.GET("/sessions/:model", middleware.UserAuth(), controller.GetModelUsageSession)
+			modelUsageSessionRoute.PUT("/sessions/:model", middleware.UserAuth(), controller.PutModelUsageSession)
+			modelUsageSessionRoute.POST("/sessions/:model/turns", middleware.UserAuth(), controller.PostModelUsageTurn)
+			modelUsageSessionRoute.POST("/sessions/:model/turns/:turnId/refresh-video", middleware.UserAuth(), controller.PostModelUsageRefreshVideo)
+			// 媒体靠 HMAC access 查询参数，便于 <img>/<video> 同源加载
+			modelUsageSessionRoute.GET("/media/*objectKey", middleware.TryUserAuth(), controller.GetModelUsageMedia)
+		}
 		apiRouter.GET("/captcha", middleware.CriticalRateLimit(), middleware.DisableCache(), controller.GetCaptcha)
 		apiRouter.GET("/verification", middleware.EmailVerificationRateLimit(), middleware.TurnstileCheck(), controller.SendEmailVerification)
 		apiRouter.GET("/reset_password", middleware.CriticalRateLimit(), middleware.TurnstileCheck(), controller.SendPasswordResetEmail)

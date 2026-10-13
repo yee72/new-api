@@ -22,8 +22,16 @@ import { toast } from 'sonner'
 
 import { sendChatCompletion } from '@/features/playground/api'
 import { handleServerError } from '@/lib/handle-server-error'
+import { useAuthStore } from '@/stores/auth-store'
 
-import { generateImages, generateVideo } from '../api'
+import {
+  commitModelUsageTurn,
+  fetchModelUsageSession,
+  generateImages,
+  generateVideo,
+  refreshModelUsageVideoTurn,
+  replaceModelUsageSession,
+} from '../api'
 import {
   aspectRatioToSize,
   validateImageConfig,
@@ -37,6 +45,7 @@ import type {
   ImageGenerationConfig,
   ModelUsageItem,
   ModelUsageMessage,
+  ModelUsageSession,
   VideoGenerationConfig,
 } from '../types'
 
@@ -59,16 +68,58 @@ function extractImageUrls(data: unknown): string[] {
   )
 }
 
-function mediaTypeOf(
-  model: ModelUsageItem
-): ModelUsageMessage['mediaType'] {
+function mediaTypeOf(model: ModelUsageItem): ModelUsageMessage['mediaType'] {
   if (model.model_type === 'image') return 'image'
   if (model.model_type === 'video') return 'video'
   return 'text'
 }
 
+function applyServerSession(
+  modelName: string,
+  dto: Awaited<ReturnType<typeof fetchModelUsageSession>>,
+  model?: ModelUsageItem
+) {
+  const defaults = createEmptySession(model)
+  const savedImage = dto.image_config as Partial<ImageGenerationConfig> | undefined
+  const savedVideo = dto.video_config as Partial<VideoGenerationConfig> | undefined
+  useModelUsageSessionsStore.getState().hydrateSession(
+    modelName,
+    {
+      messages: dto.messages ?? [],
+      sending: false,
+      imageConfig: {
+        ...defaults.imageConfig,
+        ...savedImage,
+      },
+      videoConfig: {
+        ...defaults.videoConfig,
+        ...savedVideo,
+      },
+    },
+    model
+  )
+}
+
+async function pollVideoUntilSettled(modelName: string, turnId: string) {
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 3000))
+    const dto = await refreshModelUsageVideoTurn(modelName, turnId)
+    applyServerSession(modelName, dto)
+    const assistant = dto.messages.find(
+      (message) =>
+        message.turnId === turnId &&
+        message.role === 'assistant' &&
+        message.mediaType === 'video'
+    )
+    if (!assistant || assistant.status === 'done' || assistant.status === 'error') {
+      return
+    }
+  }
+}
+
 export function useModelSessions() {
   const { t } = useTranslation()
+  const userId = useAuthStore((state) => state.auth.user?.id ?? null)
   const sessions = useModelUsageSessionsStore((state) => state.sessions)
   const lastModelName = useModelUsageSessionsStore(
     (state) => state.lastModelName
@@ -76,8 +127,14 @@ export function useModelSessions() {
   const setLastModelName = useModelUsageSessionsStore(
     (state) => state.setLastModelName
   )
+  const setOwnerUserId = useModelUsageSessionsStore(
+    (state) => state.setOwnerUserId
+  )
   const ensureSession = useModelUsageSessionsStore(
     (state) => state.ensureSession
+  )
+  const hydrateSession = useModelUsageSessionsStore(
+    (state) => state.hydrateSession
   )
   const patchSession = useModelUsageSessionsStore(
     (state) => state.patchSession
@@ -88,7 +145,7 @@ export function useModelSessions() {
   const setVideoConfig = useModelUsageSessionsStore(
     (state) => state.setVideoConfig
   )
-  const deleteTurn = useModelUsageSessionsStore((state) => state.deleteTurn)
+  const deleteTurnLocal = useModelUsageSessionsStore((state) => state.deleteTurn)
 
   const getSession = useCallback(
     (model?: ModelUsageItem) => {
@@ -96,6 +153,36 @@ export function useModelSessions() {
       return sessions[model.model_name] ?? createEmptySession(model)
     },
     [sessions]
+  )
+
+  const loadServerSession = useCallback(
+    async (model: ModelUsageItem) => {
+      setOwnerUserId(userId)
+      if (!userId) {
+        ensureSession(model)
+        return
+      }
+      try {
+        const dto = await fetchModelUsageSession(model.model_name)
+        applyServerSession(model.model_name, dto, model)
+        // 续拉未完成视频
+        for (const message of dto.messages) {
+          if (
+            message.role === 'assistant' &&
+            message.mediaType === 'video' &&
+            message.status === 'pending'
+          ) {
+            void pollVideoUntilSettled(model.model_name, message.turnId).catch(
+              () => undefined
+            )
+          }
+        }
+      } catch (error) {
+        ensureSession(model)
+        handleServerError(error, t('Failed to load conversation'))
+      }
+    },
+    [ensureSession, setOwnerUserId, t, userId]
   )
 
   const runGeneration = useCallback(
@@ -110,8 +197,7 @@ export function useModelSessions() {
     ) => {
       const modelName = model.model_name
       const store = useModelUsageSessionsStore.getState()
-      const latest =
-        store.sessions[modelName] ?? createEmptySession(model)
+      const latest = store.sessions[modelName] ?? createEmptySession(model)
       if (latest.sending) return
 
       const imageConfig = options?.imageConfig ?? latest.imageConfig
@@ -214,22 +300,6 @@ export function useModelSessions() {
         )
       }
 
-      const completeAssistant = (patch: Partial<ModelUsageMessage>) => {
-        patchSession(
-          modelName,
-          (current) => ({
-            ...current,
-            sending: false,
-            messages: current.messages.map((message) =>
-              message.id === assistantId
-                ? { ...message, status: 'done', ...patch }
-                : message
-            ),
-          }),
-          model
-        )
-      }
-
       try {
         if (model.model_type === 'chat') {
           const response = await sendChatCompletion({
@@ -243,10 +313,31 @@ export function useModelSessions() {
           const content =
             response.choices?.[0]?.message?.content ||
             t('Empty response from model')
-          completeAssistant({
+          const assistantMessage: ModelUsageMessage = {
+            ...pendingAssistant,
+            status: 'done',
             content:
               typeof content === 'string' ? content : String(content),
-          })
+          }
+          if (userId) {
+            const dto = await commitModelUsageTurn(modelName, {
+              user_message: userMessage,
+              assistant_message: assistantMessage,
+            })
+            applyServerSession(modelName, dto, model)
+          } else {
+            patchSession(
+              modelName,
+              (current) => ({
+                ...current,
+                sending: false,
+                messages: current.messages.map((message) =>
+                  message.id === assistantId ? assistantMessage : message
+                ),
+              }),
+              model
+            )
+          }
           return
         }
 
@@ -261,32 +352,59 @@ export function useModelSessions() {
                 ? undefined
                 : imageConfig.quality,
           })
-          const urls = extractImageUrls(data)
-          completeAssistant({
-            content: urls.length > 0 ? '' : t('Empty response from model'),
-            images: urls,
+          const sources = extractImageUrls(data)
+          if (!userId) {
+            failAssistant(t('Please sign in to save generated works'))
+            return
+          }
+          const dto = await commitModelUsageTurn(modelName, {
+            user_message: userMessage,
+            assistant_message: {
+              ...pendingAssistant,
+              content: '',
+              status: 'done',
+            },
+            image_sources: sources,
+            image_config: imageConfig as unknown as Record<string, unknown>,
           })
+          applyServerSession(modelName, dto, model)
           toast.success(t('Generation completed'))
           return
         }
 
-        const tasks: unknown[] = []
+        const taskIds: string[] = []
         for (let i = 0; i < videoConfig.n; i += 1) {
-          const result = await generateVideo({
+          const result = (await generateVideo({
             model: modelName,
             prompt,
             seconds: videoConfig.seconds,
             size: aspectRatioToSize(videoConfig.aspectRatio),
-          })
-          tasks.push(result)
+          })) as { id?: string }
+          if (result?.id) taskIds.push(result.id)
         }
-        const first = tasks[0] as { id?: string; status?: string }
-        completeAssistant({
-          content: first?.id
-            ? t('Video task submitted: {{id}}', { id: first.id })
-            : t('Video task submitted'),
+        if (!userId) {
+          failAssistant(t('Please sign in to save generated works'))
+          return
+        }
+        if (taskIds.length === 0) {
+          failAssistant(t('Generation failed'))
+          return
+        }
+        const dto = await commitModelUsageTurn(modelName, {
+          user_message: userMessage,
+          assistant_message: {
+            ...pendingAssistant,
+            content: t('Your work is being generated...'),
+            status: 'pending',
+          },
+          video_task_ids: taskIds,
+          video_config: videoConfig as unknown as Record<string, unknown>,
         })
+        applyServerSession(modelName, dto, model)
         toast.success(t('Generation completed'))
+        void pollVideoUntilSettled(modelName, turnId).catch((error) => {
+          handleServerError(error, t('Generation failed'))
+        })
       } catch (error) {
         const fallback =
           model.model_type === 'chat'
@@ -299,7 +417,7 @@ export function useModelSessions() {
         failAssistant(fallback)
       }
     },
-    [patchSession, t]
+    [patchSession, t, userId]
   )
 
   const send = useCallback(
@@ -325,6 +443,34 @@ export function useModelSessions() {
     [runGeneration]
   )
 
+  const deleteTurn = useCallback(
+    async (model: ModelUsageItem, turnId: string) => {
+      deleteTurnLocal(model, turnId)
+      if (!userId) return
+      const session = useModelUsageSessionsStore
+        .getState()
+        .getSessionSnapshot(model.model_name, model)
+      try {
+        const dto = await replaceModelUsageSession(model.model_name, {
+          model_name: model.model_name,
+          messages: session.messages,
+          image_config: session.imageConfig as unknown as Record<
+            string,
+            unknown
+          >,
+          video_config: session.videoConfig as unknown as Record<
+            string,
+            unknown
+          >,
+        })
+        applyServerSession(model.model_name, dto, model)
+      } catch (error) {
+        handleServerError(error, t('Failed to save conversation'))
+      }
+    },
+    [deleteTurnLocal, t, userId]
+  )
+
   const isModelSending = useCallback(
     (modelName: string) => Boolean(sessions[modelName]?.sending),
     [sessions]
@@ -333,6 +479,8 @@ export function useModelSessions() {
   return {
     getSession,
     ensureSession,
+    loadServerSession,
+    hydrateSession,
     setImageConfig,
     setVideoConfig,
     send,
@@ -343,3 +491,5 @@ export function useModelSessions() {
     setLastModelName,
   }
 }
+
+export type { ModelUsageSession }

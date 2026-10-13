@@ -41,7 +41,7 @@ export function ModelUsagePage() {
   const user = useAuthStore((state) => state.auth.user)
   const {
     getSession,
-    ensureSession,
+    loadServerSession,
     setImageConfig,
     setVideoConfig,
     send,
@@ -132,9 +132,9 @@ export function ModelUsagePage() {
 
   useEffect(() => {
     if (selectedModel) {
-      ensureSession(selectedModel)
+      void loadServerSession(selectedModel)
     }
-  }, [selectedModel, ensureSession])
+  }, [selectedModel, loadServerSession, user?.id])
 
   useEffect(() => {
     void navigate({
@@ -203,7 +203,7 @@ export function ModelUsagePage() {
             }}
             onDeleteTurn={(turnId) => {
               if (!selectedModel) return
-              deleteTurn(selectedModel, turnId)
+              void deleteTurn(selectedModel, turnId)
             }}
             onRegenerate={async (message) => {
               if (!selectedModel) return

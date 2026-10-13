@@ -6,7 +6,6 @@ import (
 	"io"
 
 	"github.com/QuantumNous/new-api/model"
-	"github.com/QuantumNous/new-api/setting/system_setting"
 	"github.com/QuantumNous/new-api/types"
 	"github.com/gin-gonic/gin"
 )
@@ -53,11 +52,19 @@ func (disabledArtifactStore) Serve(*gin.Context, *model.Task, *StoredArtifactRef
 var taskArtifactStore TaskArtifactStore = &disabledArtifactStore{}
 
 func init() {
-	_ = system_setting.LoadTaskArtifactStoreConfig()
+	initS3ArtifactStoreFromConfig()
 }
 
-// GetTaskArtifactStore returns the process-wide artifact storage backend. This
-// release always returns the disabled implementation.
+// GetTaskArtifactStore returns the process-wide artifact storage backend.
 func GetTaskArtifactStore() TaskArtifactStore {
 	return taskArtifactStore
+}
+
+// SetTaskArtifactStoreForTest replaces the process-wide store (tests only).
+func SetTaskArtifactStoreForTest(store TaskArtifactStore) {
+	if store == nil {
+		taskArtifactStore = &disabledArtifactStore{}
+		return
+	}
+	taskArtifactStore = store
 }

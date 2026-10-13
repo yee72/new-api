@@ -24,6 +24,13 @@ services:
       - BATCH_UPDATE_ENABLED=true
       - NODE_NAME=new-api-node-1
       - SESSION_SECRET=9bf7ac9696ee6a39792f933ac31e793c02aaafed6c3ef792973a4027e79dac1f
+      # R2 任务产物存储（S3 兼容）；cfat_ Cloudflare API Token 不用于此处
+      - TASK_ARTIFACT_STORE_MODE=s3
+      - TASK_ARTIFACT_STORE_S3_ENDPOINT=https://b406783e92de7862dfeab977e284d6ba.r2.cloudflarestorage.com
+      - TASK_ARTIFACT_STORE_S3_BUCKET=new-api-cache-bucket
+      - TASK_ARTIFACT_STORE_S3_REGION=auto
+      - TASK_ARTIFACT_STORE_S3_ACCESS_KEY=78a04202778bcdcad7f5b38656174f29
+      - TASK_ARTIFACT_STORE_S3_SECRET_KEY=b053918203cea67ceb9a69550fdfe69e6a47d79b86009dd51c46e9fcdccb7355
     depends_on:
       - redis
       - postgres

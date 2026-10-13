@@ -108,10 +108,21 @@ func (m Properties) Value() (driver.Value, error) {
 	return string(b), nil
 }
 
+// StoredArtifactRef is a durable pointer to bytes in the configured object store.
+type StoredArtifactRef struct {
+	Backend   string `json:"backend,omitempty"`
+	Bucket    string `json:"bucket,omitempty"`
+	ObjectKey string `json:"object_key,omitempty"`
+	MimeType  string `json:"mime_type,omitempty"`
+	Size      int64  `json:"size,omitempty"`
+}
+
 type TaskPrivateData struct {
 	Key            string `json:"key,omitempty"`
 	UpstreamTaskID string `json:"upstream_task_id,omitempty"` // 上游真实 task ID
 	ResultURL      string `json:"result_url,omitempty"`       // 任务成功后的结果 URL（视频地址等）
+	// ArtifactRefs maps artifact keys to objects copied into S3/R2.
+	ArtifactRefs map[string]StoredArtifactRef `json:"artifact_refs,omitempty"`
 	// Execution records safe, immutable request provenance. It lives next to
 	// other private task state so public task DTOs cannot expose it by accident.
 	Execution *TaskExecutionSnapshot `json:"execution,omitempty"`

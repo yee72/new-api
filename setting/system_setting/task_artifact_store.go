@@ -36,8 +36,8 @@ var (
 	taskArtifactStoreRegionPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
 )
 
-// TaskArtifactStoreConfig reserves the configuration contract for a future S3
-// implementation. The current release always falls back to upstream proxying.
+// TaskArtifactStoreConfig is the startup-only S3-compatible object store config
+// (including Cloudflare R2 via a custom endpoint).
 type TaskArtifactStoreConfig struct {
 	Mode                string
 	S3Endpoint          string
@@ -50,7 +50,7 @@ type TaskArtifactStoreConfig struct {
 }
 
 // LoadTaskArtifactStoreConfig reads and validates startup-only configuration.
-// S3 mode is deliberately disabled until a storage implementation is shipped.
+// Invalid S3 settings fall back to upstream proxying.
 func LoadTaskArtifactStoreConfig() TaskArtifactStoreConfig {
 	config := TaskArtifactStoreConfig{
 		Mode:                common.GetEnvOrDefaultString(TaskArtifactStoreModeEnv, TaskArtifactStoreModeUpstream),
@@ -66,10 +66,6 @@ func LoadTaskArtifactStoreConfig() TaskArtifactStoreConfig {
 		common.SysError("invalid task artifact store configuration: " + err.Error() + "; using upstream mode")
 		config.Mode = TaskArtifactStoreModeUpstream
 		return config
-	}
-	if config.Mode == TaskArtifactStoreModeS3 {
-		common.SysError("task artifact S3 storage is not implemented; using upstream mode")
-		config.Mode = TaskArtifactStoreModeUpstream
 	}
 	return config
 }

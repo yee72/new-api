@@ -9,14 +9,15 @@ function stableStringify(obj) {
 
 const newKeys = {
   en: {
-    'Show endpoint type filter': 'Show endpoint type filter',
-    'Allow users to filter models by endpoint type on the model plaza':
-      'Allow users to filter models by endpoint type on the model plaza',
+    'Failed to load conversation': 'Failed to load conversation',
+    'Failed to save conversation': 'Failed to save conversation',
+    'Please sign in to save generated works':
+      'Please sign in to save generated works',
   },
   zh: {
-    'Show endpoint type filter': '显示端点类型筛选',
-    'Allow users to filter models by endpoint type on the model plaza':
-      '允许用户在模型广场按端点类型筛选模型',
+    'Failed to load conversation': '加载对话失败',
+    'Failed to save conversation': '保存对话失败',
+    'Please sign in to save generated works': '请先登录以保存生成的作品',
   },
 }
 
