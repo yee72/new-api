@@ -60,8 +60,17 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
             message.videos?.filter((item) => Boolean(item.url)) ?? []
           const hasImages = images.length > 0
           const hasVideos = videos.length > 0
-          const hasText =
-            message.status === 'pending' || Boolean(message.content)
+          // 已有媒体时不再展示「生成中」占位；完成态空 content 也不出气泡
+          const showGenerating =
+            message.status === 'pending' && !hasImages && !hasVideos
+          const showTextBubble =
+            showGenerating ||
+            (message.status === 'error' && Boolean(message.content)) ||
+            (message.status !== 'pending' &&
+              Boolean(message.content) &&
+              !hasImages &&
+              !hasVideos) ||
+            (isUser && Boolean(message.content))
 
           return (
             <div
@@ -71,7 +80,7 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
                 isUser ? 'items-end' : 'items-start'
               )}
             >
-              {hasText && (
+              {showTextBubble && (
                 <div
                   className={cn(
                     'max-w-[min(100%,36rem)] rounded-2xl px-3.5 py-2 text-sm whitespace-pre-wrap',
@@ -82,7 +91,7 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
                         : 'bg-muted'
                   )}
                 >
-                  {message.status === 'pending' ? (
+                  {showGenerating ? (
                     <span className='inline-flex items-center gap-2'>
                       <Loader2 className='size-3.5 shrink-0 animate-spin' />
                       {message.content || t('Your work is being generated...')}

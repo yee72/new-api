@@ -134,6 +134,10 @@ func CommitModelUsageTurn(ctx context.Context, userId int, modelName string, req
 		}
 		assistant.Videos = videos
 		assistant.Status = status
+		// 完成后去掉「生成中」占位文案，避免与视频并存
+		if status == "done" {
+			assistant.Content = ""
+		}
 	default:
 		assistant.MediaType = "text"
 		if containsDataURL(assistant.Content) {
@@ -199,7 +203,13 @@ func RefreshModelUsageVideoTurn(ctx context.Context, userId int, modelName, turn
 				break
 			}
 		}
-		if !needRefresh && message.Status == "done" {
+		if !needRefresh {
+			// URL 已齐：补齐完成态并清掉占位文案，无需再次拉任务/上传
+			if message.Status != "done" || message.Content != "" {
+				message.Status = "done"
+				message.Content = ""
+				changed = true
+			}
 			continue
 		}
 		videos, status, err := persistOrTrackModelUsageVideos(ctx, userId, modelName, message.ID, taskIDs)
@@ -208,6 +218,9 @@ func RefreshModelUsageVideoTurn(ctx context.Context, userId int, modelName, turn
 		}
 		message.Videos = videos
 		message.Status = status
+		if status == "done" {
+			message.Content = ""
+		}
 		changed = true
 	}
 	if !changed {
