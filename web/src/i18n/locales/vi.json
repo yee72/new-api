@@ -1418,6 +1418,7 @@
     "Controls catalog visibility. Channel availability is configured separately.": "Kiểm soát hiển thị trong danh mục. Khả năng sử dụng kênh được cấu hình riêng.",
     "Controls how much the model thinks before answering": "Điều chỉnh mức suy luận trước khi trả lời",
     "Controls randomness and creativity": "Điều chỉnh độ ngẫu nhiên và sáng tạo",
+    "Controls the Model Usage tab (Chat / Image / Video). The actual API route still follows the model endpoints: image-generation uses the Images API, openai-video uses Videos, otherwise Chat Completions. Set Image for chat-based image models (for example Gemini image) so they appear under Image.": "Controls the Model Usage tab (Chat / Image / Video). The actual API route still follows the model endpoints: image-generation uses the Images API, openai-video uses Videos, otherwise Chat Completions. Set Image for chat-based image models (for example Gemini image) so they appear under Image.",
     "Controls visibility in the model square. Channel status and existing API access are unchanged.": "Kiểm soát hiển thị trong kho mô hình, không ảnh hưởng trạng thái kênh và quyền gọi API hiện có.",
     "Controls whether user verification (biometrics/PIN) is required during Passkey flows.": "Kiểm soát xem liệu có yêu cầu xác minh người dùng (sinh trắc học/mã PIN) trong các luồng Passkey hay không.",
     "Conversation cleared": "Đã xóa cuộc trò chuyện",

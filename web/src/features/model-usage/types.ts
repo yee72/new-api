@@ -18,6 +18,9 @@ For commercial licensing, please contact support@quantumnous.com
 */
 export type ModelUsageType = 'chat' | 'image' | 'video'
 
+/** 实际调用协议：与 model_type（Tab）解耦 */
+export type ModelUsageInvokeProtocol = 'chat' | 'images' | 'videos'
+
 export type ModelUsageTab = 'all' | ModelUsageType
 
 export type ModelUsageVendor = {
@@ -33,6 +36,8 @@ export type ModelUsageItem = {
   description?: string
   icon?: string
   model_type: ModelUsageType
+  /** 后端下发；缺省时前端按 endpoint 回退 */
+  invoke_protocol?: ModelUsageInvokeProtocol
   vendor_id?: number
   vendor_name?: string
   vendor_icon?: string

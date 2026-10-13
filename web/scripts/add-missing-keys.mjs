@@ -9,15 +9,12 @@ function stableStringify(obj) {
 
 const newKeys = {
   en: {
-    'Failed to load conversation': 'Failed to load conversation',
-    'Failed to save conversation': 'Failed to save conversation',
-    'Please sign in to save generated works':
-      'Please sign in to save generated works',
+    'Controls the Model Usage tab (Chat / Image / Video). The actual API route still follows the model endpoints: image-generation uses the Images API, openai-video uses Videos, otherwise Chat Completions. Set Image for chat-based image models (for example Gemini image) so they appear under Image.':
+      'Controls the Model Usage tab (Chat / Image / Video). The actual API route still follows the model endpoints: image-generation uses the Images API, openai-video uses Videos, otherwise Chat Completions. Set Image for chat-based image models (for example Gemini image) so they appear under Image.',
   },
   zh: {
-    'Failed to load conversation': '加载对话失败',
-    'Failed to save conversation': '保存对话失败',
-    'Please sign in to save generated works': '请先登录以保存生成的作品',
+    'Controls the Model Usage tab (Chat / Image / Video). The actual API route still follows the model endpoints: image-generation uses the Images API, openai-video uses Videos, otherwise Chat Completions. Set Image for chat-based image models (for example Gemini image) so they appear under Image.':
+      '决定「模型使用」页的 Tab（聊天 / 图片 / 视频）。实际调用协议仍按模型端点：含 image-generation 走图片 API，含 openai-video 走视频 API，否则走对话补全。若模型通过对话协议生图（例如 Gemini image），请将类型设为「图片」以出现在图片 Tab。',
   },
 }
 

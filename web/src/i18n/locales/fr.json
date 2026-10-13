@@ -1418,6 +1418,7 @@
     "Controls catalog visibility. Channel availability is configured separately.": "Contrôle la visibilité dans le catalogue. La disponibilité des canaux se configure séparément.",
     "Controls how much the model thinks before answering": "Contrôle la quantité de raisonnement avant la réponse",
     "Controls randomness and creativity": "Contrôle le hasard et la créativité",
+    "Controls the Model Usage tab (Chat / Image / Video). The actual API route still follows the model endpoints: image-generation uses the Images API, openai-video uses Videos, otherwise Chat Completions. Set Image for chat-based image models (for example Gemini image) so they appear under Image.": "Controls the Model Usage tab (Chat / Image / Video). The actual API route still follows the model endpoints: image-generation uses the Images API, openai-video uses Videos, otherwise Chat Completions. Set Image for chat-based image models (for example Gemini image) so they appear under Image.",
     "Controls visibility in the model square. Channel status and existing API access are unchanged.": "Contrôle la visibilité dans la galerie des modèles sans changer les canaux ni les accès API existants.",
     "Controls whether user verification (biometrics/PIN) is required during Passkey flows.": "Contrôle si la vérification de l'utilisateur (biométrie/PIN) est requise lors des flux de Passkey.",
     "Conversation cleared": "Conversation effacée",

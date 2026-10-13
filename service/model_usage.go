@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/model"
 )
@@ -20,12 +19,20 @@ var ErrInvalidModelUsageVendorIDs = errors.New("invalid vendor_ids")
 
 const modelUsageCacheTTL = 2 * time.Minute
 
+// 模型使用页的实际调用协议（与 Tab 用的 model_type 解耦）。
+const (
+	InvokeProtocolChat   = "chat"
+	InvokeProtocolImages = "images"
+	InvokeProtocolVideos = "videos"
+)
+
 type ModelUsageItem struct {
 	ID                     int                     `json:"id"`
 	ModelName              string                  `json:"model_name"`
 	Description            string                  `json:"description,omitempty"`
 	Icon                   string                  `json:"icon,omitempty"`
 	ModelType              string                  `json:"model_type"`
+	InvokeProtocol         string                  `json:"invoke_protocol"`
 	VendorID               int                     `json:"vendor_id,omitempty"`
 	VendorName             string                  `json:"vendor_name,omitempty"`
 	VendorIcon             string                  `json:"vendor_icon,omitempty"`
@@ -168,15 +175,17 @@ func loadModelUsageCatalog() ([]ModelUsageItem, []model.PricingVendor, error) {
 	items := make([]ModelUsageItem, 0, len(pricing))
 	for _, p := range pricing {
 		meta := metaByName[p.ModelName]
+		invokeProtocol := resolveInvokeProtocol(p.SupportedEndpointTypes)
 		item := ModelUsageItem{
 			ModelName:              p.ModelName,
 			Description:            p.Description,
 			Icon:                   p.Icon,
 			ModelType:              model.ModelTypeChat,
+			InvokeProtocol:         invokeProtocol,
 			VendorID:               p.VendorID,
 			Status:                 1,
 			SupportedEndpointTypes: p.SupportedEndpointTypes,
-			EndpointPath:           defaultEndpointPath(p.SupportedEndpointTypes),
+			EndpointPath:           endpointPathForProtocol(invokeProtocol),
 		}
 		if vendor, ok := vendorByID[p.VendorID]; ok {
 			item.VendorName = vendor.Name
@@ -187,6 +196,7 @@ func loadModelUsageCatalog() ([]ModelUsageItem, []model.PricingVendor, error) {
 		}
 		if meta != nil {
 			item.ID = meta.Id
+			// 产品类型以元数据为准（可把 chat 协议模型标成 image Tab）
 			item.ModelType = model.NormalizeModelType(meta.ModelType)
 			item.ManualUsage = meta.ManualUsage
 			item.CreatedTime = meta.CreatedTime
@@ -244,26 +254,32 @@ func sortModelUsageItems(items []ModelUsageItem) {
 }
 
 func inferModelTypeFromEndpoints(endpoints []constant.EndpointType) string {
-	if slices.Contains(endpoints, constant.EndpointTypeOpenAIVideo) {
+	switch resolveInvokeProtocol(endpoints) {
+	case InvokeProtocolVideos:
 		return model.ModelTypeVideo
-	}
-	if slices.Contains(endpoints, constant.EndpointTypeImageGeneration) {
+	case InvokeProtocolImages:
 		return model.ModelTypeImage
+	default:
+		return model.ModelTypeChat
 	}
-	return model.ModelTypeChat
 }
 
-func defaultEndpointPath(endpoints []constant.EndpointType) string {
-	if len(endpoints) == 0 {
-		return "/v1/chat/completions"
+// resolveInvokeProtocol 按 endpoint 决定实际调用协议（与 model_type Tab 解耦）。
+func resolveInvokeProtocol(endpoints []constant.EndpointType) string {
+	if slices.Contains(endpoints, constant.EndpointTypeOpenAIVideo) {
+		return InvokeProtocolVideos
 	}
-	if info, ok := common.GetDefaultEndpointInfo(endpoints[0]); ok && info.Path != "" {
-		return info.Path
+	if slices.Contains(endpoints, constant.EndpointTypeImageGeneration) {
+		return InvokeProtocolImages
 	}
-	switch endpoints[0] {
-	case constant.EndpointTypeImageGeneration:
+	return InvokeProtocolChat
+}
+
+func endpointPathForProtocol(protocol string) string {
+	switch protocol {
+	case InvokeProtocolImages:
 		return "/v1/images/generations"
-	case constant.EndpointTypeOpenAIVideo:
+	case InvokeProtocolVideos:
 		return "/v1/videos"
 	default:
 		return "/v1/chat/completions"

@@ -471,7 +471,7 @@ export function ModelMutateDrawer(props: {
                             </FormControl>
                             <FormDescription>
                               {t(
-                                'Primary type for the model usage landing page.'
+                                'Controls the Model Usage tab (Chat / Image / Video). The actual API route still follows the model endpoints: image-generation uses the Images API, openai-video uses Videos, otherwise Chat Completions. Set Image for chat-based image models (for example Gemini image) so they appear under Image.'
                               )}
                             </FormDescription>
                             <FormMessage />

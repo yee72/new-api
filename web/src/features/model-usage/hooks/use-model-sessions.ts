@@ -38,6 +38,10 @@ import {
   validateVideoConfig,
 } from '../lib/capabilities'
 import {
+  extractImagesFromChatContent,
+  resolveInvokeProtocol,
+} from '../lib/invoke-protocol'
+import {
   createEmptySession,
   useModelUsageSessionsStore,
 } from '../stores/sessions-store'
@@ -206,7 +210,9 @@ export function useModelSessions() {
       const isRegenerate = Boolean(options?.turnId)
       const mediaType = mediaTypeOf(model)
 
-      if (model.model_type === 'image') {
+      const invokeProtocolEarly = resolveInvokeProtocol(model)
+      // Images API 才校验 size/quality；chat 协议生图只用提示词
+      if (model.model_type === 'image' && invokeProtocolEarly === 'images') {
         const errorKey = validateImageConfig(
           imageConfig,
           model.generation_capabilities
@@ -300,8 +306,10 @@ export function useModelSessions() {
         )
       }
 
+      const invokeProtocol = invokeProtocolEarly
+
       try {
-        if (model.model_type === 'chat') {
+        if (invokeProtocol === 'chat') {
           const response = await sendChatCompletion({
             model: modelName,
             messages: [
@@ -310,14 +318,48 @@ export function useModelSessions() {
             ],
             stream: false,
           })
-          const content =
-            response.choices?.[0]?.message?.content ||
-            t('Empty response from model')
+          const rawContent = response.choices?.[0]?.message?.content
+          const contentText =
+            typeof rawContent === 'string'
+              ? rawContent
+              : rawContent == null
+                ? ''
+                : String(rawContent)
+          const chatImages =
+            model.model_type === 'image'
+              ? extractImagesFromChatContent(contentText)
+              : []
+
+          if (model.model_type === 'image') {
+            if (!userId) {
+              failAssistant(t('Please sign in to save generated works'))
+              return
+            }
+            if (chatImages.length === 0) {
+              failAssistant(
+                contentText.trim() || t('Generation failed')
+              )
+              return
+            }
+            const dto = await commitModelUsageTurn(modelName, {
+              user_message: userMessage,
+              assistant_message: {
+                ...pendingAssistant,
+                content: contentText,
+                status: 'done',
+              },
+              image_sources: chatImages,
+              image_config: imageConfig as unknown as Record<string, unknown>,
+            })
+            applyServerSession(modelName, dto, model)
+            toast.success(t('Generation completed'))
+            return
+          }
+
           const assistantMessage: ModelUsageMessage = {
             ...pendingAssistant,
             status: 'done',
-            content:
-              typeof content === 'string' ? content : String(content),
+            content: contentText || t('Empty response from model'),
           }
           if (userId) {
             const dto = await commitModelUsageTurn(modelName, {
@@ -341,7 +383,7 @@ export function useModelSessions() {
           return
         }
 
-        if (model.model_type === 'image') {
+        if (invokeProtocol === 'images') {
           const data = await generateImages({
             model: modelName,
             prompt,
@@ -407,11 +449,11 @@ export function useModelSessions() {
         })
       } catch (error) {
         const fallback =
-          model.model_type === 'chat'
+          invokeProtocol === 'chat' && model.model_type === 'chat'
             ? t('Chat request failed')
             : t('Generation failed')
         handleServerError(error, fallback)
-        if (model.model_type === 'chat') {
+        if (invokeProtocol === 'chat' && model.model_type === 'chat') {
           toast.error(fallback)
         }
         failAssistant(fallback)

@@ -1418,6 +1418,7 @@
     "Controls catalog visibility. Channel availability is configured separately.": "控制目录中的展示，渠道可用性需单独配置。",
     "Controls how much the model thinks before answering": "控制模型回答前的推理深度",
     "Controls randomness and creativity": "控制输出的随机性和创造性",
+    "Controls the Model Usage tab (Chat / Image / Video). The actual API route still follows the model endpoints: image-generation uses the Images API, openai-video uses Videos, otherwise Chat Completions. Set Image for chat-based image models (for example Gemini image) so they appear under Image.": "决定「模型使用」页的 Tab（聊天 / 图片 / 视频）。实际调用协议仍按模型端点：含 image-generation 走图片 API，含 openai-video 走视频 API，否则走对话补全。若模型通过对话协议生图（例如 Gemini image），请将类型设为「图片」以出现在图片 Tab。",
     "Controls visibility in the model square. Channel status and existing API access are unchanged.": "控制模型在模型广场中的展示，不影响渠道启用状态和已有调用权限。",
     "Controls whether user verification (biometrics/PIN) is required during Passkey flows.": "控制在通行密钥流程中是否需要用户验证（生物识别/PIN）。",
     "Conversation cleared": "对话已清空",
