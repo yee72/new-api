@@ -142,15 +142,25 @@ describe('model cards', () => {
     expect(onClick).toHaveBeenCalledWith(name)
   })
 
-  it('shows description and details without performance metrics', () => {
-    render(<ModelCard model={pricingModel()} onClick={vi.fn()} />)
+  it('hides model description and performance metrics, with a details action', () => {
+    render(
+      <ModelCard
+        model={pricingModel({ description: 'Should not appear on the card.' })}
+        onClick={vi.fn()}
+      />
+    )
     expect(
       screen.queryByLabelText('Performance metrics for the last 24 hours')
     ).not.toBeInTheDocument()
     expect(screen.queryByText('Status')).not.toBeInTheDocument()
     expect(screen.queryByText('Latency')).not.toBeInTheDocument()
     expect(screen.queryByText('Throughput')).not.toBeInTheDocument()
-    expect(screen.getByText('No description available.')).toBeVisible()
+    expect(
+      screen.queryByText('No description available.')
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByText('Should not appear on the card.')
+    ).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Details' })).toBeEnabled()
   })
 

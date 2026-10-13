@@ -31,6 +31,7 @@ import { fetchModelUsageModels } from './api'
 import { ModelUsageSidebar } from './components/model-usage-sidebar'
 import { ModelUsageWorkspace } from './components/model-usage-workspace'
 import { useModelSessions } from './hooks/use-model-sessions'
+import { parseModelUsageVendorIds } from './lib/vendor-ids'
 import type { ModelUsageTab } from './types'
 
 export function ModelUsagePage() {
@@ -55,12 +56,7 @@ export function ModelUsagePage() {
     (search.type as ModelUsageTab) || 'all'
   )
   const [selectedVendorIds, setSelectedVendorIds] = useState<number[]>(() =>
-    search.vendors
-      ? String(search.vendors)
-          .split(',')
-          .map((part) => Number(part))
-          .filter((id) => id > 0)
-      : []
+    parseModelUsageVendorIds(search.vendors)
   )
   const [searchInput, setSearchInput] = useState(search.q || '')
   const [activeQuery, setActiveQuery] = useState<{
@@ -73,12 +69,7 @@ export function ModelUsagePage() {
       : {
           mode: 'filter',
           q: '',
-          vendorIds: search.vendors
-            ? String(search.vendors)
-                .split(',')
-                .map((part) => Number(part))
-                .filter((id) => id > 0)
-            : [],
+          vendorIds: parseModelUsageVendorIds(search.vendors),
         }
   )
   const [selectedModelName, setSelectedModelName] = useState(

@@ -65,7 +65,7 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
   const groups = props.model.enable_groups || []
   const endpoints = props.model.supported_endpoint_types || []
   const modelIconKey = props.model.icon || props.model.vendor_icon
-  const modelIcon = modelIconKey ? getLobeIcon(modelIconKey, 28) : null
+  const modelIcon = modelIconKey ? getLobeIcon(modelIconKey, 20) : null
   const initial = props.model.model_name?.charAt(0).toUpperCase() || '?'
   const isUnconfiguredTaskUsage = isUnconfiguredTaskUsageModel(props.model)
   const billingTime = useBillingTime(props.model.billing_expr)
@@ -252,28 +252,28 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
   }
 
   return (
-    <Card className='hover:ring-foreground/20 h-full min-w-0 gap-3 transition-colors'>
-      <CardHeader className='flex flex-row items-start gap-3'>
+    <Card className='hover:ring-foreground/20 h-full min-w-0 gap-2 py-3 transition-colors'>
+      <CardHeader className='flex flex-row items-start gap-2.5 px-3'>
         <div
           aria-hidden
-          className='bg-muted/50 flex size-10 shrink-0 items-center justify-center rounded-lg'
+          className='bg-muted/50 flex size-8 shrink-0 items-center justify-center rounded-md'
         >
           {modelIcon || (
-            <span className='text-muted-foreground text-sm font-bold'>
+            <span className='text-muted-foreground text-xs font-bold'>
               {initial}
             </span>
           )}
         </div>
         <div className='min-w-0 flex-1'>
           <h3
-            className='line-clamp-2 font-mono text-[15px] leading-snug font-semibold [overflow-wrap:anywhere]'
+            className='line-clamp-2 font-mono text-sm leading-snug font-semibold [overflow-wrap:anywhere]'
             title={props.model.model_name}
           >
             {props.model.model_name}
           </h3>
           {props.model.vendor_name && (
             <p
-              className='text-muted-foreground mt-1 truncate text-xs'
+              className='text-muted-foreground mt-0.5 truncate text-[11px]'
               title={props.model.vendor_name}
             >
               {props.model.vendor_name}
@@ -287,37 +287,32 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
           iconClassName='size-3.5'
         />
       </CardHeader>
-      <CardContent className='flex flex-1 flex-col gap-3'>
-        <div className='flex min-w-0 flex-col gap-1.5'>
-          <p className='text-muted-foreground line-clamp-2 text-[13px] leading-5 break-words'>
-            {props.model.description || t('No description available.')}
-          </p>
-          {tags.length > 0 && (
-            <div
-              role='group'
-              aria-label={t('Tags')}
-              className='text-muted-foreground flex min-w-0 items-baseline gap-1.5 text-xs'
-            >
-              <span className='shrink-0'>{t('Tags')}</span>
-              <span className='truncate' title={tags.join(', ')}>
-                {tags.slice(0, 2).join(', ')}
+      <CardContent className='flex flex-1 flex-col gap-2 px-3'>
+        {tags.length > 0 && (
+          <div
+            role='group'
+            aria-label={t('Tags')}
+            className='text-muted-foreground flex min-w-0 items-baseline gap-1.5 text-[11px]'
+          >
+            <span className='shrink-0'>{t('Tags')}</span>
+            <span className='truncate' title={tags.join(', ')}>
+              {tags.slice(0, 2).join(', ')}
+            </span>
+            {tags.length > 2 && (
+              <span className='shrink-0' title={tags.slice(2).join(', ')}>
+                +{tags.length - 2}
               </span>
-              {tags.length > 2 && (
-                <span className='shrink-0' title={tags.slice(2).join(', ')}>
-                  +{tags.length - 2}
-                </span>
-              )}
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
         <div
           role='group'
           aria-label={t('Pricing')}
-          className='mt-auto flex min-w-0 flex-col gap-1.5'
+          className='mt-auto flex min-w-0 flex-col gap-1'
         >
           <ModelBillingModeBadge model={props.model} appearance='caption' />
           {dynamicSummary?.providerCount && (
-            <span className='text-muted-foreground text-xs break-words'>
+            <span className='text-muted-foreground text-[11px] break-words'>
               {t('{{count}} providers', {
                 count: dynamicSummary.providerCount,
               })}
@@ -325,14 +320,14 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
                 ` · ${t('Not configured for some providers')}`}
             </span>
           )}
-          <div className='grid grid-cols-[repeat(auto-fit,minmax(88px,1fr))] gap-x-3 gap-y-2'>
+          <div className='grid grid-cols-[repeat(auto-fit,minmax(80px,1fr))] gap-x-2 gap-y-1.5'>
             {priceSummary}
           </div>
         </div>
         {(groups.length > 0 || endpoints.length > 0) && (
           <dl
             className={cn(
-              'grid min-w-0 grid-cols-2 gap-3 text-xs',
+              'grid min-w-0 grid-cols-2 gap-2 text-[11px]',
               (groups.length === 0 || endpoints.length === 0) && 'grid-cols-1'
             )}
           >
@@ -379,11 +374,11 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
           </dl>
         )}
       </CardContent>
-      <CardFooter className='border-border/60 mt-auto justify-end bg-transparent'>
+      <CardFooter className='border-border/60 mt-auto justify-end bg-transparent px-3 pt-0'>
         <Button
           variant='ghost'
           size='sm'
-          className='shrink-0'
+          className='h-7 shrink-0 px-2 text-xs'
           onClick={() => props.onClick(props.model.model_name || '')}
         >
           {t('Details')}

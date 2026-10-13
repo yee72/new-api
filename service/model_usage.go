@@ -1,8 +1,10 @@
 package service
 
 import (
+	"errors"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -11,6 +13,10 @@ import (
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/model"
 )
+
+// ErrInvalidModelUsageVendorIDs 表示 vendor_ids 含非整数或 0。
+// 负数是默认定价展示厂商，例如 OpenAI 为 -1012，属于合法筛选值。
+var ErrInvalidModelUsageVendorIDs = errors.New("invalid vendor_ids")
 
 const modelUsageCacheTTL = 2 * time.Minute
 
@@ -49,7 +55,20 @@ var (
 	modelUsageCache   *modelUsageCacheEntry
 )
 
-func GetModelUsageCatalog(typeFilter, keyword string, vendorIDs []int) (*ModelUsageListResponse, error) {
+func GetModelUsageCatalog(typeFilter, keyword, rawVendorIDs string) (*ModelUsageListResponse, error) {
+	var vendorIDs []int
+	for part := range strings.SplitSeq(strings.TrimSpace(rawVendorIDs), ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		id, err := strconv.Atoi(part)
+		if err != nil || id == 0 {
+			return nil, ErrInvalidModelUsageVendorIDs
+		}
+		vendorIDs = append(vendorIDs, id)
+	}
+
 	items, vendors, err := loadModelUsageCatalog()
 	if err != nil {
 		return nil, err
@@ -62,9 +81,7 @@ func GetModelUsageCatalog(typeFilter, keyword string, vendorIDs []int) (*ModelUs
 	keyword = strings.TrimSpace(strings.ToLower(keyword))
 	vendorSet := make(map[int]struct{}, len(vendorIDs))
 	for _, id := range vendorIDs {
-		if id > 0 {
-			vendorSet[id] = struct{}{}
-		}
+		vendorSet[id] = struct{}{}
 	}
 
 	// 搜索与厂商互斥：有 keyword 时忽略厂商
