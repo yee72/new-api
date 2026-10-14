@@ -9,12 +9,32 @@ function stableStringify(obj) {
 
 const newKeys = {
   en: {
-    'Controls the Model Usage tab (Chat / Image / Video). The actual API route still follows the model endpoints: image-generation uses the Images API, openai-video uses Videos, otherwise Chat Completions. Set Image for chat-based image models (for example Gemini image) so they appear under Image.':
-      'Controls the Model Usage tab (Chat / Image / Video). The actual API route still follows the model endpoints: image-generation uses the Images API, openai-video uses Videos, otherwise Chat Completions. Set Image for chat-based image models (for example Gemini image) so they appear under Image.',
+    Resolution: 'Resolution',
+    Low: 'Low',
+    Medium: 'Medium',
+    High: 'High',
+    HD: 'HD',
+    '2K': '2K',
+    '4K': '4K',
+    '480p': '480p',
+    '720p': '720p',
+    '1080p': '1080p',
+    'Current model does not support this image resolution':
+      'Current model does not support this image resolution',
   },
   zh: {
-    'Controls the Model Usage tab (Chat / Image / Video). The actual API route still follows the model endpoints: image-generation uses the Images API, openai-video uses Videos, otherwise Chat Completions. Set Image for chat-based image models (for example Gemini image) so they appear under Image.':
-      '决定「模型使用」页的 Tab（聊天 / 图片 / 视频）。实际调用协议仍按模型端点：含 image-generation 走图片 API，含 openai-video 走视频 API，否则走对话补全。若模型通过对话协议生图（例如 Gemini image），请将类型设为「图片」以出现在图片 Tab。',
+    Resolution: '清晰度',
+    Low: '低',
+    Medium: '中',
+    High: '高',
+    HD: '高清',
+    '2K': '2K',
+    '4K': '4K',
+    '480p': '480p',
+    '720p': '720p',
+    '1080p': '1080p',
+    'Current model does not support this image resolution':
+      '当前模型不支持该图片清晰度',
   },
 }
 

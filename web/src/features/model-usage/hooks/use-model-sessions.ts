@@ -325,7 +325,7 @@ export function useModelSessions() {
             ? Math.max(1, imageConfig.n || 1)
             : 1
           const requestPrompt = chatImage
-            ? `${prompt}\n\n[image settings: aspect_ratio=${imageConfig.aspect_ratio}, quality=${imageConfig.quality}]`
+            ? `${prompt}\n\n[image settings: aspect_ratio=${imageConfig.aspect_ratio}, quality=${imageConfig.quality}, resolution=${imageConfig.resolution ?? 'auto'}]`
             : prompt
 
           // 附件随 chat 多模态 content 发给上游（短链需转 data URL）

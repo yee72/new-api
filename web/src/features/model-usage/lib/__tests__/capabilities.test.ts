@@ -36,10 +36,39 @@ import {
 describe('generation capability validation', () => {
   it('rejects unsupported image quality without coercing', () => {
     const error = validateImageConfig(
-      { ...DEFAULT_IMAGE_FORM, n: 4, aspect_ratio: '16:9', quality: '4k' },
-      JSON.stringify({ qualities: ['auto', '2k'] })
+      {
+        ...DEFAULT_IMAGE_FORM,
+        n: 4,
+        aspect_ratio: '16:9',
+        quality: 'ultra',
+        resolution: 'auto',
+      },
+      JSON.stringify({ qualities: ['auto', 'medium', '2k'] })
     )
     expect(error).toBe('Current model does not support this image quality')
+  })
+
+  it('rejects unsupported image resolution without coercing', () => {
+    const error = validateImageConfig(
+      {
+        ...DEFAULT_IMAGE_FORM,
+        n: 1,
+        aspect_ratio: '1:1',
+        quality: 'medium',
+        resolution: '4k',
+      },
+      JSON.stringify({ qualities: ['medium'], resolution: ['auto', '2k'] })
+    )
+    expect(error).toBe('Current model does not support this image resolution')
+  })
+
+  it('splits legacy image qualities into tier and resolution', () => {
+    const matrix = resolveGenerationCapabilities(
+      JSON.stringify({ qualities: ['auto', 'medium', '2k', '4k'] }),
+      'image'
+    )
+    expect(matrix.quality).toEqual(['auto', 'medium'])
+    expect(matrix.resolution).toEqual(['auto', '2k', '4k'])
   })
 
   it('accepts video defaults within matrix', () => {
@@ -126,7 +155,8 @@ describe('hydrateGenerationForm', () => {
       mode: 'image_generate',
       n: 2,
       aspect_ratio: '16:9',
-      quality: '2k',
+      quality: 'medium',
+      resolution: '2k',
     })
     expect(
       hydrateGenerationForm(

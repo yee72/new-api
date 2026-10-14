@@ -20,6 +20,7 @@ import {
   ChevronDown,
   Images,
   Loader2,
+  Maximize2,
   Plus,
   Ratio,
   Send,
@@ -66,6 +67,7 @@ import {
   nValues,
   resolveGenerationCapabilities,
 } from '../lib/capabilities'
+import { generationOptionLabelKey } from '../lib/generation-option-labels'
 import type {
   ImageGenerationConfig,
   LocalAttachment,
@@ -553,7 +555,26 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
                 >
                   {imageCaps.quality.map((quality) => (
                     <SelectItem key={quality} value={quality}>
-                      {quality}
+                      {t(generationOptionLabelKey(quality))}
+                    </SelectItem>
+                  ))}
+                </SettingPill>
+              )}
+              {imageCaps.resolution.length > 0 && (
+                <SettingPill
+                  label={t('Resolution')}
+                  value={props.session.imageConfig.resolution ?? ''}
+                  icon={<Maximize2 className='size-3.5 text-sky-500' />}
+                  onValueChange={(value) =>
+                    props.onImageConfigChange({
+                      ...props.session.imageConfig,
+                      resolution: value,
+                    })
+                  }
+                >
+                  {imageCaps.resolution.map((resolution) => (
+                    <SelectItem key={resolution} value={resolution}>
+                      {t(generationOptionLabelKey(resolution))}
                     </SelectItem>
                   ))}
                 </SettingPill>
@@ -603,9 +624,9 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
               )}
               {videoCaps.resolution.length > 0 && (
                 <SettingPill
-                  label={t('Quality')}
+                  label={t('Resolution')}
                   value={props.session.videoConfig.resolution ?? ''}
-                  icon={<Sparkles className='size-3.5 text-violet-500' />}
+                  icon={<Maximize2 className='size-3.5 text-sky-500' />}
                   onValueChange={(value) =>
                     props.onVideoConfigChange({
                       ...props.session.videoConfig,
@@ -615,7 +636,7 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
                 >
                   {videoCaps.resolution.map((resolution) => (
                     <SelectItem key={resolution} value={resolution}>
-                      {resolution}
+                      {t(generationOptionLabelKey(resolution))}
                     </SelectItem>
                   ))}
                 </SettingPill>

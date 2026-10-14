@@ -19,12 +19,14 @@ For commercial licensing, please contact support@quantumnous.com
 import {
   IMAGE_COUNT_OPTIONS,
   IMAGE_QUALITY_OPTIONS,
+  IMAGE_RESOLUTION_OPTIONS,
   VIDEO_COUNT_OPTIONS,
   VIDEO_RESOLUTION_OPTIONS,
   VIDEO_SECONDS_MAX,
   VIDEO_SECONDS_MIN,
 } from '../constants'
 import type { ModelUsageItem, ModelUsageType } from '../types'
+import { splitLegacyQualityList } from './generation-option-labels'
 import {
   DEFAULT_IMAGE_FORM,
   DEFAULT_VIDEO_FORM,
@@ -103,12 +105,17 @@ function durationRange(
   }
 }
 
+function withAutoPrefixed(list: string[]): string[] {
+  if (list.length === 0 || list.includes('auto')) return list
+  return ['auto', ...list]
+}
+
 const DEFAULT_IMAGE_CAPS: GenerationCapabilityMatrix = {
   modes: ['image_generate'],
   n: rangeFromCounts([...IMAGE_COUNT_OPTIONS], DEFAULT_IMAGE_FORM.n),
   aspect_ratio: ['1:1', '3:4', '16:9', '9:16'],
   quality: [...IMAGE_QUALITY_OPTIONS],
-  resolution: [],
+  resolution: [...IMAGE_RESOLUTION_OPTIONS],
   duration_sec: durationRange(1, 1, 1),
   output_format: ['auto', 'png', 'jpeg', 'webp'],
   size_map: {},
@@ -227,11 +234,24 @@ function fromLegacySource(
     asStringList(source.aspect_ratio) ?? asStringList(source.aspectRatios)
   const qualities =
     asStringList(source.quality) ?? asStringList(source.qualities)
+  const explicitResolution = asStringList(source.resolution)
   const out: Partial<GenerationCapabilityMatrix> = {}
   if (counts) out.n = rangeFromCounts(counts, kind === 'video' ? 1 : 1)
   if (aspect) out.aspect_ratio = aspect
-  if (kind === 'image' && qualities) out.quality = qualities
+  if (kind === 'image' && qualities) {
+    // 旧 qualities 常混入 2k/4k：拆成档位与清晰度
+    const split = splitLegacyQualityList(qualities)
+    if (split.quality.length > 0) out.quality = split.quality
+    if (explicitResolution?.length) {
+      out.resolution = explicitResolution
+    } else if (split.resolution.length > 0) {
+      out.resolution = withAutoPrefixed(split.resolution)
+    }
+  }
   if (kind === 'video' && qualities) out.resolution = qualities
+  if (kind === 'video' && explicitResolution?.length) {
+    out.resolution = explicitResolution
+  }
   const secondsMin =
     typeof source.secondsMin === 'number'
       ? source.secondsMin
@@ -304,9 +324,23 @@ function resolveV1Shape(
   const aspect = asStringList(parsed.aspect_ratio)
   if (aspect) patch.aspect_ratio = aspect
   const quality = asStringList(parsed.quality)
-  if (quality) patch.quality = quality
   const resolution = asStringList(parsed.resolution)
-  if (resolution) patch.resolution = resolution
+  if (kind === 'image') {
+    if (quality) {
+      const split = splitLegacyQualityList(quality)
+      if (split.quality.length > 0) patch.quality = split.quality
+      if (resolution?.length) {
+        patch.resolution = resolution
+      } else if (split.resolution.length > 0) {
+        patch.resolution = withAutoPrefixed(split.resolution)
+      }
+    } else if (resolution) {
+      patch.resolution = resolution
+    }
+  } else {
+    if (quality) patch.quality = quality
+    if (resolution) patch.resolution = resolution
+  }
   if (parsed.duration_sec != null) {
     patch.duration_sec = parseDuration(
       parsed.duration_sec,
@@ -430,6 +464,13 @@ export function clampImageConfigToMatrix(
       matrix.aspect_ratio
     ),
     quality: pickInList(DEFAULT_IMAGE_FORM.quality, matrix.quality),
+    resolution:
+      matrix.resolution.length > 0
+        ? pickInList(
+            DEFAULT_IMAGE_FORM.resolution ?? 'auto',
+            matrix.resolution
+          )
+        : (DEFAULT_IMAGE_FORM.resolution ?? 'auto'),
     output_format: pickInList(
       DEFAULT_IMAGE_FORM.output_format,
       matrix.output_format
@@ -481,6 +522,13 @@ export function validateImageConfig(
     !matrix.quality.includes(config.quality)
   ) {
     return 'Current model does not support this image quality'
+  }
+  if (
+    matrix.resolution.length > 0 &&
+    config.resolution &&
+    !matrix.resolution.includes(config.resolution)
+  ) {
+    return 'Current model does not support this image resolution'
   }
   return null
 }

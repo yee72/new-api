@@ -93,7 +93,7 @@ export function SignUpForm({
 
   const validateCaptcha = () => {
     if (!captchaReady) {
-      toast.error(t('Please enter the captcha'))
+      toast.error(t('Please complete the captcha'))
       return false
     }
     return true

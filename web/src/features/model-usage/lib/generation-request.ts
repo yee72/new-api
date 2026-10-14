@@ -74,6 +74,7 @@ export const DEFAULT_IMAGE_FORM: GenerationFormConfig = {
   n: 1,
   aspect_ratio: '1:1',
   quality: 'medium',
+  resolution: 'auto',
   output_format: 'png',
 }
 
@@ -155,13 +156,24 @@ export function hydrateGenerationForm(
     }
   }
 
+  let quality = pickString(record, 'quality') ?? fallback.quality
+  const explicitResolution = pickString(record, 'resolution')
+  let resolution = explicitResolution ?? fallback.resolution ?? 'auto'
+  // 旧配置把 2k/4k 写在 quality 里：挪到 resolution（已有显式 resolution 时不覆盖）
+  const qLower = quality?.toLowerCase() ?? ''
+  if (qLower === '2k' || qLower === '4k') {
+    if (!explicitResolution) resolution = qLower
+    quality = fallback.quality ?? 'medium'
+  }
+
   return {
     ...fallback,
     schema_version: GENERATION_SCHEMA_VERSION,
     mode: 'image_generate',
     n,
     aspect_ratio: aspectRatio,
-    quality: pickString(record, 'quality') ?? fallback.quality,
+    quality,
+    resolution,
     output_format: pickString(record, 'output_format') ?? fallback.output_format,
     size: pickString(record, 'size') ?? fallback.size,
   }
@@ -179,6 +191,7 @@ export function generationFormToRecord(
   }
   if (config.mode === 'image_generate') {
     if (config.quality != null) base.quality = config.quality
+    if (config.resolution != null) base.resolution = config.resolution
     if (config.output_format != null) base.output_format = config.output_format
     if (config.size != null) base.size = config.size
   } else {

@@ -22,6 +22,10 @@ import {
   DEFAULT_VIDEO_FORM,
   type GenerationFormConfig,
 } from './lib/generation-request'
+import {
+  IMAGE_QUALITY_TIER_VALUES,
+  IMAGE_RESOLUTION_VALUES,
+} from './lib/generation-option-labels'
 
 export const MODEL_USAGE_TABS: Array<{ value: ModelUsageTab; labelKey: string }> =
   [
@@ -45,16 +49,12 @@ export const ASPECT_RATIO_OPTIONS = [
   '9:16',
   '21:9',
 ] as const
-export const IMAGE_QUALITY_OPTIONS = [
-  'auto',
-  'low',
-  'medium',
-  'high',
-  'standard',
-  'hd',
-  '2k',
-  '4k',
-] as const
+
+/** 图片质量档位（精细度） */
+export const IMAGE_QUALITY_OPTIONS = [...IMAGE_QUALITY_TIER_VALUES] as const
+/** 图片清晰度（2k/4k，不含 1k） */
+export const IMAGE_RESOLUTION_OPTIONS = [...IMAGE_RESOLUTION_VALUES] as const
+
 export const VIDEO_RESOLUTION_OPTIONS = [
   'auto',
   '480p',
