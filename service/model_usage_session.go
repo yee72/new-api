@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/QuantumNous/new-api/common"
@@ -25,6 +26,7 @@ import (
 var (
 	ErrModelUsageObjectStoreRequired = errors.New("object storage is not configured")
 	ErrModelUsageMediaForbidden      = errors.New("media access denied")
+	ErrModelUsageMediaExpired        = errors.New("media expired")
 	ErrModelUsageInvalidRequest      = errors.New("invalid model usage request")
 )
 
@@ -75,15 +77,22 @@ func ReplaceModelUsageSession(userId int, modelName string, dto ModelUsageSessio
 	if err != nil {
 		return nil, ErrModelUsageInvalidRequest
 	}
+	messages := make([]model.ModelUsageMessage, 0, len(dto.Messages))
 	for _, message := range dto.Messages {
+		normalized, normErr := normalizePersistedAttachments(userId, message.Attachments)
+		if normErr != nil {
+			return nil, normErr
+		}
+		message.Attachments = normalized
 		if err := validatePersistedMessage(message); err != nil {
 			return nil, err
 		}
+		messages = append(messages, message)
 	}
 	session := &model.ModelUsageSession{
 		UserId:      userId,
 		ModelName:   modelName,
-		Messages:    dto.Messages,
+		Messages:    messages,
 		ImageConfig: dto.ImageConfig,
 		VideoConfig: dto.VideoConfig,
 	}
@@ -108,9 +117,17 @@ func CommitModelUsageTurn(ctx context.Context, userId int, modelName string, req
 		return nil, ErrModelUsageInvalidRequest
 	}
 
+	userMessage := req.UserMessage
+	normalizedAttachments, err := normalizePersistedAttachments(userId, userMessage.Attachments)
+	if err != nil {
+		return nil, err
+	}
+	userMessage.Attachments = normalizedAttachments
+
 	assistant := req.AssistantMessage
 	assistant.Images = nil
 	assistant.Videos = nil
+	assistant.Attachments = nil
 
 	switch assistant.MediaType {
 	case "image":
@@ -145,7 +162,7 @@ func CommitModelUsageTurn(ctx context.Context, userId int, modelName string, req
 		}
 	}
 
-	if err := validatePersistedMessage(req.UserMessage); err != nil {
+	if err := validatePersistedMessage(userMessage); err != nil {
 		return nil, err
 	}
 	if err := validatePersistedMessage(assistant); err != nil {
@@ -161,8 +178,8 @@ func CommitModelUsageTurn(ctx context.Context, userId int, modelName string, req
 		return nil, err
 	}
 
-	messages := removeTurn([]model.ModelUsageMessage(session.Messages), req.UserMessage.TurnID)
-	messages = append(messages, req.UserMessage, assistant)
+	messages := removeTurn([]model.ModelUsageMessage(session.Messages), userMessage.TurnID)
+	messages = append(messages, userMessage, assistant)
 	session.Messages = messages
 	if req.ImageConfig != nil {
 		session.ImageConfig = req.ImageConfig
@@ -257,13 +274,24 @@ func ResolveModelUsageMediaObjectKey(userId int, rawKey, access string) (string,
 	return store.Prefix() + strings.TrimPrefix(relativeKey, "/"), nil
 }
 
-func BuildModelUsageMediaURL(userId int, relativeKey string) string {
+func BuildModelUsageMediaURL(userId int, relativeKey string, expiresAt int64) string {
 	relativeKey = strings.TrimPrefix(strings.TrimSpace(relativeKey), "/")
 	access, err := IssueModelUsageMediaAccess(userId, relativeKey)
 	if err != nil {
 		return modelUsageMediaURLPrefix + relativeKey
 	}
-	return modelUsageMediaURLPrefix + relativeKey + "?access=" + url.QueryEscape(access)
+	values := url.Values{}
+	values.Set("access", access)
+	if expiresAt > 0 {
+		values.Set("expires", strconv.FormatInt(expiresAt, 10))
+	}
+	return modelUsageMediaURLPrefix + relativeKey + "?" + values.Encode()
+}
+
+// IsModelUsageMediaExpired 根据 URL 上的 expires 查询参数判断是否已过展示期。
+func IsModelUsageMediaExpired(rawURL string) bool {
+	expiresAt := parseModelUsageExpiresQuery(rawURL)
+	return expiresAt > 0 && time.Now().Unix() > expiresAt
 }
 
 func IssueModelUsageMediaAccess(userId int, relativeKey string) (string, error) {
@@ -298,7 +326,15 @@ func modelUsageOwnerID(relativeKey string) (int, bool) {
 	if len(parts) < 3 || parts[0] != "model-usage" {
 		return 0, false
 	}
-	id, err := strconv.Atoi(parts[1])
+	uidPart := parts[1]
+	// model-usage/outputs|{attachments}/{userId}/...
+	if parts[1] == "outputs" || parts[1] == "attachments" {
+		if len(parts) < 4 {
+			return 0, false
+		}
+		uidPart = parts[2]
+	}
+	id, err := strconv.Atoi(uidPart)
 	if err != nil || id <= 0 {
 		return 0, false
 	}
@@ -347,7 +383,11 @@ func persistModelUsageImageAt(ctx context.Context, userId int, modelName, messag
 		if !ownerOK || owner != userId {
 			return "", ErrModelUsageInvalidRequest
 		}
-		return BuildModelUsageMediaURL(userId, relative), nil
+		expiresAt := parseModelUsageExpiresQuery(source)
+		if expiresAt <= 0 {
+			expiresAt = time.Now().Add(modelUsageOutputTTL).Unix()
+		}
+		return BuildModelUsageMediaURL(userId, relative, expiresAt), nil
 	}
 	store := GetObjectBlobStore()
 	if !store.Enabled() {
@@ -358,7 +398,7 @@ func persistModelUsageImageAt(ctx context.Context, userId int, modelName, messag
 		return "", err
 	}
 	relative := fmt.Sprintf(
-		"model-usage/%d/%s/%s/%d.%s",
+		"model-usage/outputs/%d/%s/%s/%d.%s",
 		userId,
 		sanitizeModelUsagePath(modelName),
 		sanitizeModelUsagePath(messageID),
@@ -369,7 +409,8 @@ func persistModelUsageImageAt(ctx context.Context, userId int, modelName, messag
 	if _, err := store.PutObject(ctx, fullKey, contentType, bytes.NewReader(body), size); err != nil {
 		return "", err
 	}
-	return BuildModelUsageMediaURL(userId, relative), nil
+	expiresAt := time.Now().Add(modelUsageOutputTTL).Unix()
+	return BuildModelUsageMediaURL(userId, relative, expiresAt), nil
 }
 
 func modelUsageMediaRelativeKey(source string) (string, bool) {
@@ -426,14 +467,15 @@ func persistOrTrackModelUsageVideos(ctx context.Context, userId int, modelName, 
 			if err != nil {
 				return nil, "", err
 			}
-			relative := fmt.Sprintf("model-usage/%d/%s/%s/v%d.%s", userId, sanitizeModelUsagePath(modelName), sanitizeModelUsagePath(messageID), index, ext)
+			relative := fmt.Sprintf("model-usage/outputs/%d/%s/%s/v%d.%s", userId, sanitizeModelUsagePath(modelName), sanitizeModelUsagePath(messageID), index, ext)
 			fullKey := store.Prefix() + relative
 			if _, err := store.PutObject(ctx, fullKey, contentType, bytes.NewReader(body), size); err != nil {
 				return nil, "", err
 			}
+			expiresAt := time.Now().Add(modelUsageOutputTTL).Unix()
 			videos = append(videos, model.ModelUsageVideo{
 				TaskID: taskID,
-				URL:    BuildModelUsageMediaURL(userId, relative),
+				URL:    BuildModelUsageMediaURL(userId, relative, expiresAt),
 			})
 		case model.TaskStatusFailure:
 			videos = append(videos, model.ModelUsageVideo{TaskID: taskID})
@@ -614,13 +656,27 @@ func validatePersistedMessage(message model.ModelUsageMessage) error {
 		return ErrModelUsageInvalidRequest
 	}
 	for _, image := range message.Images {
-		if !strings.HasPrefix(image, modelUsageMediaURLPrefix) {
+		if !strings.HasPrefix(image, modelUsageMediaURLPrefix) || containsDataURL(image) {
 			return ErrModelUsageInvalidRequest
 		}
 	}
 	for _, video := range message.Videos {
-		if video.URL != "" && !strings.HasPrefix(video.URL, modelUsageMediaURLPrefix) {
+		if video.URL != "" && (!strings.HasPrefix(video.URL, modelUsageMediaURLPrefix) || containsDataURL(video.URL)) {
 			return ErrModelUsageInvalidRequest
+		}
+	}
+	for _, attachment := range message.Attachments {
+		if attachment.Name == "" || attachment.Kind == "" {
+			return ErrModelUsageInvalidRequest
+		}
+		if attachment.URL != "" {
+			if !strings.HasPrefix(attachment.URL, modelUsageMediaURLPrefix) || containsDataURL(attachment.URL) {
+				return ErrModelUsageInvalidRequest
+			}
+			relative, ok := modelUsageMediaRelativeKey(attachment.URL)
+			if !ok || !strings.HasPrefix(relative, "model-usage/attachments/") {
+				return ErrModelUsageInvalidRequest
+			}
 		}
 	}
 	return nil
@@ -695,11 +751,31 @@ func refreshModelUsageMediaURLs(messages []model.ModelUsageMessage) []model.Mode
 			}
 			out[i].Videos = videos
 		}
+		if len(out[i].Attachments) > 0 {
+			attachments := make([]model.ModelUsageAttachment, len(out[i].Attachments))
+			copy(attachments, out[i].Attachments)
+			for j := range attachments {
+				if attachments[j].URL == "" {
+					continue
+				}
+				expiresAt := attachments[j].ExpiresAt
+				if expiresAt <= 0 {
+					expiresAt = parseModelUsageExpiresQuery(attachments[j].URL)
+				}
+				attachments[j].ExpiresAt = expiresAt
+				attachments[j].URL = resignModelUsageMediaURLWithExpires(attachments[j].URL, expiresAt)
+			}
+			out[i].Attachments = attachments
+		}
 	}
 	return out
 }
 
 func resignModelUsageMediaURL(source string) string {
+	return resignModelUsageMediaURLWithExpires(source, parseModelUsageExpiresQuery(source))
+}
+
+func resignModelUsageMediaURLWithExpires(source string, expiresAt int64) string {
 	relative, ok := modelUsageMediaRelativeKey(source)
 	if !ok {
 		return source
@@ -708,5 +784,5 @@ func resignModelUsageMediaURL(source string) string {
 	if !ownerOK {
 		return source
 	}
-	return BuildModelUsageMediaURL(owner, relative)
+	return BuildModelUsageMediaURL(owner, relative, expiresAt)
 }

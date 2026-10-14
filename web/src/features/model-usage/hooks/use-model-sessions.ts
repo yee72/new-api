@@ -48,6 +48,7 @@ import {
 } from '../stores/sessions-store'
 import type {
   ImageGenerationConfig,
+  ModelUsageAttachment,
   ModelUsageItem,
   ModelUsageMessage,
   ModelUsageSession,
@@ -198,6 +199,7 @@ export function useModelSessions() {
         turnId?: string
         imageConfig?: ImageGenerationConfig
         videoConfig?: VideoGenerationConfig
+        attachments?: ModelUsageAttachment[]
       }
     ) => {
       const modelName = model.model_name
@@ -234,6 +236,10 @@ export function useModelSessions() {
         }
       }
 
+      const attachments =
+        options?.attachments && options.attachments.length > 0
+          ? options.attachments
+          : undefined
       const userMessage: ModelUsageMessage = {
         id: newId('u'),
         turnId,
@@ -242,6 +248,7 @@ export function useModelSessions() {
         status: 'done',
         mediaType,
         prompt,
+        attachments,
         imageConfig: model.model_type === 'image' ? imageConfig : undefined,
         videoConfig: model.model_type === 'video' ? videoConfig : undefined,
       }
@@ -488,13 +495,17 @@ export function useModelSessions() {
   )
 
   const send = useCallback(
-    async (model: ModelUsageItem, prompt: string) => {
+    async (
+      model: ModelUsageItem,
+      prompt: string,
+      attachments?: ModelUsageAttachment[]
+    ) => {
       const text = prompt.trim()
-      if (!text) return
+      if (!text && (!attachments || attachments.length === 0)) return
       setLastModelName(model.model_name)
-      await runGeneration(model, text)
+      await runGeneration(model, text || t('Attachment'), { attachments })
     },
-    [runGeneration, setLastModelName]
+    [runGeneration, setLastModelName, t]
   )
 
   const regenerate = useCallback(

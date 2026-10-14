@@ -88,6 +88,17 @@ export type ModelUsageVideo = {
   url?: string
 }
 
+/** 用户上传附件元数据（文件在 R2，会话只存指针） */
+export type ModelUsageAttachment = {
+  id: string
+  name: string
+  mime?: string
+  size?: number
+  kind: 'image' | 'pdf' | 'sheet' | 'ppt' | 'doc' | 'file'
+  url?: string
+  expires_at: number
+}
+
 /** 单轮对话气泡（chat / image / video 共用） */
 export type ModelUsageMessage = {
   id: string
@@ -98,6 +109,7 @@ export type ModelUsageMessage = {
   mediaType: 'text' | 'image' | 'video'
   images?: string[]
   videos?: ModelUsageVideo[]
+  attachments?: ModelUsageAttachment[]
   /** 用户输入，供删除后重生成 */
   prompt?: string
   imageConfig?: ImageGenerationConfig

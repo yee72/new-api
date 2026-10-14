@@ -29,22 +29,34 @@ type ModelUsageSession struct {
 
 // ModelUsageMessage is the persisted chat/image/video bubble shape.
 type ModelUsageMessage struct {
-	ID          string            `json:"id"`
-	TurnID      string            `json:"turnId"`
-	Role        string            `json:"role"`
-	Content     string            `json:"content"`
-	Status      string            `json:"status"`
-	MediaType   string            `json:"mediaType"`
-	Images      []string          `json:"images,omitempty"`
-	Videos      []ModelUsageVideo `json:"videos,omitempty"`
-	Prompt      string            `json:"prompt,omitempty"`
-	ImageConfig map[string]any    `json:"imageConfig,omitempty"`
-	VideoConfig map[string]any    `json:"videoConfig,omitempty"`
+	ID          string                 `json:"id"`
+	TurnID      string                 `json:"turnId"`
+	Role        string                 `json:"role"`
+	Content     string                 `json:"content"`
+	Status      string                 `json:"status"`
+	MediaType   string                 `json:"mediaType"`
+	Images      []string               `json:"images,omitempty"`
+	Videos      []ModelUsageVideo      `json:"videos,omitempty"`
+	Attachments []ModelUsageAttachment `json:"attachments,omitempty"`
+	Prompt      string                 `json:"prompt,omitempty"`
+	ImageConfig map[string]any         `json:"imageConfig,omitempty"`
+	VideoConfig map[string]any         `json:"videoConfig,omitempty"`
 }
 
 type ModelUsageVideo struct {
 	TaskID string `json:"task_id,omitempty"`
 	URL    string `json:"url,omitempty"`
+}
+
+// ModelUsageAttachment 用户上传附件元数据（文件在 R2，库中不存内容）。
+type ModelUsageAttachment struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Mime      string `json:"mime,omitempty"`
+	Size      int64  `json:"size,omitempty"`
+	Kind      string `json:"kind"` // image | pdf | sheet | ppt | doc | file
+	URL       string `json:"url,omitempty"`
+	ExpiresAt int64  `json:"expires_at"` // unix；到期后仅展示名称
 }
 
 type ModelUsageMessageList []ModelUsageMessage

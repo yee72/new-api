@@ -16,13 +16,17 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Loader2, RefreshCw, Trash2 } from 'lucide-react'
+import { FileText, Loader2, RefreshCw, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
+import {
+  canPreviewModelUsageAttachment,
+  isModelUsageAttachmentExpired,
+} from '../lib/attachments'
 import type { ModelUsageMessage } from '../types'
 import {
   ModelUsageAuthImage,
@@ -62,8 +66,10 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
           const images = message.images?.filter(Boolean) ?? []
           const videos =
             message.videos?.filter((item) => Boolean(item.url)) ?? []
+          const attachments = message.attachments ?? []
           const hasImages = images.length > 0
           const hasVideos = videos.length > 0
+          const hasAttachments = attachments.length > 0
           // 已有媒体时不再展示「生成中」占位；完成态空 content 也不出气泡
           const showGenerating =
             message.status === 'pending' && !hasImages && !hasVideos
@@ -180,6 +186,66 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
                       />
                     </button>
                   ))}
+                </div>
+              )}
+
+              {hasAttachments && (
+                <div
+                  className={cn(
+                    'flex w-full max-w-[min(100%,36rem)] flex-wrap gap-2',
+                    isUser ? 'justify-end' : 'justify-start'
+                  )}
+                >
+                  {attachments.map((attachment) => {
+                    const expired = isModelUsageAttachmentExpired(attachment)
+                    const canPreview = canPreviewModelUsageAttachment(attachment)
+                    return (
+                      <button
+                        key={attachment.id}
+                        type='button'
+                        disabled={!canPreview}
+                        onClick={() => {
+                          if (!canPreview || !attachment.url) return
+                          setPreview({
+                            items: [{ url: attachment.url, kind: 'image' }],
+                            index: 0,
+                          })
+                        }}
+                        className={cn(
+                          'bg-background flex max-w-[14rem] items-center gap-2 rounded-lg border px-2 py-1.5 text-left text-xs',
+                          expired && 'opacity-60',
+                          canPreview && 'hover:ring-primary/40 hover:ring-2'
+                        )}
+                        title={
+                          expired
+                            ? t('Attachment expired')
+                            : attachment.name
+                        }
+                      >
+                        {canPreview ? (
+                          <ModelUsageAuthImage
+                            url={attachment.url!}
+                            alt={attachment.name}
+                            className='size-9 shrink-0 rounded-md object-cover'
+                          />
+                        ) : (
+                          <span className='bg-muted text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-md'>
+                            <FileText className='size-3.5' />
+                          </span>
+                        )}
+                        <span className='min-w-0'>
+                          <span className='block truncate font-medium'>
+                            {attachment.name}
+                          </span>
+                          <span className='text-muted-foreground block text-[10px]'>
+                            {expired
+                              ? t('Expired')
+                              : attachment.kind.toUpperCase()}
+                          </span>
+                        </span>
+                      </button>
+                    )
+                  })}
                 </div>
               )}
 

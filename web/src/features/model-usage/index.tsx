@@ -197,9 +197,9 @@ export function ModelUsagePage() {
             session={activeSession}
             isAuthenticated={Boolean(user)}
             onRequireLogin={() => setLoginOpen(true)}
-            onSend={async (text) => {
+            onSend={async (text, attachments) => {
               if (!selectedModel) return
-              await send(selectedModel, text)
+              await send(selectedModel, text, attachments)
             }}
             onDeleteTurn={(turnId) => {
               if (!selectedModel) return

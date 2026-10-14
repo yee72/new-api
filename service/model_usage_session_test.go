@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
@@ -191,6 +192,54 @@ func TestReplaceModelUsageSessionRejectsDataURLs(t *testing.T) {
 		}},
 	})
 	require.ErrorIs(t, err, ErrModelUsageInvalidRequest)
+}
+
+func TestUploadModelUsageAttachmentPersistsMetadataOnly(t *testing.T) {
+	common.CryptoSecret = "test-secret-for-model-usage"
+	setupModelUsageSessionTestDB(t)
+	store := withMemoryBlobStore(t)
+
+	attachment, err := UploadModelUsageAttachment(
+		context.Background(),
+		9,
+		"notes.csv",
+		"text/csv",
+		5,
+		strings.NewReader("a,b,c\n"),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, attachment)
+	assert.Equal(t, "notes.csv", attachment.Name)
+	assert.Equal(t, "sheet", attachment.Kind)
+	assert.True(t, strings.HasPrefix(attachment.URL, modelUsageMediaURLPrefix))
+	assert.Contains(t, attachment.URL, "model-usage/attachments/9/")
+	assert.Greater(t, attachment.ExpiresAt, time.Now().Unix())
+	assert.NotEmpty(t, store.objects)
+
+	dto, err := CommitModelUsageTurn(context.Background(), 9, "gpt-4o", ModelUsageTurnRequest{
+		UserMessage: model.ModelUsageMessage{
+			ID: "u1", TurnID: "t1", Role: "user", Content: "see file", Status: "done", MediaType: "text",
+			Attachments: []model.ModelUsageAttachment{*attachment},
+		},
+		AssistantMessage: model.ModelUsageMessage{
+			ID: "a1", TurnID: "t1", Role: "assistant", Content: "ok", Status: "done", MediaType: "text",
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, dto.Messages[0].Attachments, 1)
+	assert.Equal(t, "notes.csv", dto.Messages[0].Attachments[0].Name)
+}
+
+func TestModelUsageOwnerIDSupportsPrefixedPaths(t *testing.T) {
+	id, ok := modelUsageOwnerID("model-usage/attachments/12/abc/file.csv")
+	assert.True(t, ok)
+	assert.Equal(t, 12, id)
+	id, ok = modelUsageOwnerID("model-usage/outputs/8/m/a/0.png")
+	assert.True(t, ok)
+	assert.Equal(t, 8, id)
+	id, ok = modelUsageOwnerID("model-usage/8/m/a/0.png")
+	assert.True(t, ok)
+	assert.Equal(t, 8, id)
 }
 
 func TestSanitizeAndDecodeHelpers(t *testing.T) {

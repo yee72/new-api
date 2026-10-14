@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 
-import api from '@/lib/api'
+import { api } from '@/lib/api'
 
 /** 模型使用媒体短链：<img>/<video> 无法带 Bearer，需经 api 拉取再转 blob。 */
 export function isModelUsageMediaURL(url: string): boolean {

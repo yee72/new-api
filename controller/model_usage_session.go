@@ -3,7 +3,9 @@ package controller
 import (
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
@@ -70,6 +72,13 @@ func PostModelUsageRefreshVideo(c *gin.Context) {
 func GetModelUsageMedia(c *gin.Context) {
 	userId := common.GetContextKeyInt(c, constant.ContextKeyUserId)
 	rawKey := strings.TrimPrefix(c.Param("objectKey"), "/")
+	if expires := c.Query("expires"); expires != "" {
+		expiresAt, parseErr := strconv.ParseInt(expires, 10, 64)
+		if parseErr == nil && expiresAt > 0 && time.Now().Unix() > expiresAt {
+			writeModelUsageMediaError(c, service.ErrModelUsageMediaExpired)
+			return
+		}
+	}
 	objectKey, err := service.ResolveModelUsageMediaObjectKey(userId, rawKey, c.Query("access"))
 	if err != nil {
 		writeModelUsageMediaError(c, err)
@@ -79,6 +88,35 @@ func GetModelUsageMedia(c *gin.Context) {
 	if err := store.ServeObject(c, objectKey, ""); err != nil {
 		writeModelUsageMediaError(c, err)
 	}
+}
+
+func PostModelUsageAttachment(c *gin.Context) {
+	userId := common.GetContextKeyInt(c, constant.ContextKeyUserId)
+	fileHeader, err := c.FormFile("file")
+	if err != nil || fileHeader == nil {
+		common.ApiErrorMsg(c, "file is required")
+		return
+	}
+	file, err := fileHeader.Open()
+	if err != nil {
+		common.ApiErrorMsg(c, "invalid file")
+		return
+	}
+	defer file.Close()
+	contentType := fileHeader.Header.Get("Content-Type")
+	attachment, err := service.UploadModelUsageAttachment(
+		c.Request.Context(),
+		userId,
+		fileHeader.Filename,
+		contentType,
+		fileHeader.Size,
+		file,
+	)
+	if err != nil {
+		writeModelUsageSessionError(c, err)
+		return
+	}
+	common.ApiSuccess(c, attachment)
 }
 
 func writeModelUsageSessionError(c *gin.Context, err error) {
@@ -104,6 +142,8 @@ func writeModelUsageMediaError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, service.ErrModelUsageMediaForbidden):
 		c.AbortWithStatus(http.StatusForbidden)
+	case errors.Is(err, service.ErrModelUsageMediaExpired):
+		c.AbortWithStatus(http.StatusGone)
 	case errors.Is(err, service.ErrModelUsageInvalidRequest):
 		c.AbortWithStatus(http.StatusBadRequest)
 	case errors.Is(err, service.ErrModelUsageObjectStoreRequired),

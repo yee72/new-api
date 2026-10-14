@@ -49,6 +49,7 @@ func SetApiRouter(router *gin.Engine) {
 			modelUsageSessionRoute.PUT("/sessions/:model", middleware.UserAuth(), controller.PutModelUsageSession)
 			modelUsageSessionRoute.POST("/sessions/:model/turns", middleware.UserAuth(), controller.PostModelUsageTurn)
 			modelUsageSessionRoute.POST("/sessions/:model/turns/:turnId/refresh-video", middleware.UserAuth(), controller.PostModelUsageRefreshVideo)
+			modelUsageSessionRoute.POST("/attachments", middleware.UserAuth(), controller.PostModelUsageAttachment)
 			// 媒体：access HMAC 或本人 Bearer；SoftUserAuth 避免过期 Bearer 挡住 access
 			modelUsageSessionRoute.GET("/media/*objectKey", middleware.SoftUserAuth(), controller.GetModelUsageMedia)
 		}

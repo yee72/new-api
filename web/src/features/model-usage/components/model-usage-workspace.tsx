@@ -37,7 +37,6 @@ import {
   type ReactNode,
 } from 'react'
 import { useTranslation } from 'react-i18next'
-import { toast } from 'sonner'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -55,9 +54,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { handleServerError } from '@/lib/handle-server-error'
 import { getLobeIcon } from '@/lib/lobe-icon'
 import { cn } from '@/lib/utils'
 
+import { uploadModelUsageAttachment } from '../api'
 import { MODEL_TYPE_LABEL_KEY } from '../constants'
 import {
   resolveImageCapabilities,
@@ -67,6 +68,7 @@ import type {
   ImageGenerationConfig,
   LocalAttachment,
   LocalAttachmentKind,
+  ModelUsageAttachment,
   ModelUsageItem,
   ModelUsageMessage,
   ModelUsageSession,
@@ -83,7 +85,7 @@ type ModelUsageWorkspaceProps = {
   session: ModelUsageSession
   isAuthenticated: boolean
   onRequireLogin: () => void
-  onSend: (text: string) => Promise<void>
+  onSend: (text: string, attachments?: ModelUsageAttachment[]) => Promise<void>
   onDeleteTurn: (turnId: string) => void
   onRegenerate: (message: ModelUsageMessage) => Promise<void>
   onImageConfigChange: (config: ImageGenerationConfig) => void
@@ -280,17 +282,29 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
 
   const handleSubmit = async () => {
     const text = prompt.trim()
-    if (!text || busy) return
+    if ((!text && !hasAttachments) || busy) return
     if (!props.isAuthenticated) {
       props.onRequireLogin()
       return
     }
-    if (hasAttachments) {
-      toast.info(t('Attachments are not available yet'))
-      return
-    }
+    const pending = [...attachments]
     setPrompt('')
-    await props.onSend(text)
+    setAttachments([])
+    for (const item of pending) {
+      if (item.previewUrl) URL.revokeObjectURL(item.previewUrl)
+    }
+    try {
+      let uploaded: ModelUsageAttachment[] | undefined
+      if (pending.length > 0) {
+        uploaded = []
+        for (const item of pending) {
+          uploaded.push(await uploadModelUsageAttachment(item.file))
+        }
+      }
+      await props.onSend(text, uploaded)
+    } catch (error) {
+      handleServerError(error, t('Failed to upload attachment'))
+    }
   }
 
   const emptyHint =
@@ -336,7 +350,7 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
               type='file'
               className='hidden'
               multiple
-              accept='image/*,video/*,.ppt,.pptx,.csv'
+              accept='image/*,.pdf,.ppt,.pptx,.xls,.xlsx,.csv,.doc,.docx,.txt,.md'
               onChange={(event) => {
                 addFiles(event.target.files)
                 event.target.value = ''
@@ -366,7 +380,7 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
                   </span>
                 </TooltipTrigger>
                 <TooltipContent>
-                  {t('Supported attachments: image, video, ppt, csv')}
+                  {t('Supported attachments: image, pdf, ppt, excel, csv')}
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>

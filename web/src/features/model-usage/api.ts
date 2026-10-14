@@ -20,6 +20,7 @@ import { api } from '@/lib/api'
 import { requireServerSuccess } from '@/lib/server-error-message'
 
 import type {
+  ModelUsageAttachment,
   ModelUsageListData,
   ModelUsageMessage,
   ModelUsageSessionDTO,
@@ -95,6 +96,18 @@ export async function refreshModelUsageVideoTurn(
   )
   requireServerSuccess(res.data)
   return res.data.data as ModelUsageSessionDTO
+}
+
+export async function uploadModelUsageAttachment(
+  file: File
+): Promise<ModelUsageAttachment> {
+  const form = new FormData()
+  form.append('file', file)
+  const res = await api.post('/api/model-usage/attachments', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  requireServerSuccess(res.data)
+  return res.data.data as ModelUsageAttachment
 }
 
 export async function generateImages(payload: {
