@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { FileText, Loader2, RefreshCw, Trash2 } from 'lucide-react'
+import { Loader2, RefreshCw, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -25,9 +25,12 @@ import { cn } from '@/lib/utils'
 
 import {
   canPreviewModelUsageAttachment,
+  displayTypeFromAttachment,
   isModelUsageAttachmentExpired,
 } from '../lib/attachments'
 import type { ModelUsageMessage } from '../types'
+import { ModelUsageAttachmentIcon } from './model-usage-attachment-icon'
+import { ModelUsageAttachmentTooltip } from './model-usage-attachment-tooltip'
 import {
   ModelUsageAuthImage,
   ModelUsageAuthVideo,
@@ -199,50 +202,62 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
                   {attachments.map((attachment) => {
                     const expired = isModelUsageAttachmentExpired(attachment)
                     const canPreview = canPreviewModelUsageAttachment(attachment)
-                    // 过期：仅文件名标识；未过期：缩略图/图标，不展示名称类型
+                    const displayType = displayTypeFromAttachment(attachment)
+                    // 过期：文件名标识；未过期：类型图标/缩略图，悬停看名称与类型
                     if (expired) {
                       return (
-                        <div
+                        <ModelUsageAttachmentTooltip
                           key={attachment.id}
-                          className='bg-muted/60 text-muted-foreground flex max-w-[14rem] items-center gap-1.5 rounded-lg border border-dashed px-2 py-1.5 text-xs opacity-70'
-                          title={t('Attachment expired')}
+                          name={attachment.name}
+                          type={displayType}
+                          hint={t('Expired')}
                         >
-                          <FileText className='size-3.5 shrink-0' />
-                          <span className='truncate'>{attachment.name}</span>
-                        </div>
+                          <div className='bg-muted/60 text-muted-foreground flex size-14 flex-col items-center justify-center gap-0.5 rounded-lg border border-dashed opacity-70'>
+                            <ModelUsageAttachmentIcon
+                              type={displayType}
+                              className='size-auto bg-transparent'
+                              iconClassName='size-4 opacity-70'
+                            />
+                            <span className='max-w-[3.25rem] truncate px-1 text-[9px]'>
+                              {attachment.name}
+                            </span>
+                          </div>
+                        </ModelUsageAttachmentTooltip>
                       )
                     }
                     return (
-                      <button
+                      <ModelUsageAttachmentTooltip
                         key={attachment.id}
-                        type='button'
-                        disabled={!canPreview}
-                        onClick={() => {
-                          if (!canPreview || !attachment.url) return
-                          setPreview({
-                            items: [{ url: attachment.url, kind: 'image' }],
-                            index: 0,
-                          })
-                        }}
-                        className={cn(
-                          'bg-background size-14 overflow-hidden rounded-lg border',
-                          canPreview && 'hover:ring-primary/40 hover:ring-2'
-                        )}
-                        title={attachment.name}
-                        aria-label={attachment.name}
+                        name={attachment.name}
+                        type={displayType}
                       >
-                        {canPreview ? (
-                          <ModelUsageAuthImage
-                            url={attachment.url!}
-                            alt=''
-                            className='size-full object-cover'
-                          />
-                        ) : (
-                          <span className='bg-muted text-muted-foreground flex size-full items-center justify-center'>
-                            <FileText className='size-5' />
-                          </span>
-                        )}
-                      </button>
+                        <button
+                          type='button'
+                          disabled={!canPreview}
+                          onClick={() => {
+                            if (!canPreview || !attachment.url) return
+                            setPreview({
+                              items: [{ url: attachment.url, kind: 'image' }],
+                              index: 0,
+                            })
+                          }}
+                          className={cn(
+                            'bg-background size-14 overflow-hidden rounded-lg border',
+                            canPreview && 'hover:ring-primary/40 hover:ring-2'
+                          )}
+                          aria-label={attachment.name}
+                        >
+                          {canPreview ? (
+                            <ModelUsageAuthImage
+                              url={attachment.url!}
+                              alt=''
+                              className='size-full object-cover'
+                            />
+                          ) : (
+                            <ModelUsageAttachmentIcon type={displayType} />
+                          )}
+                        </button>
+                      </ModelUsageAttachmentTooltip>
                     )
                   })}
                 </div>

@@ -18,7 +18,6 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import {
   ChevronDown,
-  FileText,
   Images,
   Loader2,
   Plus,
@@ -61,6 +60,7 @@ import { cn } from '@/lib/utils'
 
 import { uploadModelUsageAttachment } from '../api'
 import { MODEL_TYPE_LABEL_KEY } from '../constants'
+import { displayTypeFromExt } from '../lib/attachments'
 import {
   resolveImageCapabilities,
   resolveVideoCapabilities,
@@ -75,6 +75,8 @@ import type {
   ModelUsageSession,
   VideoGenerationConfig,
 } from '../types'
+import { ModelUsageAttachmentIcon } from './model-usage-attachment-icon'
+import { ModelUsageAttachmentTooltip } from './model-usage-attachment-tooltip'
 import {
   ModelUsageMediaPreview,
   type ModelUsagePreviewItem,
@@ -407,58 +409,61 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
             <div className='flex min-w-0 flex-1 flex-col gap-2'>
               {hasAttachments && (
                 <div className='flex flex-wrap gap-2'>
-                  {attachments.map((file) => (
-                    <div
-                      key={file.id}
-                      className='bg-background relative size-14 overflow-hidden rounded-lg border'
-                      title={file.name}
-                    >
-                      {file.kind === 'image' && file.previewUrl ? (
-                        <button
-                          type='button'
-                          className='size-full'
-                          onClick={() => openAttachmentPreview(file)}
-                          aria-label={t('Image Preview')}
-                        >
-                          <img
-                            src={file.previewUrl}
-                            alt=''
-                            className='size-full object-cover'
-                          />
-                        </button>
-                      ) : file.kind === 'video' && file.previewUrl ? (
-                        <button
-                          type='button'
-                          className='bg-muted size-full'
-                          onClick={() => openAttachmentPreview(file)}
-                          aria-label={t('Video Preview')}
-                        >
-                          <video
-                            src={file.previewUrl}
-                            className='size-full object-cover'
-                            muted
-                            playsInline
-                            preload='metadata'
-                          />
-                        </button>
-                      ) : (
-                        <div
-                          className='bg-muted text-muted-foreground flex size-full items-center justify-center'
-                          aria-label={file.name}
-                        >
-                          <FileText className='size-5' />
-                        </div>
-                      )}
-                      <button
-                        type='button'
-                        className='bg-background/90 text-muted-foreground hover:text-foreground absolute top-0.5 right-0.5 rounded-full p-0.5 shadow-sm'
-                        onClick={() => removeAttachment(file.id)}
-                        aria-label={t('Remove attachment')}
+                  {attachments.map((file) => {
+                    const displayType =
+                      file.kind === 'image' || file.kind === 'video'
+                        ? file.kind
+                        : displayTypeFromExt(file.ext)
+                    return (
+                      <ModelUsageAttachmentTooltip
+                        key={file.id}
+                        name={file.name}
+                        type={displayType}
                       >
-                        <X className='size-3' />
-                      </button>
-                    </div>
-                  ))}
+                        <div className='bg-background relative size-14 overflow-hidden rounded-lg border'>
+                          {file.kind === 'image' && file.previewUrl ? (
+                            <button
+                              type='button'
+                              className='size-full'
+                              onClick={() => openAttachmentPreview(file)}
+                              aria-label={t('Image Preview')}
+                            >
+                              <img
+                                src={file.previewUrl}
+                                alt=''
+                                className='size-full object-cover'
+                              />
+                            </button>
+                          ) : file.kind === 'video' && file.previewUrl ? (
+                            <button
+                              type='button'
+                              className='bg-muted size-full'
+                              onClick={() => openAttachmentPreview(file)}
+                              aria-label={t('Video Preview')}
+                            >
+                              <video
+                                src={file.previewUrl}
+                                className='size-full object-cover'
+                                muted
+                                playsInline
+                                preload='metadata'
+                              />
+                            </button>
+                          ) : (
+                            <ModelUsageAttachmentIcon type={displayType} />
+                          )}
+                          <button
+                            type='button'
+                            className='bg-background/90 text-muted-foreground hover:text-foreground absolute top-0.5 right-0.5 rounded-full p-0.5 shadow-sm'
+                            onClick={() => removeAttachment(file.id)}
+                            aria-label={t('Remove attachment')}
+                          >
+                            <X className='size-3' />
+                          </button>
+                        </div>
+                      </ModelUsageAttachmentTooltip>
+                    )
+                  })}
                 </div>
               )}
 
