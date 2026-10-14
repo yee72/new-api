@@ -18,6 +18,14 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { api } from '@/lib/api'
 
+import {
+  getCachedModelUsageMedia,
+  modelUsageMediaCacheKey,
+  putCachedModelUsageMedia,
+} from './media-cache'
+
+export { modelUsageMediaCacheKey }
+
 /** 模型使用媒体短链：<img>/<video> 无法带 Bearer，需经 api 拉取再转 blob。 */
 export function isModelUsageMediaURL(url: string): boolean {
   const trimmed = url.trim()
@@ -62,6 +70,29 @@ export async function fetchModelUsageMediaBlob(
   return await response.blob()
 }
 
+/**
+ * 优先读 IndexedDB，未命中再请求网络并回写。
+ * userId<=0 时退化为直拉，不落盘。
+ */
+export async function fetchModelUsageMediaBlobCached(
+  url: string,
+  options?: {
+    userId?: number | null
+    signal?: AbortSignal
+  }
+): Promise<Blob> {
+  const userId = options?.userId ?? 0
+  if (userId > 0 && isModelUsageMediaURL(url)) {
+    const cached = await getCachedModelUsageMedia(userId, url)
+    if (cached) return cached
+  }
+  const blob = await fetchModelUsageMediaBlob(url, options?.signal)
+  if (userId > 0 && isModelUsageMediaURL(url)) {
+    void putCachedModelUsageMedia(userId, url, blob)
+  }
+  return blob
+}
+
 function extensionFromBlob(blob: Blob, kind: 'image' | 'video'): string {
   const type = blob.type.toLowerCase()
   if (type.includes('png')) return 'png'
@@ -102,9 +133,13 @@ export async function downloadModelUsageMedia(
     kind?: 'image' | 'video'
     filename?: string
     signal?: AbortSignal
+    userId?: number | null
   }
 ): Promise<void> {
-  const blob = await fetchModelUsageMediaBlob(url, options?.signal)
+  const blob = await fetchModelUsageMediaBlobCached(url, {
+    userId: options?.userId,
+    signal: options?.signal,
+  })
   const kind =
     options?.kind ??
     (blob.type.startsWith('video/') ? 'video' : 'image')

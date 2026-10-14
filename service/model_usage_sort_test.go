@@ -12,6 +12,10 @@ func TestResolveInvokeProtocol(t *testing.T) {
 	t.Parallel()
 	assert.Equal(t, InvokeProtocolChat, resolveInvokeProtocol(nil, ""))
 	assert.Equal(t, InvokeProtocolChat, resolveInvokeProtocol([]constant.EndpointType{constant.EndpointTypeOpenAI}, ""))
+	assert.Equal(t, InvokeProtocolMessages, resolveInvokeProtocol([]constant.EndpointType{
+		constant.EndpointTypeAnthropic,
+		constant.EndpointTypeOpenAI,
+	}, ""))
 	assert.Equal(t, InvokeProtocolImages, resolveInvokeProtocol([]constant.EndpointType{
 		constant.EndpointTypeImageGeneration,
 		constant.EndpointTypeOpenAI,
@@ -27,10 +31,15 @@ func TestResolveInvokeProtocol(t *testing.T) {
 	assert.Equal(t, InvokeProtocolChat, resolveInvokeProtocol(
 		[]constant.EndpointType{constant.EndpointTypeOpenAI}, model.ModelTypeImage,
 	))
+	// 图片类型即使带 anthropic 仍走 chat 生图路径
+	assert.Equal(t, InvokeProtocolChat, resolveInvokeProtocol(
+		[]constant.EndpointType{constant.EndpointTypeAnthropic}, model.ModelTypeImage,
+	))
 	assert.Equal(t, model.ModelTypeChat, inferModelTypeFromEndpoints([]constant.EndpointType{constant.EndpointTypeOpenAI}))
 	assert.Equal(t, model.ModelTypeImage, inferModelTypeFromEndpoints([]constant.EndpointType{constant.EndpointTypeImageGeneration}))
 	assert.Equal(t, "/v1/images/generations", endpointPathForProtocol(InvokeProtocolImages))
 	assert.Equal(t, "/v1/videos", endpointPathForProtocol(InvokeProtocolVideos))
+	assert.Equal(t, "/v1/messages", endpointPathForProtocol(InvokeProtocolMessages))
 	assert.Equal(t, "/v1/chat/completions", endpointPathForProtocol(InvokeProtocolChat))
 }
 

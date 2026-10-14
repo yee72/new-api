@@ -110,6 +110,26 @@ export async function uploadModelUsageAttachment(
   return res.data.data as ModelUsageAttachment
 }
 
+/** Anthropic Messages（Playground /pg/messages） */
+export async function sendAnthropicMessages(
+  payload: {
+    model: string
+    max_tokens: number
+    messages: unknown[]
+    stream?: boolean
+  },
+  signal?: AbortSignal
+): Promise<unknown> {
+  const res = await api.post('/pg/messages', payload, {
+    signal,
+    skipErrorHandler: true,
+    headers: {
+      'anthropic-version': '2023-06-01',
+    },
+  } as Record<string, unknown>)
+  return res.data
+}
+
 export async function generateImages(payload: {
   model: string
   prompt: string

@@ -21,9 +21,10 @@ const modelUsageCacheTTL = 2 * time.Minute
 
 // 模型使用页的实际调用协议（与 Tab 用的 model_type 解耦）。
 const (
-	InvokeProtocolChat   = "chat"
-	InvokeProtocolImages = "images"
-	InvokeProtocolVideos = "videos"
+	InvokeProtocolChat     = "chat"
+	InvokeProtocolMessages = "messages" // Anthropic /v1/messages
+	InvokeProtocolImages   = "images"
+	InvokeProtocolVideos   = "videos"
 )
 
 type ModelUsageItem struct {
@@ -258,7 +259,8 @@ func inferModelTypeFromEndpoints(endpoints []constant.EndpointType) string {
 }
 
 // resolveInvokeProtocol 决定模型使用页的实际调用协议。
-// endpoint 有明确能力时优先；否则用 model_type（例如 Wan 任务视频标成 video 但无 openai-video）。
+// endpoint 有明确能力时优先；否则用 model_type（例如 Wan 任务视频常无 openai-video）。
+// 对话类若声明 anthropic 端点，优先走 /v1/messages（与上游双协议约定一致）。
 func resolveInvokeProtocol(endpoints []constant.EndpointType, modelType string) string {
 	if slices.Contains(endpoints, constant.EndpointTypeOpenAIVideo) {
 		return InvokeProtocolVideos
@@ -273,6 +275,9 @@ func resolveInvokeProtocol(endpoints []constant.EndpointType, modelType string) 
 		// 无 image-generation 端点时走 chat 生图（如 Gemini image）
 		return InvokeProtocolChat
 	default:
+		if slices.Contains(endpoints, constant.EndpointTypeAnthropic) {
+			return InvokeProtocolMessages
+		}
 		return InvokeProtocolChat
 	}
 }
@@ -283,6 +288,8 @@ func endpointPathForProtocol(protocol string) string {
 		return "/v1/images/generations"
 	case InvokeProtocolVideos:
 		return "/v1/videos"
+	case InvokeProtocolMessages:
+		return "/v1/messages"
 	default:
 		return "/v1/chat/completions"
 	}

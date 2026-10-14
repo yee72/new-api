@@ -68,6 +68,8 @@ func SetRelayRouter(router *gin.Engine) {
 	{
 		// 对话：与历史行为一致（路径保持 /pg，由 GenRelayInfo 改写）
 		playgroundRouter.POST("/chat/completions", middleware.Distribute(), controller.Playground)
+		// Anthropic Messages：按 endpoint 分流的模型使用页调用
+		playgroundRouter.POST("/messages", middleware.Distribute(), controller.PlaygroundClaude)
 		// 图片 / 视频：先把 /pg 映射到 /v1，以便任务插件认领路径命中；浏览器会话无需 API Token
 		playgroundRouter.POST("/images/generations",
 			middleware.PlaygroundPathAlias(),

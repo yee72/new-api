@@ -20,6 +20,14 @@ func Playground(c *gin.Context) {
 	Relay(c, types.RelayFormatOpenAI)
 }
 
+// PlaygroundClaude 浏览器会话下的 Anthropic Messages 试用
+func PlaygroundClaude(c *gin.Context) {
+	if !setupPlaygroundToken(c, types.RelayFormatClaude) {
+		return
+	}
+	Relay(c, types.RelayFormatClaude)
+}
+
 // PlaygroundImage 浏览器会话下的图片生成试用
 func PlaygroundImage(c *gin.Context) {
 	if !setupPlaygroundToken(c, types.RelayFormatOpenAIImage) {

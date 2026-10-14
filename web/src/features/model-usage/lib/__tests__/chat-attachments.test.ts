@@ -27,12 +27,12 @@ import {
 import type { ModelUsageAttachment } from '../../types'
 
 vi.mock('../media-download', () => ({
-  fetchModelUsageMediaBlob: vi.fn(),
+  fetchModelUsageMediaBlobCached: vi.fn(),
 }))
 
-import { fetchModelUsageMediaBlob } from '../media-download'
+import { fetchModelUsageMediaBlobCached } from '../media-download'
 
-const fetchBlob = vi.mocked(fetchModelUsageMediaBlob)
+const fetchBlob = vi.mocked(fetchModelUsageMediaBlobCached)
 
 afterEach(() => {
   fetchBlob.mockReset()

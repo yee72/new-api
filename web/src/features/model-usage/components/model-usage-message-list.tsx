@@ -23,6 +23,7 @@ import { toast } from 'sonner'
 
 import { CopyButton } from '@/components/copy-button'
 import { Button } from '@/components/ui/button'
+import { useAuthStore } from '@/stores/auth-store'
 import {
   Tooltip,
   TooltipContent,
@@ -57,6 +58,7 @@ type ModelUsageMessageListProps = {
 
 export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
   const { t } = useTranslation()
+  const userId = useAuthStore((state) => state.auth.user?.id ?? null)
   const [preview, setPreview] = useState<{
     items: { url: string; kind: 'image' | 'video' }[]
     index: number
@@ -339,6 +341,7 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
                                     for (const item of downloadItems) {
                                       await downloadModelUsageMedia(item.url, {
                                         kind: item.kind,
+                                        userId,
                                       })
                                     }
                                   } catch {

@@ -19,24 +19,37 @@ For commercial licensing, please contact support@quantumnous.com
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 
+import { useAuthStore } from '@/stores/auth-store'
+
 import {
-  fetchModelUsageMediaBlob,
+  fetchModelUsageMediaBlobCached,
   isModelUsageMediaURL,
+  modelUsageMediaCacheKey,
 } from '../lib/media-download'
 
 export { isModelUsageMediaURL }
+
+/** 同页内存缓存：30 分钟内视为新鲜；离开组件后仍保留 2 小时 */
+const MEDIA_STALE_TIME_MS = 30 * 60 * 1000
+const MEDIA_GC_TIME_MS = 2 * 60 * 60 * 1000
 
 export function useAuthorizedMediaSrc(url: string | undefined): {
   src: string | undefined
   loading: boolean
   failed: boolean
 } {
+  const userId = useAuthStore((state) => state.auth.user?.id ?? null)
   const needsAuth = Boolean(url && isModelUsageMediaURL(url))
+  const cacheKey = url ? modelUsageMediaCacheKey(url) : ''
   const query = useQuery({
-    queryKey: ['model-usage-media', url],
-    enabled: needsAuth && Boolean(url),
+    queryKey: ['model-usage-media', userId ?? 0, cacheKey],
+    enabled: needsAuth && Boolean(url) && Boolean(cacheKey),
     queryFn: async ({ signal }) => {
-      const blob = await fetchModelUsageMediaBlob(url!, signal)
+      if (!url) return null
+      const blob = await fetchModelUsageMediaBlobCached(url, {
+        userId,
+        signal,
+      })
       const type = blob.type || ''
       if (
         type.startsWith('image/') ||
@@ -47,7 +60,8 @@ export function useAuthorizedMediaSrc(url: string | undefined): {
       }
       return null
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: MEDIA_STALE_TIME_MS,
+    gcTime: MEDIA_GC_TIME_MS,
     retry: false,
     meta: { errorToast: false },
   })

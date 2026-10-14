@@ -23,7 +23,11 @@ export type { GenerationFormConfig } from './lib/generation-request'
 export type ModelUsageType = 'chat' | 'image' | 'video'
 
 /** 实际调用协议：与 model_type（Tab）解耦 */
-export type ModelUsageInvokeProtocol = 'chat' | 'images' | 'videos'
+export type ModelUsageInvokeProtocol =
+  | 'chat'
+  | 'messages'
+  | 'images'
+  | 'videos'
 
 export type ModelUsageTab = 'all' | ModelUsageType
 

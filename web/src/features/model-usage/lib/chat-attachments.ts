@@ -25,7 +25,7 @@ import {
   isTextExtractableAttachment,
 } from './attachment-text-extract'
 import { isModelUsageAttachmentExpired } from './attachments'
-import { fetchModelUsageMediaBlob } from './media-download'
+import { fetchModelUsageMediaBlobCached } from './media-download'
 
 function blobToDataURL(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -90,7 +90,8 @@ function isExtractFailure(error: unknown): boolean {
 /** 拉取附件并组装 chat content：可抽取类型 → text；图片 → image_url；其余 → file。 */
 export async function buildChatUserContent(
   text: string,
-  attachments?: ModelUsageAttachment[]
+  attachments?: ModelUsageAttachment[],
+  options?: { userId?: number | null }
 ): Promise<string | ContentPart[]> {
   const usable = usableChatAttachments(attachments)
   if (usable.length === 0) return text
@@ -99,7 +100,9 @@ export async function buildChatUserContent(
   const mediaParts: ContentPart[] = []
 
   for (const attachment of usable) {
-    const blob = await fetchModelUsageMediaBlob(attachment.url!)
+    const blob = await fetchModelUsageMediaBlobCached(attachment.url!, {
+      userId: options?.userId,
+    })
     if (isTextExtractableAttachment(attachment)) {
       try {
         const extracted = await extractAttachmentText(attachment, blob)

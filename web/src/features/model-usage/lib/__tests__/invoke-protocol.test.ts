@@ -58,6 +58,28 @@ describe('resolveInvokeProtocol', () => {
       })
     ).toBe('chat')
   })
+
+  it('prefers Anthropic messages when anthropic endpoint is present', () => {
+    expect(
+      resolveInvokeProtocol({
+        model_type: 'chat',
+        invoke_protocol: 'chat',
+        supported_endpoint_types: ['anthropic', 'openai'],
+      })
+    ).toBe('messages')
+    expect(
+      resolveInvokeProtocol({
+        model_type: 'image',
+        supported_endpoint_types: ['anthropic', 'openai'],
+      })
+    ).toBe('chat')
+    expect(
+      resolveInvokeProtocol({
+        invoke_protocol: 'messages',
+        supported_endpoint_types: ['openai'],
+      })
+    ).toBe('messages')
+  })
 })
 
 describe('extractImagesFromChatContent', () => {

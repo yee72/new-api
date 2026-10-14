@@ -123,20 +123,6 @@ export function PricingToolbar(props: PricingToolbarProps) {
 
         <div className='flex min-w-0 flex-wrap items-center gap-2'>
           <ToggleGroup
-            value={[props.showRechargePrice ? 'recharge' : 'standard']}
-            onValueChange={(values) => {
-              if (values.length > 0) {
-                props.onRechargePriceChange(values[0] === 'recharge')
-              }
-            }}
-            variant='outline'
-            size='sm'
-            aria-label={t('Price display mode')}
-          >
-            <ToggleGroupItem value='standard'>{t('Standard')}</ToggleGroupItem>
-            <ToggleGroupItem value='recharge'>{t('Recharge')}</ToggleGroupItem>
-          </ToggleGroup>
-          <ToggleGroup
             value={[props.tokenUnit]}
             onValueChange={(values) => {
               if (values[0] === 'M' || values[0] === 'K') {

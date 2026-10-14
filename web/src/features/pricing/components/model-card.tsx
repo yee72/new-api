@@ -292,15 +292,23 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
           <div
             role='group'
             aria-label={t('Tags')}
-            className='text-muted-foreground flex min-w-0 items-baseline gap-1.5 text-[11px]'
+            className='flex min-w-0 flex-wrap gap-1.5'
           >
-            <span className='shrink-0'>{t('Tags')}</span>
-            <span className='truncate' title={tags.join(', ')}>
-              {tags.slice(0, 2).join(', ')}
-            </span>
-            {tags.length > 2 && (
-              <span className='shrink-0' title={tags.slice(2).join(', ')}>
-                +{tags.length - 2}
+            {tags.slice(0, 3).map((tag) => (
+              <span
+                key={tag}
+                title={tag}
+                className='border-primary/40 bg-primary/10 text-primary inline-flex max-w-full items-center truncate rounded-md border px-1.5 py-0.5 text-[11px] font-medium'
+              >
+                {tag}
+              </span>
+            ))}
+            {tags.length > 3 && (
+              <span
+                className='text-muted-foreground inline-flex items-center text-[11px]'
+                title={tags.slice(3).join(', ')}
+              >
+                +{tags.length - 3}
               </span>
             )}
           </div>

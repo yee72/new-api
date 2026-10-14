@@ -16,7 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useCallback } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { useCallback, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -31,6 +32,7 @@ import {
   generateVideo,
   refreshModelUsageVideoTurn,
   replaceModelUsageSession,
+  sendAnthropicMessages,
 } from '../api'
 import {
   resolveGenerationCapabilities,
@@ -42,6 +44,7 @@ import {
   buildChatUserContent,
   usableChatAttachments,
 } from '../lib/chat-attachments'
+import { clearModelUsageMediaCache } from '../lib/media-cache'
 import {
   mapToImagesGenerations,
   mapToVideosCreate,
@@ -50,6 +53,11 @@ import {
   generationFormToRecord,
   hydrateGenerationForm,
 } from '../lib/generation-request'
+import {
+  textFromAnthropicResponse,
+  toAnthropicMessages,
+  type AnthropicMessagesResponse,
+} from '../lib/claude-messages'
 import {
   extractImagesFromChatContent,
   resolveInvokeProtocol,
@@ -133,8 +141,21 @@ async function pollVideoUntilSettled(modelName: string, turnId: string) {
 
 export function useModelSessions() {
   const { t } = useTranslation()
+  const queryClient = useQueryClient()
   const userId = useAuthStore((state) => state.auth.user?.id ?? null)
+  const previousUserIdRef = useRef(userId)
   const sessions = useModelUsageSessionsStore((state) => state.sessions)
+
+  useEffect(() => {
+    const previous = previousUserIdRef.current
+    previousUserIdRef.current = userId
+    if (previous === userId) return
+    // 切换账号时丢掉内存中的媒体 blob，避免串号；磁盘按 userId 隔离
+    queryClient.removeQueries({ queryKey: ['model-usage-media'] })
+    if (previous != null && previous > 0 && userId == null) {
+      void clearModelUsageMediaCache(previous)
+    }
+  }, [userId, queryClient])
   const lastModelName = useModelUsageSessionsStore(
     (state) => state.lastModelName
   )
@@ -357,13 +378,14 @@ export function useModelSessions() {
       const invokeProtocol = invokeProtocolEarly
 
       try {
-        if (invokeProtocol === 'chat') {
+        if (invokeProtocol === 'chat' || invokeProtocol === 'messages') {
           // chat 协议生图：按配置张数多次请求；比例/质量写入当次调用提示（不改用户气泡原文）
           const chatImage = model.model_type === 'image'
           const requestCount = chatImage ? Math.max(1, imageConfig.n || 1) : 1
           const requestPrompt = chatImage
             ? `${prompt}\n\n[image settings: aspect_ratio=${imageConfig.aspect_ratio}, quality=${imageConfig.quality}, resolution=${imageConfig.resolution ?? 'auto'}]`
             : prompt
+          const useAnthropicMessages = invokeProtocol === 'messages'
 
           // 附件随 chat 多模态 content 发给上游（短链需转 data URL）
           if (
@@ -386,11 +408,16 @@ export function useModelSessions() {
                 role: message.role,
                 content: await buildChatUserContent(
                   message.content,
-                  message.role === 'user' ? message.attachments : undefined
+                  message.role === 'user' ? message.attachments : undefined,
+                  { userId }
                 ),
               }))
             )
-            userContent = await buildChatUserContent(requestPrompt, attachments)
+            userContent = await buildChatUserContent(
+              requestPrompt,
+              attachments,
+              { userId }
+            )
           } catch (error) {
             const extractFailed =
               error instanceof Error &&
@@ -407,22 +434,33 @@ export function useModelSessions() {
 
           const chatImages: string[] = []
           let contentText = ''
+          const openAIMessages = [
+            ...chatHistory,
+            { role: 'user' as const, content: userContent },
+          ]
           for (let i = 0; i < requestCount; i += 1) {
-            const response = await sendChatCompletion({
-              model: modelName,
-              messages: [
-                ...chatHistory,
-                { role: 'user' as const, content: userContent },
-              ],
-              stream: false,
-            })
-            const rawContent = response.choices?.[0]?.message?.content
-            if (typeof rawContent === 'string') {
-              contentText = rawContent
-            } else if (rawContent == null) {
-              contentText = ''
+            if (useAnthropicMessages) {
+              const response = (await sendAnthropicMessages({
+                model: modelName,
+                max_tokens: 4096,
+                messages: toAnthropicMessages(openAIMessages),
+                stream: false,
+              })) as AnthropicMessagesResponse
+              contentText = textFromAnthropicResponse(response)
             } else {
-              contentText = String(rawContent)
+              const response = await sendChatCompletion({
+                model: modelName,
+                messages: openAIMessages,
+                stream: false,
+              })
+              const rawContent = response.choices?.[0]?.message?.content
+              if (typeof rawContent === 'string') {
+                contentText = rawContent
+              } else if (rawContent == null) {
+                contentText = ''
+              } else {
+                contentText = String(rawContent)
+              }
             }
             if (chatImage) {
               for (const src of extractImagesFromChatContent(contentText)) {
@@ -566,12 +604,14 @@ export function useModelSessions() {
           handleServerError(error, t('Generation failed'))
         })
       } catch (error) {
-        const fallback =
-          invokeProtocol === 'chat' && model.model_type === 'chat'
-            ? t('Chat request failed')
-            : t('Generation failed')
+        const isTextChat =
+          (invokeProtocol === 'chat' || invokeProtocol === 'messages') &&
+          model.model_type === 'chat'
+        const fallback = isTextChat
+          ? t('Chat request failed')
+          : t('Generation failed')
         handleServerError(error, fallback)
-        if (invokeProtocol === 'chat' && model.model_type === 'chat') {
+        if (isTextChat) {
           toast.error(fallback)
         }
         failAssistant(fallback)

@@ -153,21 +153,14 @@ describe('pricing controls', () => {
     expect(props.onTokenUnitChange).toHaveBeenCalledTimes(1)
   })
 
-  it('changes the recharge display mode with an accessible selected state', async () => {
-    const props = toolbarProps()
-    const user = userEvent.setup()
-    const { rerender } = render(<PricingToolbar {...props} />)
-    await user.click(screen.getByRole('button', { name: 'Recharge' }))
-    expect(props.onRechargePriceChange).toHaveBeenCalledWith(true)
-    rerender(<PricingToolbar {...props} showRechargePrice />)
-    expect(screen.getByRole('button', { name: 'Recharge' })).toHaveAttribute(
-      'aria-pressed',
-      'true'
-    )
-    expect(screen.getByRole('button', { name: 'Standard' })).toHaveAttribute(
-      'aria-pressed',
-      'false'
-    )
+  it('no longer exposes standard/recharge price mode toggles', () => {
+    render(<PricingToolbar {...toolbarProps()} />)
+    expect(
+      screen.queryByRole('button', { name: 'Recharge' })
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Standard' })
+    ).not.toBeInTheDocument()
   })
 
   it('switches to table view with the keyboard and exposes the selected view', async () => {

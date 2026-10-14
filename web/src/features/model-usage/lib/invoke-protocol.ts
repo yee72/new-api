@@ -29,9 +29,13 @@ export function resolveInvokeProtocol(
   if (endpoints.includes('openai-video')) return 'videos'
   if (endpoints.includes('image-generation')) return 'images'
   if (model.model_type === 'video') return 'videos'
+  // 图片类型走 chat 生图（即使用 anthropic 端点也不改）
   if (model.model_type === 'image') return 'chat'
+  // 对话：声明 anthropic 时优先 Messages，兼容上游双协议
+  if (endpoints.includes('anthropic')) return 'messages'
   if (
     model.invoke_protocol === 'chat' ||
+    model.invoke_protocol === 'messages' ||
     model.invoke_protocol === 'images' ||
     model.invoke_protocol === 'videos'
   ) {

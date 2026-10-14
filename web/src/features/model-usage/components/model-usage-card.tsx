@@ -60,51 +60,52 @@ export function ModelUsageCard(props: ModelUsageCardProps) {
       }}
       aria-pressed={props.selected}
       className={cn(
-        'relative w-full cursor-pointer rounded-lg border bg-card p-3 pr-9 text-left transition-colors',
+        'relative w-full cursor-pointer rounded-lg border bg-card p-3 text-left transition-colors',
         'hover:bg-accent/40 focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none',
         props.selected
           ? 'border-primary ring-primary/20 ring-1'
           : 'border-border'
       )}
     >
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <button
-                type='button'
-                className={cn(
-                  'absolute top-1.5 right-1.5 z-10 inline-flex size-7 items-center justify-center rounded-md transition-colors',
-                  'hover:bg-accent focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none',
-                  props.pinned
-                    ? 'text-primary'
-                    : 'text-muted-foreground/70 hover:text-foreground'
-                )}
-                aria-label={pinLabel}
-                aria-pressed={Boolean(props.pinned)}
-                onClick={(event) => {
-                  event.stopPropagation()
-                  props.onTogglePin(props.model.model_name)
-                }}
-              />
-            }
-          >
-            <Pin
-              className={cn('size-3.5', props.pinned && 'fill-current')}
-              aria-hidden
-            />
-          </TooltipTrigger>
-          <TooltipContent side='left'>{pinLabel}</TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-
       <div className='flex items-start gap-3'>
-        <div className='bg-muted flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-md'>
-          {icon ?? (
-            <span className='text-muted-foreground text-sm font-semibold'>
-              {initial}
-            </span>
-          )}
+        <div className='relative size-10 shrink-0'>
+          <div className='bg-muted flex size-10 items-center justify-center overflow-hidden rounded-md'>
+            {icon ?? (
+              <span className='text-muted-foreground text-sm font-semibold'>
+                {initial}
+              </span>
+            )}
+          </div>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <button
+                    type='button'
+                    className={cn(
+                      'absolute -top-1.5 -left-1.5 z-10 inline-flex size-5 items-center justify-center rounded-full border bg-background shadow-sm transition-colors',
+                      'focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none',
+                      props.pinned
+                        ? 'border-amber-500 text-amber-500'
+                        : 'border-muted-foreground/50 text-muted-foreground/70 hover:border-foreground/50 hover:text-foreground'
+                    )}
+                    aria-label={pinLabel}
+                    aria-pressed={Boolean(props.pinned)}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      props.onTogglePin(props.model.model_name)
+                    }}
+                  />
+                }
+              >
+                <Pin
+                  className={cn('size-2.5', props.pinned && 'fill-current')}
+                  aria-hidden
+                />
+              </TooltipTrigger>
+              <TooltipContent side='right'>{pinLabel}</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
         <div className='min-w-0 flex-1'>
           <div className='flex items-center gap-2'>
