@@ -21,7 +21,7 @@ import {
   Images,
   Loader2,
   Maximize2,
-  Plus,
+  Paperclip,
   Ratio,
   Send,
   Sparkles,
@@ -383,26 +383,19 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
                     <button
                       type='button'
                       onClick={() => fileInputRef.current?.click()}
-                      aria-label={t('Reference image')}
+                      aria-label={t('Upload image or file attachment')}
                       className={cn(
                         'bg-muted/80 hover:bg-muted text-muted-foreground hover:text-foreground',
-                        'flex h-[72px] w-[58px] shrink-0 -skew-x-12 flex-col items-center justify-center gap-1 rounded-md border border-dashed transition-colors',
+                        'inline-flex size-9 shrink-0 items-center justify-center rounded-md border border-dashed transition-colors',
                         'focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none'
                       )}
                     />
                   }
                 >
-                  <span className='flex skew-x-12 flex-col items-center gap-0.5'>
-                    <Plus className='size-5' strokeWidth={2.25} />
-                    <span className='text-[10px] leading-none'>
-                      {t('Reference image')}
-                    </span>
-                  </span>
+                  <Paperclip className='size-4' aria-hidden />
                 </TooltipTrigger>
                 <TooltipContent>
-                  {t(
-                    'Supported attachments: images stay multimodal; excel/csv/txt are extracted as text before sending'
-                  )}
+                  {t('Upload image or file attachment')}
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>

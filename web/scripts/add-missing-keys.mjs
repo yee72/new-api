@@ -9,14 +9,32 @@ function stableStringify(obj) {
 
 const newKeys = {
   en: {
-    'Supported attachments: images stay multimodal; excel/csv/txt are extracted as text before sending':
-      'Supported attachments: images stay multimodal; excel/csv/txt are extracted as text before sending',
-    'Failed to extract attachment text': 'Failed to extract attachment text',
+    'Waiting to load...': 'Waiting to load...',
+    'Waiting to generate...': 'Waiting to generate...',
   },
   zh: {
-    'Supported attachments: images stay multimodal; excel/csv/txt are extracted as text before sending':
-      '支持附件：图片走多模态；Excel/CSV/TXT 会先抽取文本再发送',
-    'Failed to extract attachment text': '附件文本抽取失败',
+    'Waiting to load...': '等待加载中…',
+    'Waiting to generate...': '等待生成中…',
+  },
+  'zh-TW': {
+    'Waiting to load...': '等待載入中…',
+    'Waiting to generate...': '等待生成中…',
+  },
+  ja: {
+    'Waiting to load...': '読み込み待機中…',
+    'Waiting to generate...': '生成待機中…',
+  },
+  fr: {
+    'Waiting to load...': 'Chargement en attente…',
+    'Waiting to generate...': 'Génération en attente…',
+  },
+  ru: {
+    'Waiting to load...': 'Ожидание загрузки…',
+    'Waiting to generate...': 'Ожидание генерации…',
+  },
+  vi: {
+    'Waiting to load...': 'Đang chờ tải…',
+    'Waiting to generate...': 'Đang chờ tạo…',
   },
 }
 
@@ -38,20 +56,21 @@ async function main() {
       }
     }
 
-    const sorted = {}
-    for (const key of Object.keys(json.translation).sort((a, b) =>
-      a.localeCompare(b)
-    )) {
-      sorted[key] = json.translation[key]
+    if (count > 0) {
+      json.translation = Object.fromEntries(
+        Object.entries(json.translation).sort(([a], [b]) => a.localeCompare(b))
+      )
+      await fs.writeFile(filePath, stableStringify(json), 'utf8')
     }
-    json.translation = sorted
 
-    await fs.writeFile(filePath, stableStringify(json))
-    console.log(`${locale}: ${count} keys added/updated`)
+    console.log(`${locale}: ${count} translations applied`)
     totalAdded += count
   }
 
-  console.log(`Done. ${totalAdded} total.`)
+  console.log(`\nTotal: ${totalAdded} translations applied`)
 }
 
-await main()
+main().catch((err) => {
+  console.error(err)
+  process.exitCode = 1
+})

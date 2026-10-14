@@ -17,28 +17,38 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { Loader2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { cn } from '@/lib/utils'
 
 import { useAuthorizedMediaSrc } from '../hooks/use-authorized-media-src'
+import { ModelUsageMediaPlaceholder } from './model-usage-media-placeholder'
 
 type ModelUsageAuthImageProps = {
   url: string
   alt: string
   className?: string
   onClick?: () => void
+  /** 附件缩略图等填满父级，不用大尺寸作品框架 */
+  compact?: boolean
 }
 
 export function ModelUsageAuthImage(props: ModelUsageAuthImageProps) {
   const { t } = useTranslation()
   const { src, loading, failed } = useAuthorizedMediaSrc(props.url)
+  const [mediaReady, setMediaReady] = useState(false)
+
+  useEffect(() => {
+    setMediaReady(false)
+  }, [src])
 
   if (failed) {
     return (
       <div
         className={cn(
-          'bg-muted text-muted-foreground flex min-h-24 items-center justify-center rounded-xl px-3 text-center text-xs',
+          'bg-muted text-muted-foreground flex items-center justify-center rounded-xl px-2 text-center text-xs',
+          props.compact ? 'size-full' : 'aspect-video min-h-36 w-full',
           props.className
         )}
       >
@@ -46,26 +56,64 @@ export function ModelUsageAuthImage(props: ModelUsageAuthImageProps) {
       </div>
     )
   }
-  if (loading || !src) {
+
+  if (props.compact) {
+    if (loading || !src) {
+      return (
+        <div
+          className={cn(
+            'bg-muted/60 flex size-full items-center justify-center',
+            props.className
+          )}
+        >
+          <Loader2 className='text-muted-foreground size-4 animate-spin' />
+        </div>
+      )
+    }
     return (
-      <div
-        className={cn(
-          'bg-muted/60 flex min-h-24 items-center justify-center rounded-xl',
-          props.className
-        )}
-      >
-        <Loader2 className='text-muted-foreground size-4 animate-spin' />
-      </div>
+      <img
+        src={src}
+        alt={props.alt}
+        className={props.className}
+        loading='lazy'
+        onClick={props.onClick}
+      />
     )
   }
+
+  const showPlaceholder = loading || !src || !mediaReady
+
   return (
-    <img
-      src={src}
-      alt={props.alt}
-      className={props.className}
-      loading='lazy'
-      onClick={props.onClick}
-    />
+    <div
+      className={cn(
+        'relative w-full overflow-hidden rounded-xl',
+        showPlaceholder && 'aspect-video min-h-36'
+      )}
+    >
+      {showPlaceholder && (
+        <ModelUsageMediaPlaceholder
+          label={t('Waiting to load...')}
+          className={cn(
+            'min-h-0',
+            src ? 'absolute inset-0 z-10' : 'h-full w-full'
+          )}
+        />
+      )}
+      {src ? (
+        <img
+          src={src}
+          alt={props.alt}
+          className={cn(
+            'max-h-80 w-full bg-black/20 object-contain',
+            props.className,
+            !mediaReady && 'invisible absolute inset-0'
+          )}
+          loading='lazy'
+          onLoad={() => setMediaReady(true)}
+          onClick={props.onClick}
+        />
+      ) : null}
+    </div>
   )
 }
 
@@ -79,12 +127,17 @@ type ModelUsageAuthVideoProps = {
 export function ModelUsageAuthVideo(props: ModelUsageAuthVideoProps) {
   const { t } = useTranslation()
   const { src, loading, failed } = useAuthorizedMediaSrc(props.url)
+  const [mediaReady, setMediaReady] = useState(false)
+
+  useEffect(() => {
+    setMediaReady(false)
+  }, [src])
 
   if (failed) {
     return (
       <div
         className={cn(
-          'bg-muted text-muted-foreground flex min-h-24 items-center justify-center rounded-xl px-3 text-center text-xs',
+          'bg-muted text-muted-foreground flex aspect-video min-h-36 w-full items-center justify-center rounded-xl px-3 text-center text-xs',
           props.className
         )}
       >
@@ -92,26 +145,40 @@ export function ModelUsageAuthVideo(props: ModelUsageAuthVideoProps) {
       </div>
     )
   }
-  if (loading || !src) {
-    return (
-      <div
-        className={cn(
-          'bg-muted/60 flex min-h-24 items-center justify-center rounded-xl',
-          props.className
-        )}
-      >
-        <Loader2 className='text-muted-foreground size-4 animate-spin' />
-      </div>
-    )
-  }
+
+  const showPlaceholder = loading || !src || !mediaReady
+
   return (
-    <video
-      src={src}
-      controls={props.controls ?? true}
-      muted={props.muted}
-      className={props.className}
-      playsInline
-      preload='metadata'
-    />
+    <div
+      className={cn(
+        'relative w-full overflow-hidden rounded-xl',
+        showPlaceholder && 'aspect-video min-h-36'
+      )}
+    >
+      {showPlaceholder && (
+        <ModelUsageMediaPlaceholder
+          label={t('Waiting to load...')}
+          className={cn(
+            'min-h-0',
+            src ? 'absolute inset-0 z-10' : 'h-full w-full'
+          )}
+        />
+      )}
+      {src ? (
+        <video
+          src={src}
+          controls={props.controls ?? true}
+          muted={props.muted}
+          className={cn(
+            'max-h-80 w-full bg-black/20 object-contain',
+            props.className,
+            !mediaReady && 'invisible absolute inset-0'
+          )}
+          playsInline
+          preload='metadata'
+          onLoadedData={() => setMediaReady(true)}
+        />
+      ) : null}
+    </div>
   )
 }

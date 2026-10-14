@@ -64,6 +64,8 @@ async function renderList(messages: ModelUsageMessage[]) {
           'Video Preview': 'Video Preview',
           'Generated image': 'Generated image',
           'Your work is being generated...': 'Your work is being generated...',
+          'Waiting to generate...': 'Waiting to generate...',
+          'Waiting to load...': 'Waiting to load...',
           'Copy to clipboard': 'Copy to clipboard',
           'Copied!': 'Copied!',
         },
@@ -128,5 +130,21 @@ describe('ModelUsageMessageList copy actions', () => {
     ])
 
     expect(screen.getByRole('button', { name: 'Copy' })).toBeInTheDocument()
+  })
+
+  it('shows a media frame while image generation is pending', async () => {
+    await renderList([
+      baseMessage({
+        content: 'Your work is being generated...',
+        status: 'pending',
+        mediaType: 'image',
+        prompt: 'cat',
+      }),
+    ])
+
+    expect(screen.getByText('Waiting to generate...')).toBeInTheDocument()
+    expect(
+      screen.queryByText('Your work is being generated...')
+    ).not.toBeInTheDocument()
   })
 })

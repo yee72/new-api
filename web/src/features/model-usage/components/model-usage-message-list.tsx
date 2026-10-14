@@ -44,6 +44,7 @@ import {
   ModelUsageAuthImage,
   ModelUsageAuthVideo,
 } from './model-usage-auth-media'
+import { ModelUsageMediaPlaceholder } from './model-usage-media-placeholder'
 import { ModelUsageMediaPreview } from './model-usage-media-preview'
 
 type ModelUsageMessageListProps = {
@@ -85,11 +86,19 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
           const hasImages = images.length > 0
           const hasVideos = videos.length > 0
           const hasAttachments = attachments.length > 0
-          // 已有媒体时不再展示「生成中」占位；完成态空 content 也不出气泡
-          const showGenerating =
-            message.status === 'pending' && !hasImages && !hasVideos
+          // 图/视频生成中用媒体框架占位；对话仍用文本气泡
+          const showGeneratingMedia =
+            message.status === 'pending' &&
+            !hasImages &&
+            !hasVideos &&
+            (message.mediaType === 'image' || message.mediaType === 'video')
+          const showGeneratingText =
+            message.status === 'pending' &&
+            !hasImages &&
+            !hasVideos &&
+            !showGeneratingMedia
           const showTextBubble =
-            showGenerating ||
+            showGeneratingText ||
             (message.status === 'error' && Boolean(message.content)) ||
             (message.status !== 'pending' &&
               Boolean(message.content) &&
@@ -98,7 +107,7 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
             (isUser && Boolean(message.content))
           // 可复制正文：仅对可见文本气泡；生成中占位与纯图/视频结果不复制
           const copyText =
-            showTextBubble && !showGenerating && message.content.trim()
+            showTextBubble && !showGeneratingText && message.content.trim()
               ? message.content
               : ''
           const showCopy = Boolean(copyText)
@@ -132,7 +141,7 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
                         : 'bg-muted'
                   )}
                 >
-                  {showGenerating ? (
+                  {showGeneratingText ? (
                     <span className='inline-flex items-center gap-2'>
                       <Loader2 className='size-3.5 shrink-0 animate-spin' />
                       {message.content || t('Your work is being generated...')}
@@ -140,6 +149,14 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
                   ) : (
                     message.content
                   )}
+                </div>
+              )}
+
+              {showGeneratingMedia && (
+                <div className='bg-muted w-full max-w-[min(100%,36rem)] overflow-hidden rounded-2xl p-2'>
+                  <ModelUsageMediaPlaceholder
+                    label={t('Waiting to generate...')}
+                  />
                 </div>
               )}
 
@@ -169,10 +186,9 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
                       <ModelUsageAuthImage
                         url={url}
                         alt={t('Generated image')}
-                        className={cn(
-                          'max-h-80 bg-black/20 object-contain',
+                        className={
                           images.length === 1 ? 'max-w-full' : 'w-full'
-                        )}
+                        }
                       />
                     </button>
                   ))}
@@ -204,10 +220,9 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
                     >
                       <ModelUsageAuthVideo
                         url={video.url!}
-                        className={cn(
-                          'max-h-80 bg-black/20 object-contain',
+                        className={
                           videos.length === 1 ? 'max-w-full' : 'w-full'
-                        )}
+                        }
                         controls={false}
                         muted
                       />
@@ -276,6 +291,7 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
                             <ModelUsageAuthImage
                               url={attachment.url!}
                               alt=''
+                              compact
                               className='size-full object-cover'
                             />
                           ) : (

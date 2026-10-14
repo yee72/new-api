@@ -31,7 +31,9 @@ import { fetchModelUsageModels } from './api'
 import { ModelUsageSidebar } from './components/model-usage-sidebar'
 import { ModelUsageWorkspace } from './components/model-usage-workspace'
 import { useModelSessions } from './hooks/use-model-sessions'
+import { sortModelsWithPins } from './lib/sort-models'
 import { parseModelUsageVendorIds } from './lib/vendor-ids'
+import { useModelUsagePinsStore } from './stores/pins-store'
 import type { ModelUsageTab } from './types'
 
 export function ModelUsagePage() {
@@ -39,6 +41,12 @@ export function ModelUsagePage() {
   const navigate = useNavigate()
   const search = useSearch({ from: '/model-usage/' })
   const user = useAuthStore((state) => state.auth.user)
+  const setPinOwnerUserId = useModelUsagePinsStore(
+    (state) => state.setOwnerUserId
+  )
+  const pinsByUser = useModelUsagePinsStore((state) => state.pinsByUser)
+  const pinOwnerUserId = useModelUsagePinsStore((state) => state.ownerUserId)
+  const togglePin = useModelUsagePinsStore((state) => state.togglePin)
   const {
     getSession,
     loadServerSession,
@@ -51,6 +59,15 @@ export function ModelUsagePage() {
     lastModelName,
     setLastModelName,
   } = useModelSessions()
+
+  useEffect(() => {
+    setPinOwnerUserId(user?.id ?? null)
+  }, [user?.id, setPinOwnerUserId])
+
+  const pins = useMemo(() => {
+    const key = pinOwnerUserId == null ? 'guest' : String(pinOwnerUserId)
+    return pinsByUser[key] ?? {}
+  }, [pinsByUser, pinOwnerUserId])
 
   const [tab, setTab] = useState<ModelUsageTab>(
     (search.type as ModelUsageTab) || 'all'
@@ -99,7 +116,10 @@ export function ModelUsagePage() {
       }),
   })
 
-  const models = listQuery.data?.models ?? []
+  const models = useMemo(
+    () => sortModelsWithPins(listQuery.data?.models ?? [], pins),
+    [listQuery.data?.models, pins]
+  )
   const vendors = listQuery.data?.vendors ?? []
   const selectedModel = useMemo(
     () => models.find((item) => item.model_name === selectedModelName),
@@ -189,6 +209,8 @@ export function ModelUsagePage() {
             models={models}
             selectedModelName={selectedModel?.model_name}
             onSelectModel={selectModel}
+            isPinned={(modelName) => Boolean(pins[modelName])}
+            onTogglePin={togglePin}
             isModelSending={isModelSending}
             isLoading={listQuery.isLoading}
           />

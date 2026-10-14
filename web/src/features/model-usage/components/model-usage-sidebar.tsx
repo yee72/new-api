@@ -39,6 +39,8 @@ type ModelUsageSidebarProps = {
   models: ModelUsageItem[]
   selectedModelName?: string
   onSelectModel: (modelName: string) => void
+  isPinned?: (modelName: string) => boolean
+  onTogglePin: (modelName: string) => void
   isModelSending?: (modelName: string) => boolean
   isLoading?: boolean
 }
@@ -125,7 +127,9 @@ export function ModelUsageSidebar(props: ModelUsageSidebarProps) {
             model={model}
             selected={props.selectedModelName === model.model_name}
             sending={props.isModelSending?.(model.model_name)}
+            pinned={props.isPinned?.(model.model_name)}
             onSelect={props.onSelectModel}
+            onTogglePin={props.onTogglePin}
           />
         ))}
       </div>

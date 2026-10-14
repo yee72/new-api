@@ -125,9 +125,8 @@ export function UserAuthForm({
     passkeyLoginEnabled || hasWeChatLogin || hasOAuthLogin
 
   useEffect(() => {
-    if (requiresLegalConsent) {
-      setAgreedToLegal(false)
-    } else {
+    // 无协议要求时保持勾选；有协议时保留默认勾选，不因 status 加载而清空
+    if (!requiresLegalConsent) {
       setAgreedToLegal(true)
     }
   }, [requiresLegalConsent])
