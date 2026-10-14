@@ -23,6 +23,12 @@ import { toast } from 'sonner'
 
 import { CopyButton } from '@/components/copy-button'
 import { Button } from '@/components/ui/button'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 
 import {
@@ -90,9 +96,9 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
               !hasImages &&
               !hasVideos) ||
             (isUser && Boolean(message.content))
-          // 可复制正文：生成中占位不复制；用户与助手文本均可
+          // 可复制正文：仅对可见文本气泡；生成中占位与纯图/视频结果不复制
           const copyText =
-            !showGenerating && message.content.trim()
+            showTextBubble && !showGenerating && message.content.trim()
               ? message.content
               : ''
           const showCopy = Boolean(copyText)
@@ -141,9 +147,7 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
                 <div
                   className={cn(
                     'bg-muted w-full max-w-[min(100%,36rem)] overflow-hidden rounded-2xl p-2',
-                    images.length === 1
-                      ? 'flex'
-                      : 'grid grid-cols-2 gap-2'
+                    images.length === 1 ? 'flex' : 'grid grid-cols-2 gap-2'
                   )}
                 >
                   {images.map((url, index) => (
@@ -179,9 +183,7 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
                 <div
                   className={cn(
                     'bg-muted w-full max-w-[min(100%,36rem)] overflow-hidden rounded-2xl p-2',
-                    videos.length === 1
-                      ? 'flex'
-                      : 'grid grid-cols-2 gap-2'
+                    videos.length === 1 ? 'flex' : 'grid grid-cols-2 gap-2'
                   )}
                 >
                   {videos.map((video, index) => (
@@ -223,7 +225,8 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
                 >
                   {attachments.map((attachment) => {
                     const expired = isModelUsageAttachmentExpired(attachment)
-                    const canPreview = canPreviewModelUsageAttachment(attachment)
+                    const canPreview =
+                      canPreviewModelUsageAttachment(attachment)
                     const displayType = displayTypeFromAttachment(attachment)
                     // 过期：文件名标识；未过期：类型图标/缩略图，悬停看名称与类型
                     if (expired) {
@@ -286,81 +289,108 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
               )}
 
               {showActions && (
-                <div
-                  className={cn(
-                    'flex gap-1 opacity-70 transition-opacity group-hover:opacity-100',
-                    isUser ? 'justify-end' : 'justify-start'
-                  )}
-                >
-                  {showCopy && (
-                    <CopyButton
-                      value={copyText}
-                      size='sm'
-                      className='h-7 gap-1 px-2 text-xs'
-                      aria-label={t('Copy')}
-                    >
-                      <span>{t('Copy')}</span>
-                    </CopyButton>
-                  )}
-                  {showDownload && (
-                    <Button
-                      type='button'
-                      variant='ghost'
-                      size='sm'
-                      className='h-7 px-2 text-xs'
-                      disabled={downloading}
-                      onClick={() => {
-                        setDownloadingMessageId(message.id)
-                        void (async () => {
-                          try {
-                            for (const item of downloadItems) {
-                              await downloadModelUsageMedia(item.url, {
-                                kind: item.kind,
-                              })
-                            }
-                          } catch {
-                            toast.error(t('Download failed'))
-                          } finally {
-                            setDownloadingMessageId(null)
+                <TooltipProvider>
+                  <div
+                    className={cn(
+                      'flex gap-1 opacity-70 transition-opacity group-hover:opacity-100',
+                      isUser ? 'justify-end' : 'justify-start'
+                    )}
+                  >
+                    {showCopy && (
+                      <CopyButton
+                        value={copyText}
+                        size='icon-sm'
+                        variant='ghost'
+                        tooltip={t('Copy')}
+                        aria-label={t('Copy')}
+                        iconClassName='size-3.5'
+                      />
+                    )}
+                    {showDownload && (
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <Button
+                              type='button'
+                              variant='ghost'
+                              size='icon-sm'
+                              disabled={downloading}
+                              aria-label={t('Download')}
+                              onClick={() => {
+                                setDownloadingMessageId(message.id)
+                                void (async () => {
+                                  try {
+                                    for (const item of downloadItems) {
+                                      await downloadModelUsageMedia(item.url, {
+                                        kind: item.kind,
+                                      })
+                                    }
+                                  } catch {
+                                    toast.error(t('Download failed'))
+                                  } finally {
+                                    setDownloadingMessageId(null)
+                                  }
+                                })()
+                              }}
+                            >
+                              {downloading ? (
+                                <Loader2 className='size-3.5 animate-spin' />
+                              ) : (
+                                <Download className='size-3.5' />
+                              )}
+                            </Button>
                           }
-                        })()
-                      }}
-                    >
-                      {downloading ? (
-                        <Loader2 className='mr-1 size-3 animate-spin' />
-                      ) : (
-                        <Download className='mr-1 size-3' />
-                      )}
-                      {t('Download')}
-                    </Button>
-                  )}
-                  {canAct && !isUser && message.prompt && (
-                    <Button
-                      type='button'
-                      variant='ghost'
-                      size='sm'
-                      className='h-7 px-2 text-xs'
-                      disabled={props.busy}
-                      onClick={() => props.onRegenerate(message)}
-                    >
-                      <RefreshCw className='mr-1 size-3' />
-                      {t('Regenerate')}
-                    </Button>
-                  )}
-                  {canAct && (
-                    <Button
-                      type='button'
-                      variant='ghost'
-                      size='sm'
-                      className='text-destructive h-7 px-2 text-xs'
-                      disabled={props.busy}
-                      onClick={() => props.onDelete(message.turnId)}
-                    >
-                      <Trash2 className='mr-1 size-3' />
-                      {t('Delete')}
-                    </Button>
-                  )}
-                </div>
+                        />
+                        <TooltipContent>
+                          <p>{t('Download')}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                    {canAct && !isUser && message.prompt && (
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <Button
+                              type='button'
+                              variant='ghost'
+                              size='icon-sm'
+                              disabled={props.busy}
+                              aria-label={t('Regenerate')}
+                              onClick={() => props.onRegenerate(message)}
+                            >
+                              <RefreshCw className='size-3.5' />
+                            </Button>
+                          }
+                        />
+                        <TooltipContent>
+                          <p>{t('Regenerate')}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                    {canAct && (
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <Button
+                              type='button'
+                              variant='ghost'
+                              size='icon-sm'
+                              className='text-destructive'
+                              disabled={props.busy}
+                              aria-label={t('Delete')}
+                              onClick={() => props.onDelete(message.turnId)}
+                            >
+                              <Trash2 className='size-3.5' />
+                            </Button>
+                          }
+                        />
+                        <TooltipContent>
+                          <p>{t('Delete')}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                  </div>
+                </TooltipProvider>
               )}
             </div>
           )
@@ -375,9 +405,7 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
           if (!open) setPreview(null)
         }}
         onIndexChange={(index) =>
-          setPreview((current) =>
-            current ? { ...current, index } : current
-          )
+          setPreview((current) => (current ? { ...current, index } : current))
         }
       />
     </>

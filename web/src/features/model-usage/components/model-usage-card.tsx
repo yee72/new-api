@@ -19,12 +19,11 @@ For commercial licensing, please contact support@quantumnous.com
 import { Check, Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
-import { Badge } from '@/components/ui/badge'
 import { getLobeIcon } from '@/lib/lobe-icon'
 import { cn } from '@/lib/utils'
 
-import { MODEL_TYPE_LABEL_KEY } from '../constants'
 import type { ModelUsageItem } from '../types'
+import { ModelUsageTypeIcon } from './model-usage-type-icon'
 
 type ModelUsageCardProps = {
   model: ModelUsageItem
@@ -38,9 +37,6 @@ export function ModelUsageCard(props: ModelUsageCardProps) {
   const iconKey = props.model.icon || props.model.vendor_icon
   const icon = iconKey ? getLobeIcon(iconKey, 28) : null
   const initial = props.model.model_name?.charAt(0).toUpperCase() || '?'
-  const typeLabel = t(
-    MODEL_TYPE_LABEL_KEY[props.model.model_type] || 'Chat'
-  )
 
   return (
     <button
@@ -68,9 +64,6 @@ export function ModelUsageCard(props: ModelUsageCardProps) {
             <span className='truncate text-sm font-medium'>
               {props.model.model_name}
             </span>
-            <Badge variant='secondary' className='shrink-0 text-[10px]'>
-              {typeLabel}
-            </Badge>
             {props.sending && (
               <Loader2
                 className='text-muted-foreground size-3.5 shrink-0 animate-spin'
@@ -82,6 +75,10 @@ export function ModelUsageCard(props: ModelUsageCardProps) {
             {props.model.description || t('No description')}
           </p>
         </div>
+        <ModelUsageTypeIcon
+          type={props.model.model_type}
+          className='mt-0.5'
+        />
       </div>
       {props.selected && (
         <span

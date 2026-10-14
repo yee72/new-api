@@ -60,7 +60,6 @@ import { getLobeIcon } from '@/lib/lobe-icon'
 import { cn } from '@/lib/utils'
 
 import { uploadModelUsageAttachment } from '../api'
-import { MODEL_TYPE_LABEL_KEY } from '../constants'
 import { displayTypeFromExt } from '../lib/attachments'
 import {
   durationValues,
@@ -80,6 +79,7 @@ import type {
 } from '../types'
 import { ModelUsageAttachmentIcon } from './model-usage-attachment-icon'
 import { ModelUsageAttachmentTooltip } from './model-usage-attachment-tooltip'
+import { ModelUsageTypeIcon } from './model-usage-type-icon'
 import {
   ModelUsageMediaPreview,
   type ModelUsagePreviewItem,
@@ -204,7 +204,6 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
 
   const iconKey = model.icon || model.vendor_icon
   const icon = iconKey ? getLobeIcon(iconKey, 32) : null
-  const typeLabel = t(MODEL_TYPE_LABEL_KEY[model.model_type] || 'Chat')
   const hasAttachments = attachments.length > 0
   // 仅当前模型发送中时禁用输入，其他模型进行中的请求互不影响
   const busy = props.session.sending
@@ -341,9 +340,8 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
         <div className='bg-muted flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-md'>
           {icon}
         </div>
-        <div className='flex min-w-0 flex-wrap items-center gap-2'>
+        <div className='flex min-w-0 flex-1 flex-wrap items-center gap-2'>
           <h2 className='truncate text-sm font-semibold'>{model.model_name}</h2>
-          <Badge className='h-5 px-1.5 text-[10px]'>{typeLabel}</Badge>
           {busy && (
             <Badge variant='outline' className='h-5 gap-1 px-1.5 text-[10px]'>
               <Loader2 className='size-3 animate-spin' />
@@ -351,6 +349,7 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
             </Badge>
           )}
         </div>
+        <ModelUsageTypeIcon type={model.model_type} />
       </div>
 
       <div ref={listRef} className='min-h-0 flex-1 overflow-y-auto px-4 py-4'>
@@ -401,7 +400,9 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
                   </span>
                 </TooltipTrigger>
                 <TooltipContent>
-                  {t('Supported attachments: image, pdf, ppt, excel, csv')}
+                  {t(
+                    'Supported attachments: images stay multimodal; excel/csv/txt are extracted as text before sending'
+                  )}
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>

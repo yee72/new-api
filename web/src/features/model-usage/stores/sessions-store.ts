@@ -93,6 +93,29 @@ function sanitizeSessions(
   return next
 }
 
+/**
+ * 重新进入页面时，chat/image 无法续跑上游请求。
+ * 保留用户气泡，并把未完成的助手气泡标成失败。
+ * 已有任务号的视频仍交给服务端轮询；还没拿到任务号的不能续跑。
+ */
+export function markUnresumedMessages(
+  messages: ModelUsageMessage[],
+  interruptedContent: string
+): ModelUsageMessage[] {
+  return messages.map((message) => {
+    if (message.status !== 'pending') return message
+    const hasVideoTask =
+      message.mediaType === 'video' &&
+      message.videos?.some((video) => Boolean(video.task_id))
+    if (hasVideoTask) return message
+    return {
+      ...message,
+      status: 'error' as const,
+      content: interruptedContent,
+    }
+  })
+}
+
 /** data URL 体积过大，本地草稿持久化时丢弃 */
 function stripHeavyImages(
   sessions: Record<string, ModelUsageSession>
@@ -102,13 +125,15 @@ function stripHeavyImages(
     next[name] = {
       ...session,
       sending: false,
-      messages: session.messages.slice(-MAX_PERSISTED_MESSAGES).map((message) => {
-        if (!message.images?.length) return message
-        const images = message.images.filter(
-          (url) => !url.startsWith('data:')
-        )
-        return { ...message, images: images.length > 0 ? images : undefined }
-      }),
+      messages: session.messages
+        .slice(-MAX_PERSISTED_MESSAGES)
+        .map((message) => {
+          if (!message.images?.length) return message
+          const images = message.images.filter(
+            (url) => !url.startsWith('data:')
+          )
+          return { ...message, images: images.length > 0 ? images : undefined }
+        }),
     }
   }
   return next
@@ -117,6 +142,8 @@ function stripHeavyImages(
 type ModelUsageSessionsState = {
   ownerUserId: number | null
   sessions: Record<string, ModelUsageSession>
+  /** 每次改写消息后递增，用来丢掉切换窗口期间返回的旧会话快照 */
+  revisions: Record<string, number>
   lastModelName: string
   setOwnerUserId: (userId: number | null) => void
   setLastModelName: (modelName: string) => void
@@ -126,6 +153,12 @@ type ModelUsageSessionsState = {
     session: ModelUsageSession,
     model?: ModelUsageItem
   ) => void
+  acceptLoadedSession: (
+    modelName: string,
+    session: ModelUsageSession,
+    capturedRevision: number,
+    model?: ModelUsageItem
+  ) => boolean
   patchSession: (
     modelName: string,
     updater: (current: ModelUsageSession) => ModelUsageSession,
@@ -145,13 +178,19 @@ export const useModelUsageSessionsStore = create<ModelUsageSessionsState>()(
     (set, get) => ({
       ownerUserId: null,
       sessions: {},
+      revisions: {},
       lastModelName: '',
       setOwnerUserId: (userId) => {
         const current = get().ownerUserId
         if (current === userId) return
         // 切换账号时清空内存会话，避免串号；未登录草稿单独保留在 null 桶
         if (current !== null && userId !== current) {
-          set({ ownerUserId: userId, sessions: {}, lastModelName: '' })
+          set({
+            ownerUserId: userId,
+            sessions: {},
+            lastModelName: '',
+            revisions: {},
+          })
           return
         }
         set({ ownerUserId: userId })
@@ -173,9 +212,13 @@ export const useModelUsageSessionsStore = create<ModelUsageSessionsState>()(
         })
       },
       hydrateSession: (modelName, session, model) => {
-        const { sessions } = get()
+        const { sessions, revisions } = get()
         const previous = sessions[modelName] ?? createEmptySession(model)
         set({
+          revisions: {
+            ...revisions,
+            [modelName]: (revisions[modelName] ?? 0) + 1,
+          },
           sessions: {
             ...sessions,
             [modelName]: {
@@ -185,13 +228,29 @@ export const useModelUsageSessionsStore = create<ModelUsageSessionsState>()(
           },
         })
       },
+      acceptLoadedSession: (modelName, session, capturedRevision, model) => {
+        const current = get().sessions[modelName]
+        const revision = get().revisions[modelName] ?? 0
+        // 正在等上游，或本地已经写过更新的一轮：不要用切换前拉到的旧历史覆盖
+        if (current?.sending || capturedRevision !== revision) return false
+        get().hydrateSession(modelName, session, model)
+        return true
+      },
       patchSession: (modelName, updater, model) => {
-        const { sessions } = get()
+        const { sessions, revisions } = get()
         const previous = sessions[modelName] ?? createEmptySession(model)
+        const next = updater(previous)
+        const messagesChanged = next.messages !== previous.messages
         set({
+          revisions: messagesChanged
+            ? {
+                ...revisions,
+                [modelName]: (revisions[modelName] ?? 0) + 1,
+              }
+            : revisions,
           sessions: {
             ...sessions,
-            [modelName]: updater(previous),
+            [modelName]: next,
           },
         })
       },
@@ -242,6 +301,7 @@ export const useModelUsageSessionsStore = create<ModelUsageSessionsState>()(
           ownerUserId: raw.ownerUserId ?? null,
           sessions: sanitizeSessions(raw.sessions ?? {}),
           lastModelName: raw.lastModelName ?? '',
+          revisions: current.revisions ?? {},
         }
       },
     }

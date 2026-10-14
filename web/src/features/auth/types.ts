@@ -48,15 +48,12 @@ export interface RegisterPayload {
   turnstile?: string
 }
 
-export type ImageCaptchaType = 'math' | 'slide'
+export type ImageCaptchaType = 'math'
 
 export interface ImageCaptchaData {
   captcha_id: string
   captcha_type?: ImageCaptchaType
   captcha_image: string
-  captcha_piece?: string
-  captcha_piece_y?: number
-  captcha_track_width?: number
 }
 
 export interface ConfirmPasswordResetPayload {

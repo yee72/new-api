@@ -68,7 +68,8 @@ export function UserAuthForm({
   const { t } = useTranslation()
   const [isLoading, setIsLoading] = useState(false)
   const [wechatCode, setWeChatCode] = useState('')
-  const [agreedToLegal, setAgreedToLegal] = useState(false)
+  // 登录页默认勾选协议，用户仍可取消；提交前仍校验须同意
+  const [agreedToLegal, setAgreedToLegal] = useState(true)
   const [passkeySupported, setPasskeySupported] = useState(false)
   const [isPasskeyLoading, setIsPasskeyLoading] = useState(false)
   const [passkeyDomains, setPasskeyDomains] = useState<PasskeyDomains | null>(

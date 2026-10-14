@@ -16,15 +16,44 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import * as XLSX from 'xlsx'
 
 import {
+  buildChatUserContent,
   contentPartFromAttachmentData,
   ensureDataUrlMime,
 } from '../chat-attachments'
+import type { ModelUsageAttachment } from '../../types'
+
+vi.mock('../media-download', () => ({
+  fetchModelUsageMediaBlob: vi.fn(),
+}))
+
+import { fetchModelUsageMediaBlob } from '../media-download'
+
+const fetchBlob = vi.mocked(fetchModelUsageMediaBlob)
+
+afterEach(() => {
+  fetchBlob.mockReset()
+})
+
+function attachment(
+  overrides: Partial<ModelUsageAttachment> &
+    Pick<ModelUsageAttachment, 'kind' | 'name'>
+): ModelUsageAttachment {
+  return {
+    id: 'att-1',
+    mime: 'application/octet-stream',
+    size: 10,
+    url: 'https://example.com/file',
+    expires_at: Math.floor(Date.now() / 1000) + 3600,
+    ...overrides,
+  }
+}
 
 describe('chat attachment content parts', () => {
-  it('maps images to image_url and documents to file', () => {
+  it('maps images to image_url and non-extractable documents to file', () => {
     expect(
       contentPartFromAttachmentData(
         { kind: 'image', name: 'a.png' },
@@ -36,15 +65,14 @@ describe('chat attachment content parts', () => {
     })
     expect(
       contentPartFromAttachmentData(
-        { kind: 'sheet', name: 'notes.xlsx' },
-        'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,bb'
+        { kind: 'pdf', name: 'a.pdf' },
+        'data:application/pdf;base64,bb'
       )
     ).toEqual({
       type: 'file',
       file: {
-        filename: 'notes.xlsx',
-        file_data:
-          'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,bb',
+        filename: 'a.pdf',
+        file_data: 'data:application/pdf;base64,bb',
       },
     })
   })
@@ -56,5 +84,62 @@ describe('chat attachment content parts', () => {
         'application/pdf'
       )
     ).toBe('data:application/pdf;base64,abc')
+  })
+
+  it('builds chat content with extracted sheet text and no file part', async () => {
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.aoa_to_sheet([
+        ['item', 'count'],
+        ['pen', 4],
+      ]),
+      'Main'
+    )
+    const buffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' })
+    fetchBlob.mockResolvedValue(
+      new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      })
+    )
+
+    const content = await buildChatUserContent(
+      '识别文件中的内容',
+      [
+        attachment({
+          kind: 'sheet',
+          name: 'notes.xlsx',
+          mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        }),
+      ]
+    )
+
+    expect(typeof content).toBe('string')
+    expect(content).toContain('识别文件中的内容')
+    expect(content).toContain('## file: notes.xlsx')
+    expect(content).toContain('item,count')
+    expect(content).toContain('pen,4')
+  })
+
+  it('keeps images as multimodal parts alongside extracted text', async () => {
+    fetchBlob
+      .mockResolvedValueOnce(new Blob(['hello'], { type: 'text/plain' }))
+      .mockResolvedValueOnce(new Blob([new Uint8Array([1, 2, 3])], { type: 'image/png' }))
+
+    const content = await buildChatUserContent('看图并读附件', [
+      attachment({ kind: 'doc', name: 'note.txt', mime: 'text/plain' }),
+      attachment({ kind: 'image', name: 'a.png', mime: 'image/png' }),
+    ])
+
+    expect(Array.isArray(content)).toBe(true)
+    if (!Array.isArray(content)) return
+    expect(content[0]).toMatchObject({
+      type: 'text',
+      text: expect.stringContaining('[Attachment: note.txt]'),
+    })
+    expect(content[1]).toMatchObject({
+      type: 'image_url',
+      image_url: { url: expect.stringContaining('data:image/png') },
+    })
   })
 })

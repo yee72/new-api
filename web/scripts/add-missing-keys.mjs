@@ -9,32 +9,14 @@ function stableStringify(obj) {
 
 const newKeys = {
   en: {
-    Resolution: 'Resolution',
-    Low: 'Low',
-    Medium: 'Medium',
-    High: 'High',
-    HD: 'HD',
-    '2K': '2K',
-    '4K': '4K',
-    '480p': '480p',
-    '720p': '720p',
-    '1080p': '1080p',
-    'Current model does not support this image resolution':
-      'Current model does not support this image resolution',
+    'Supported attachments: images stay multimodal; excel/csv/txt are extracted as text before sending':
+      'Supported attachments: images stay multimodal; excel/csv/txt are extracted as text before sending',
+    'Failed to extract attachment text': 'Failed to extract attachment text',
   },
   zh: {
-    Resolution: '清晰度',
-    Low: '低',
-    Medium: '中',
-    High: '高',
-    HD: '高清',
-    '2K': '2K',
-    '4K': '4K',
-    '480p': '480p',
-    '720p': '720p',
-    '1080p': '1080p',
-    'Current model does not support this image resolution':
-      '当前模型不支持该图片清晰度',
+    'Supported attachments: images stay multimodal; excel/csv/txt are extracted as text before sending':
+      '支持附件：图片走多模态；Excel/CSV/TXT 会先抽取文本再发送',
+    'Failed to extract attachment text': '附件文本抽取失败',
   },
 }
 

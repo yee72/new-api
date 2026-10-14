@@ -19,6 +19,11 @@ For commercial licensing, please contact support@quantumnous.com
 import type { ContentPart } from '@/features/playground/types'
 
 import type { ModelUsageAttachment } from '../types'
+import {
+  ATTACHMENT_EXTRACT_FAILED,
+  extractAttachmentText,
+  isTextExtractableAttachment,
+} from './attachment-text-extract'
 import { isModelUsageAttachmentExpired } from './attachments'
 import { fetchModelUsageMediaBlob } from './media-download'
 
@@ -72,13 +77,17 @@ export function usableChatAttachments(
 ): ModelUsageAttachment[] {
   if (!attachments?.length) return []
   return attachments.filter(
-    (item) =>
-      Boolean(item.url) &&
-      !isModelUsageAttachmentExpired(item)
+    (item) => Boolean(item.url) && !isModelUsageAttachmentExpired(item)
   )
 }
 
-/** 拉取附件并组装 chat content（图片 → image_url，其它 → file）。 */
+function isExtractFailure(error: unknown): boolean {
+  return (
+    error instanceof Error && error.message === ATTACHMENT_EXTRACT_FAILED
+  )
+}
+
+/** 拉取附件并组装 chat content：可抽取类型 → text；图片 → image_url；其余 → file。 */
 export async function buildChatUserContent(
   text: string,
   attachments?: ModelUsageAttachment[]
@@ -86,14 +95,42 @@ export async function buildChatUserContent(
   const usable = usableChatAttachments(attachments)
   if (usable.length === 0) return text
 
+  const extractedBlocks: string[] = []
   const mediaParts: ContentPart[] = []
+
   for (const attachment of usable) {
     const blob = await fetchModelUsageMediaBlob(attachment.url!)
+    if (isTextExtractableAttachment(attachment)) {
+      try {
+        const extracted = await extractAttachmentText(attachment, blob)
+        extractedBlocks.push(extracted.text)
+      } catch (error) {
+        if (isExtractFailure(error)) throw error
+        throw new Error(ATTACHMENT_EXTRACT_FAILED)
+      }
+      continue
+    }
+    if (attachment.kind === 'image') {
+      const dataUrl = ensureDataUrlMime(
+        await blobToDataURL(blob),
+        attachment.mime
+      )
+      mediaParts.push(contentPartFromAttachmentData(attachment, dataUrl))
+      continue
+    }
     const dataUrl = ensureDataUrlMime(
       await blobToDataURL(blob),
       attachment.mime
     )
     mediaParts.push(contentPartFromAttachmentData(attachment, dataUrl))
   }
-  return [{ type: 'text', text: text || '' }, ...mediaParts]
+
+  const textBody = [text || '', ...extractedBlocks]
+    .filter((part) => part.length > 0)
+    .join('\n\n')
+
+  if (mediaParts.length === 0) {
+    return textBody
+  }
+  return [{ type: 'text', text: textBody }, ...mediaParts]
 }

@@ -33,14 +33,15 @@ import {
   replaceModelUsageSession,
 } from '../api'
 import {
-  buildChatUserContent,
-  usableChatAttachments,
-} from '../lib/chat-attachments'
-import {
   resolveGenerationCapabilities,
   validateImageConfig,
   validateVideoConfig,
 } from '../lib/capabilities'
+import { ATTACHMENT_EXTRACT_FAILED } from '../lib/attachment-text-extract'
+import {
+  buildChatUserContent,
+  usableChatAttachments,
+} from '../lib/chat-attachments'
 import {
   mapToImagesGenerations,
   mapToVideosCreate,
@@ -55,6 +56,7 @@ import {
 } from '../lib/invoke-protocol'
 import {
   createEmptySession,
+  markUnresumedMessages,
   mergeSessionConfigs,
   useModelUsageSessionsStore,
 } from '../stores/sessions-store'
@@ -96,11 +98,7 @@ function applyServerSession(
   dto: Awaited<ReturnType<typeof fetchModelUsageSession>>,
   model?: ModelUsageItem
 ) {
-  const configs = mergeSessionConfigs(
-    model,
-    dto.image_config,
-    dto.video_config
-  )
+  const configs = mergeSessionConfigs(model, dto.image_config, dto.video_config)
   useModelUsageSessionsStore.getState().hydrateSession(
     modelName,
     {
@@ -123,7 +121,11 @@ async function pollVideoUntilSettled(modelName: string, turnId: string) {
         message.role === 'assistant' &&
         message.mediaType === 'video'
     )
-    if (!assistant || assistant.status === 'done' || assistant.status === 'error') {
+    if (
+      !assistant ||
+      assistant.status === 'done' ||
+      assistant.status === 'error'
+    ) {
       return
     }
   }
@@ -148,16 +150,16 @@ export function useModelSessions() {
   const hydrateSession = useModelUsageSessionsStore(
     (state) => state.hydrateSession
   )
-  const patchSession = useModelUsageSessionsStore(
-    (state) => state.patchSession
-  )
+  const patchSession = useModelUsageSessionsStore((state) => state.patchSession)
   const setImageConfig = useModelUsageSessionsStore(
     (state) => state.setImageConfig
   )
   const setVideoConfig = useModelUsageSessionsStore(
     (state) => state.setVideoConfig
   )
-  const deleteTurnLocal = useModelUsageSessionsStore((state) => state.deleteTurn)
+  const deleteTurnLocal = useModelUsageSessionsStore(
+    (state) => state.deleteTurn
+  )
 
   const getSession = useCallback(
     (model?: ModelUsageItem) => {
@@ -174,11 +176,31 @@ export function useModelSessions() {
         ensureSession(model)
         return
       }
+      const modelName = model.model_name
+      const capturedRevision =
+        useModelUsageSessionsStore.getState().revisions[modelName] ?? 0
       try {
-        const dto = await fetchModelUsageSession(model.model_name)
-        applyServerSession(model.model_name, dto, model)
+        const dto = await fetchModelUsageSession(modelName)
+        const messages = markUnresumedMessages(
+          dto.messages ?? [],
+          t('Generation failed')
+        )
+        const accepted = useModelUsageSessionsStore
+          .getState()
+          .acceptLoadedSession(
+            modelName,
+            {
+              messages,
+              sending: false,
+              ...mergeSessionConfigs(model, dto.image_config, dto.video_config),
+            },
+            capturedRevision,
+            model
+          )
+        // 本地仍在等上游，或快照已经过期：保留当前对话
+        if (!accepted) return
         // 续拉未完成视频
-        for (const message of dto.messages) {
+        for (const message of messages) {
           if (
             message.role === 'assistant' &&
             message.mediaType === 'video' &&
@@ -314,16 +336,31 @@ export function useModelSessions() {
         )
       }
 
+      // 上游返回前先落库，切换窗口或重新进入页面时仍能看到刚提交的对话
+      const savePendingTurn = async () => {
+        if (!userId) return
+        const snapshot = useModelUsageSessionsStore
+          .getState()
+          .getSessionSnapshot(modelName, model)
+        try {
+          await replaceModelUsageSession(modelName, {
+            model_name: modelName,
+            messages: snapshot.messages,
+            image_config: generationFormToRecord(snapshot.imageConfig),
+            video_config: generationFormToRecord(snapshot.videoConfig),
+          })
+        } catch (error) {
+          handleServerError(error, t('Failed to save conversation'))
+        }
+      }
+
       const invokeProtocol = invokeProtocolEarly
 
       try {
         if (invokeProtocol === 'chat') {
           // chat 协议生图：按配置张数多次请求；比例/质量写入当次调用提示（不改用户气泡原文）
-          const chatImage =
-            model.model_type === 'image'
-          const requestCount = chatImage
-            ? Math.max(1, imageConfig.n || 1)
-            : 1
+          const chatImage = model.model_type === 'image'
+          const requestCount = chatImage ? Math.max(1, imageConfig.n || 1) : 1
           const requestPrompt = chatImage
             ? `${prompt}\n\n[image settings: aspect_ratio=${imageConfig.aspect_ratio}, quality=${imageConfig.quality}, resolution=${imageConfig.resolution ?? 'auto'}]`
             : prompt
@@ -338,9 +375,10 @@ export function useModelSessions() {
             toast.error(t('Attachment expired'))
             return
           }
-          let chatHistory: { role: 'user' | 'assistant'; content: Awaited<
-            ReturnType<typeof buildChatUserContent>
-          > }[]
+          let chatHistory: {
+            role: 'user' | 'assistant'
+            content: Awaited<ReturnType<typeof buildChatUserContent>>
+          }[]
           let userContent: Awaited<ReturnType<typeof buildChatUserContent>>
           try {
             chatHistory = await Promise.all(
@@ -352,15 +390,20 @@ export function useModelSessions() {
                 ),
               }))
             )
-            userContent = await buildChatUserContent(
-              requestPrompt,
-              attachments
-            )
-          } catch {
-            failAssistant(t('Failed to load attachment'))
-            toast.error(t('Failed to load attachment'))
+            userContent = await buildChatUserContent(requestPrompt, attachments)
+          } catch (error) {
+            const extractFailed =
+              error instanceof Error &&
+              error.message === ATTACHMENT_EXTRACT_FAILED
+            const message = extractFailed
+              ? t('Failed to extract attachment text')
+              : t('Failed to load attachment')
+            failAssistant(message)
+            toast.error(message)
             return
           }
+
+          await savePendingTurn()
 
           const chatImages: string[] = []
           let contentText = ''
@@ -374,12 +417,13 @@ export function useModelSessions() {
               stream: false,
             })
             const rawContent = response.choices?.[0]?.message?.content
-            contentText =
-              typeof rawContent === 'string'
-                ? rawContent
-                : rawContent == null
-                  ? ''
-                  : String(rawContent)
+            if (typeof rawContent === 'string') {
+              contentText = rawContent
+            } else if (rawContent == null) {
+              contentText = ''
+            } else {
+              contentText = String(rawContent)
+            }
             if (chatImage) {
               for (const src of extractImagesFromChatContent(contentText)) {
                 if (!chatImages.includes(src)) chatImages.push(src)
@@ -397,9 +441,7 @@ export function useModelSessions() {
               return
             }
             if (chatImages.length === 0) {
-              failAssistant(
-                contentText.trim() || t('Generation failed')
-              )
+              failAssistant(contentText.trim() || t('Generation failed'))
               return
             }
             // 优先提交短链/URL；若仍有 data: 则由后端落库
@@ -450,6 +492,7 @@ export function useModelSessions() {
             model.generation_capabilities,
             'image'
           )
+          await savePendingTurn()
           const data = await generateImages(
             mapToImagesGenerations(
               {
@@ -496,6 +539,7 @@ export function useModelSessions() {
           videoCaps
         )
         // 视频强制单任务；n 预留能力表但 MVP mapper 固定 1
+        await savePendingTurn()
         const result = (await generateVideo(videoPayload)) as { id?: string }
         const taskIds = result?.id ? [result.id] : []
         if (!userId) {
