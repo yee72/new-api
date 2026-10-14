@@ -523,7 +523,7 @@ export function ModelMutateDrawer(props: {
                             <FormControl>
                               <Textarea
                                 rows={4}
-                                placeholder='{"counts":[1,2,4],"aspectRatios":["16:9"],"qualities":["auto","720p"],"secondsMin":1,"secondsMax":15}'
+                                placeholder='{"schema_version":"1.0","modes":["video_generate"],"n":{"min":1,"max":1,"default":1},"aspect_ratio":["16:9","9:16"],"resolution":["720p","1080p"],"duration_sec":{"min":1,"max":15,"default":5},"size_map":{"16:9":"1280x720"}}'
                                 {...field}
                               />
                             </FormControl>

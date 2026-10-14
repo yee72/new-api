@@ -23,12 +23,16 @@ import {
   clampImageConfigToMatrix,
   clampVideoConfigToMatrix,
 } from '../lib/capabilities'
+import {
+  DEFAULT_IMAGE_FORM,
+  DEFAULT_VIDEO_FORM,
+  hydrateGenerationForm,
+} from '../lib/generation-request'
 import type {
-  ImageGenerationConfig,
+  GenerationFormConfig,
   ModelUsageItem,
   ModelUsageMessage,
   ModelUsageSession,
-  VideoGenerationConfig,
 } from '../types'
 
 const MAX_PERSISTED_MESSAGES = 80
@@ -42,6 +46,19 @@ export function createEmptySession(model?: ModelUsageItem): ModelUsageSession {
   }
 }
 
+/** 合并服务端/本地草稿配置，兼容旧 camelCase */
+export function mergeSessionConfigs(
+  model: ModelUsageItem | undefined,
+  imageRaw?: unknown,
+  videoRaw?: unknown
+): Pick<ModelUsageSession, 'imageConfig' | 'videoConfig'> {
+  const defaults = createEmptySession(model)
+  return {
+    imageConfig: hydrateGenerationForm(imageRaw, defaults.imageConfig),
+    videoConfig: hydrateGenerationForm(videoRaw, defaults.videoConfig),
+  }
+}
+
 /** 刷新后无法续跑的请求：清 sending，并把未完成气泡标为失败 */
 function sanitizeSessions(
   sessions: Record<string, ModelUsageSession>
@@ -51,6 +68,14 @@ function sanitizeSessions(
     next[name] = {
       ...session,
       sending: false,
+      imageConfig: hydrateGenerationForm(
+        session.imageConfig,
+        DEFAULT_IMAGE_FORM
+      ),
+      videoConfig: hydrateGenerationForm(
+        session.videoConfig,
+        DEFAULT_VIDEO_FORM
+      ),
       messages: session.messages
         .slice(-MAX_PERSISTED_MESSAGES)
         .map((message) => {
@@ -106,8 +131,8 @@ type ModelUsageSessionsState = {
     updater: (current: ModelUsageSession) => ModelUsageSession,
     model?: ModelUsageItem
   ) => void
-  setImageConfig: (model: ModelUsageItem, config: ImageGenerationConfig) => void
-  setVideoConfig: (model: ModelUsageItem, config: VideoGenerationConfig) => void
+  setImageConfig: (model: ModelUsageItem, config: GenerationFormConfig) => void
+  setVideoConfig: (model: ModelUsageItem, config: GenerationFormConfig) => void
   deleteTurn: (model: ModelUsageItem, turnId: string) => void
   getSessionSnapshot: (
     modelName: string,

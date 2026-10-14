@@ -37,26 +37,33 @@ import {
   usableChatAttachments,
 } from '../lib/chat-attachments'
 import {
-  aspectRatioToSize,
-  aspectRatioToVideoSize,
+  resolveGenerationCapabilities,
   validateImageConfig,
   validateVideoConfig,
 } from '../lib/capabilities'
+import {
+  mapToImagesGenerations,
+  mapToVideosCreate,
+} from '../lib/generation-mapper'
+import {
+  generationFormToRecord,
+  hydrateGenerationForm,
+} from '../lib/generation-request'
 import {
   extractImagesFromChatContent,
   resolveInvokeProtocol,
 } from '../lib/invoke-protocol'
 import {
   createEmptySession,
+  mergeSessionConfigs,
   useModelUsageSessionsStore,
 } from '../stores/sessions-store'
 import type {
-  ImageGenerationConfig,
+  GenerationFormConfig,
   ModelUsageAttachment,
   ModelUsageItem,
   ModelUsageMessage,
   ModelUsageSession,
-  VideoGenerationConfig,
 } from '../types'
 
 function newId(prefix: string) {
@@ -89,22 +96,17 @@ function applyServerSession(
   dto: Awaited<ReturnType<typeof fetchModelUsageSession>>,
   model?: ModelUsageItem
 ) {
-  const defaults = createEmptySession(model)
-  const savedImage = dto.image_config as Partial<ImageGenerationConfig> | undefined
-  const savedVideo = dto.video_config as Partial<VideoGenerationConfig> | undefined
+  const configs = mergeSessionConfigs(
+    model,
+    dto.image_config,
+    dto.video_config
+  )
   useModelUsageSessionsStore.getState().hydrateSession(
     modelName,
     {
       messages: dto.messages ?? [],
       sending: false,
-      imageConfig: {
-        ...defaults.imageConfig,
-        ...savedImage,
-      },
-      videoConfig: {
-        ...defaults.videoConfig,
-        ...savedVideo,
-      },
+      ...configs,
     },
     model
   )
@@ -201,8 +203,8 @@ export function useModelSessions() {
       prompt: string,
       options?: {
         turnId?: string
-        imageConfig?: ImageGenerationConfig
-        videoConfig?: VideoGenerationConfig
+        imageConfig?: GenerationFormConfig
+        videoConfig?: GenerationFormConfig
         attachments?: ModelUsageAttachment[]
       }
     ) => {
@@ -323,7 +325,7 @@ export function useModelSessions() {
             ? Math.max(1, imageConfig.n || 1)
             : 1
           const requestPrompt = chatImage
-            ? `${prompt}\n\n[image settings: aspect_ratio=${imageConfig.aspectRatio}, quality=${imageConfig.quality}]`
+            ? `${prompt}\n\n[image settings: aspect_ratio=${imageConfig.aspect_ratio}, quality=${imageConfig.quality}]`
             : prompt
 
           // 附件随 chat 多模态 content 发给上游（短链需转 data URL）
@@ -409,7 +411,7 @@ export function useModelSessions() {
                 status: 'done',
               },
               image_sources: chatImages,
-              image_config: imageConfig as unknown as Record<string, unknown>,
+              image_config: generationFormToRecord(imageConfig),
             })
             applyServerSession(modelName, dto, model)
             toast.success(t('Generation completed'))
@@ -444,16 +446,21 @@ export function useModelSessions() {
         }
 
         if (invokeProtocol === 'images') {
-          const data = await generateImages({
-            model: modelName,
-            prompt,
-            n: imageConfig.n,
-            size: aspectRatioToSize(imageConfig.aspectRatio),
-            quality:
-              imageConfig.quality === 'auto'
-                ? undefined
-                : imageConfig.quality,
-          })
+          const imageCaps = resolveGenerationCapabilities(
+            model.generation_capabilities,
+            'image'
+          )
+          const data = await generateImages(
+            mapToImagesGenerations(
+              {
+                ...imageConfig,
+                mode: 'image_generate',
+                model: modelName,
+                prompt,
+              },
+              imageCaps
+            )
+          )
           const sources = extractImageUrls(data)
           if (!userId) {
             failAssistant(t('Please sign in to save generated works'))
@@ -467,27 +474,30 @@ export function useModelSessions() {
               status: 'done',
             },
             image_sources: sources,
-            image_config: imageConfig as unknown as Record<string, unknown>,
+            image_config: generationFormToRecord(imageConfig),
           })
           applyServerSession(modelName, dto, model)
           toast.success(t('Generation completed'))
           return
         }
 
-        const taskIds: string[] = []
-        for (let i = 0; i < videoConfig.n; i += 1) {
-          const result = (await generateVideo({
+        const videoCaps = resolveGenerationCapabilities(
+          model.generation_capabilities,
+          'video'
+        )
+        const videoPayload = mapToVideosCreate(
+          {
+            ...videoConfig,
+            mode: 'video_generate',
+            n: 1,
             model: modelName,
             prompt,
-            seconds: videoConfig.seconds,
-            // Wan 等插件不认 OpenAI 图片 size（如 1792x1024），需按分辨率像素表
-            size: aspectRatioToVideoSize(
-              videoConfig.aspectRatio,
-              videoConfig.quality
-            ),
-          })) as { id?: string }
-          if (result?.id) taskIds.push(result.id)
-        }
+          },
+          videoCaps
+        )
+        // 视频强制单任务；n 预留能力表但 MVP mapper 固定 1
+        const result = (await generateVideo(videoPayload)) as { id?: string }
+        const taskIds = result?.id ? [result.id] : []
         if (!userId) {
           failAssistant(t('Please sign in to save generated works'))
           return
@@ -504,7 +514,7 @@ export function useModelSessions() {
             status: 'pending',
           },
           video_task_ids: taskIds,
-          video_config: videoConfig as unknown as Record<string, unknown>,
+          video_config: generationFormToRecord(videoConfig),
         })
         applyServerSession(modelName, dto, model)
         toast.success(t('Generation completed'))
@@ -549,10 +559,15 @@ export function useModelSessions() {
       const userTurn = session?.messages.find(
         (item) => item.turnId === message.turnId && item.role === 'user'
       )
+      const defaults = createEmptySession(model)
       await runGeneration(model, prompt, {
         turnId: message.turnId,
-        imageConfig: message.imageConfig,
-        videoConfig: message.videoConfig,
+        imageConfig: message.imageConfig
+          ? hydrateGenerationForm(message.imageConfig, defaults.imageConfig)
+          : undefined,
+        videoConfig: message.videoConfig
+          ? hydrateGenerationForm(message.videoConfig, defaults.videoConfig)
+          : undefined,
         attachments: userTurn?.attachments,
       })
     },
@@ -570,14 +585,8 @@ export function useModelSessions() {
         const dto = await replaceModelUsageSession(model.model_name, {
           model_name: model.model_name,
           messages: session.messages,
-          image_config: session.imageConfig as unknown as Record<
-            string,
-            unknown
-          >,
-          video_config: session.videoConfig as unknown as Record<
-            string,
-            unknown
-          >,
+          image_config: generationFormToRecord(session.imageConfig),
+          video_config: generationFormToRecord(session.videoConfig),
         })
         applyServerSession(model.model_name, dto, model)
       } catch (error) {

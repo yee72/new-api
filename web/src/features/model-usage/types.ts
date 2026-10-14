@@ -16,6 +16,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import type { GenerationFormConfig } from './lib/generation-request'
+
+export type { GenerationFormConfig } from './lib/generation-request'
+
 export type ModelUsageType = 'chat' | 'image' | 'video'
 
 /** 实际调用协议：与 model_type（Tab）解耦 */
@@ -56,18 +60,10 @@ export type ModelUsageListData = {
   vendors: ModelUsageVendor[]
 }
 
-export type ImageGenerationConfig = {
-  n: number
-  aspectRatio: string
-  quality: string
-}
-
-export type VideoGenerationConfig = {
-  n: number
-  aspectRatio: string
-  quality: string
-  seconds: number
-}
+/** 生图表单配置（schema_version 1.0） */
+export type ImageGenerationConfig = GenerationFormConfig
+/** 生视频表单配置（schema_version 1.0） */
+export type VideoGenerationConfig = GenerationFormConfig
 
 export type LocalAttachmentKind = 'image' | 'video' | 'file'
 

@@ -62,8 +62,9 @@ import { uploadModelUsageAttachment } from '../api'
 import { MODEL_TYPE_LABEL_KEY } from '../constants'
 import { displayTypeFromExt } from '../lib/attachments'
 import {
-  resolveImageCapabilities,
-  resolveVideoCapabilities,
+  durationValues,
+  nValues,
+  resolveGenerationCapabilities,
 } from '../lib/capabilities'
 import type {
   ImageGenerationConfig,
@@ -161,24 +162,21 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
 
   const model = props.model
   const imageCaps = useMemo(
-    () => resolveImageCapabilities(model?.generation_capabilities),
+    () =>
+      resolveGenerationCapabilities(model?.generation_capabilities, 'image'),
     [model?.generation_capabilities]
   )
   const videoCaps = useMemo(
-    () => resolveVideoCapabilities(model?.generation_capabilities),
+    () =>
+      resolveGenerationCapabilities(model?.generation_capabilities, 'video'),
     [model?.generation_capabilities]
   )
-  const videoSecondOptions = useMemo(() => {
-    const options: number[] = []
-    for (
-      let second = videoCaps.secondsMin;
-      second <= videoCaps.secondsMax;
-      second += 1
-    ) {
-      options.push(second)
-    }
-    return options
-  }, [videoCaps.secondsMin, videoCaps.secondsMax])
+  const imageCountOptions = useMemo(() => nValues(imageCaps.n), [imageCaps.n])
+  const videoCountOptions = useMemo(() => nValues(videoCaps.n), [videoCaps.n])
+  const videoSecondOptions = useMemo(
+    () => durationValues(videoCaps.duration_sec),
+    [videoCaps.duration_sec]
+  )
 
   useEffect(() => {
     const node = listRef.current
@@ -503,130 +501,144 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
           {/* 模型类型为图片即展示（含 chat 协议生图，如 Gemini image） */}
           {model.model_type === 'image' && (
             <div className='mt-2 flex flex-wrap gap-1.5'>
-              <SettingPill
-                label={t('Image count')}
-                value={String(props.session.imageConfig.n)}
-                icon={<Images className='size-3.5 text-amber-500' />}
-                onValueChange={(value) =>
-                  props.onImageConfigChange({
-                    ...props.session.imageConfig,
-                    n: Number(value),
-                  })
-                }
-              >
-                {imageCaps.counts.map((count) => (
-                  <SelectItem key={count} value={String(count)}>
-                    {count}
-                  </SelectItem>
-                ))}
-              </SettingPill>
-              <SettingPill
-                label={t('Aspect ratio')}
-                value={props.session.imageConfig.aspectRatio}
-                icon={<Ratio className='size-3.5' />}
-                onValueChange={(value) =>
-                  props.onImageConfigChange({
-                    ...props.session.imageConfig,
-                    aspectRatio: value,
-                  })
-                }
-              >
-                {imageCaps.aspectRatios.map((ratio) => (
-                  <SelectItem key={ratio} value={ratio}>
-                    {ratio}
-                  </SelectItem>
-                ))}
-              </SettingPill>
-              <SettingPill
-                label={t('Quality')}
-                value={props.session.imageConfig.quality}
-                icon={<Sparkles className='size-3.5 text-violet-500' />}
-                onValueChange={(value) =>
-                  props.onImageConfigChange({
-                    ...props.session.imageConfig,
-                    quality: value,
-                  })
-                }
-              >
-                {imageCaps.qualities.map((quality) => (
-                  <SelectItem key={quality} value={quality}>
-                    {quality}
-                  </SelectItem>
-                ))}
-              </SettingPill>
+              {imageCountOptions.length > 0 && (
+                <SettingPill
+                  label={t('Image count')}
+                  value={String(props.session.imageConfig.n)}
+                  icon={<Images className='size-3.5 text-amber-500' />}
+                  onValueChange={(value) =>
+                    props.onImageConfigChange({
+                      ...props.session.imageConfig,
+                      n: Number(value),
+                    })
+                  }
+                >
+                  {imageCountOptions.map((count) => (
+                    <SelectItem key={count} value={String(count)}>
+                      {count}
+                    </SelectItem>
+                  ))}
+                </SettingPill>
+              )}
+              {imageCaps.aspect_ratio.length > 0 && (
+                <SettingPill
+                  label={t('Aspect ratio')}
+                  value={props.session.imageConfig.aspect_ratio}
+                  icon={<Ratio className='size-3.5' />}
+                  onValueChange={(value) =>
+                    props.onImageConfigChange({
+                      ...props.session.imageConfig,
+                      aspect_ratio: value,
+                    })
+                  }
+                >
+                  {imageCaps.aspect_ratio.map((ratio) => (
+                    <SelectItem key={ratio} value={ratio}>
+                      {ratio}
+                    </SelectItem>
+                  ))}
+                </SettingPill>
+              )}
+              {imageCaps.quality.length > 0 && (
+                <SettingPill
+                  label={t('Quality')}
+                  value={props.session.imageConfig.quality ?? ''}
+                  icon={<Sparkles className='size-3.5 text-violet-500' />}
+                  onValueChange={(value) =>
+                    props.onImageConfigChange({
+                      ...props.session.imageConfig,
+                      quality: value,
+                    })
+                  }
+                >
+                  {imageCaps.quality.map((quality) => (
+                    <SelectItem key={quality} value={quality}>
+                      {quality}
+                    </SelectItem>
+                  ))}
+                </SettingPill>
+              )}
             </div>
           )}
 
           {model.model_type === 'video' && (
             <div className='mt-2 flex flex-wrap gap-1.5'>
-              <SettingPill
-                label={t('Video count')}
-                value={String(props.session.videoConfig.n)}
-                icon={<Images className='size-3.5 text-amber-500' />}
-                onValueChange={(value) =>
-                  props.onVideoConfigChange({
-                    ...props.session.videoConfig,
-                    n: Number(value),
-                  })
-                }
-              >
-                {videoCaps.counts.map((count) => (
-                  <SelectItem key={count} value={String(count)}>
-                    {count}
-                  </SelectItem>
-                ))}
-              </SettingPill>
-              <SettingPill
-                label={t('Aspect ratio')}
-                value={props.session.videoConfig.aspectRatio}
-                icon={<Ratio className='size-3.5' />}
-                onValueChange={(value) =>
-                  props.onVideoConfigChange({
-                    ...props.session.videoConfig,
-                    aspectRatio: value,
-                  })
-                }
-              >
-                {videoCaps.aspectRatios.map((ratio) => (
-                  <SelectItem key={ratio} value={ratio}>
-                    {ratio}
-                  </SelectItem>
-                ))}
-              </SettingPill>
-              <SettingPill
-                label={t('Quality')}
-                value={props.session.videoConfig.quality}
-                icon={<Sparkles className='size-3.5 text-violet-500' />}
-                onValueChange={(value) =>
-                  props.onVideoConfigChange({
-                    ...props.session.videoConfig,
-                    quality: value,
-                  })
-                }
-              >
-                {videoCaps.qualities.map((quality) => (
-                  <SelectItem key={quality} value={quality}>
-                    {quality}
-                  </SelectItem>
-                ))}
-              </SettingPill>
-              <SettingPill
-                label={t('Seconds')}
-                value={String(props.session.videoConfig.seconds)}
-                icon={<Timer className='size-3.5' />}
-                onValueChange={(value) =>
-                  props.onVideoConfigChange({
-                    ...props.session.videoConfig,
-                    seconds: Number(value),
-                  })
-                }
-              >
-                {videoSecondOptions.map((second) => (
-                  <SelectItem key={second} value={String(second)}>
-                    {second}s
-                  </SelectItem>
-                ))}
-              </SettingPill>
+              {videoCountOptions.length > 1 && (
+                <SettingPill
+                  label={t('Video count')}
+                  value={String(props.session.videoConfig.n)}
+                  icon={<Images className='size-3.5 text-amber-500' />}
+                  onValueChange={(value) =>
+                    props.onVideoConfigChange({
+                      ...props.session.videoConfig,
+                      n: Number(value),
+                    })
+                  }
+                >
+                  {videoCountOptions.map((count) => (
+                    <SelectItem key={count} value={String(count)}>
+                      {count}
+                    </SelectItem>
+                  ))}
+                </SettingPill>
+              )}
+              {videoCaps.aspect_ratio.length > 0 && (
+                <SettingPill
+                  label={t('Aspect ratio')}
+                  value={props.session.videoConfig.aspect_ratio}
+                  icon={<Ratio className='size-3.5' />}
+                  onValueChange={(value) =>
+                    props.onVideoConfigChange({
+                      ...props.session.videoConfig,
+                      aspect_ratio: value,
+                    })
+                  }
+                >
+                  {videoCaps.aspect_ratio.map((ratio) => (
+                    <SelectItem key={ratio} value={ratio}>
+                      {ratio}
+                    </SelectItem>
+                  ))}
+                </SettingPill>
+              )}
+              {videoCaps.resolution.length > 0 && (
+                <SettingPill
+                  label={t('Quality')}
+                  value={props.session.videoConfig.resolution ?? ''}
+                  icon={<Sparkles className='size-3.5 text-violet-500' />}
+                  onValueChange={(value) =>
+                    props.onVideoConfigChange({
+                      ...props.session.videoConfig,
+                      resolution: value,
+                    })
+                  }
+                >
+                  {videoCaps.resolution.map((resolution) => (
+                    <SelectItem key={resolution} value={resolution}>
+                      {resolution}
+                    </SelectItem>
+                  ))}
+                </SettingPill>
+              )}
+              {videoSecondOptions.length > 0 && (
+                <SettingPill
+                  label={t('Seconds')}
+                  value={String(props.session.videoConfig.duration_sec ?? '')}
+                  icon={<Timer className='size-3.5' />}
+                  onValueChange={(value) =>
+                    props.onVideoConfigChange({
+                      ...props.session.videoConfig,
+                      duration_sec: Number(value),
+                    })
+                  }
+                >
+                  {videoSecondOptions.map((second) => (
+                    <SelectItem key={second} value={String(second)}>
+                      {second === -1 ? t('Auto') : `${second}s`}
+                    </SelectItem>
+                  ))}
+                </SettingPill>
+              )}
             </div>
           )}
         </div>
