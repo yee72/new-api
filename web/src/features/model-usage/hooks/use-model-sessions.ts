@@ -33,6 +33,10 @@ import {
   replaceModelUsageSession,
 } from '../api'
 import {
+  buildChatUserContent,
+  usableChatAttachments,
+} from '../lib/chat-attachments'
+import {
   aspectRatioToSize,
   aspectRatioToVideoSize,
   validateImageConfig,
@@ -268,19 +272,13 @@ export function useModelSessions() {
         videoConfig: model.model_type === 'video' ? videoConfig : undefined,
       }
 
-      const chatHistory = (
+      const historyMessages = (
         isRegenerate
           ? latest.messages.filter((message) => message.turnId !== turnId)
           : latest.messages
+      ).filter(
+        (message) => message.status === 'done' && message.mediaType === 'text'
       )
-        .filter(
-          (message) =>
-            message.status === 'done' && message.mediaType === 'text'
-        )
-        .map((message) => ({
-          role: message.role,
-          content: message.content,
-        }))
 
       patchSession(
         modelName,
@@ -328,6 +326,40 @@ export function useModelSessions() {
             ? `${prompt}\n\n[image settings: aspect_ratio=${imageConfig.aspectRatio}, quality=${imageConfig.quality}]`
             : prompt
 
+          // 附件随 chat 多模态 content 发给上游（短链需转 data URL）
+          if (
+            attachments &&
+            attachments.length > 0 &&
+            usableChatAttachments(attachments).length !== attachments.length
+          ) {
+            failAssistant(t('Attachment expired'))
+            toast.error(t('Attachment expired'))
+            return
+          }
+          let chatHistory: { role: 'user' | 'assistant'; content: Awaited<
+            ReturnType<typeof buildChatUserContent>
+          > }[]
+          let userContent: Awaited<ReturnType<typeof buildChatUserContent>>
+          try {
+            chatHistory = await Promise.all(
+              historyMessages.map(async (message) => ({
+                role: message.role,
+                content: await buildChatUserContent(
+                  message.content,
+                  message.role === 'user' ? message.attachments : undefined
+                ),
+              }))
+            )
+            userContent = await buildChatUserContent(
+              requestPrompt,
+              attachments
+            )
+          } catch {
+            failAssistant(t('Failed to load attachment'))
+            toast.error(t('Failed to load attachment'))
+            return
+          }
+
           const chatImages: string[] = []
           let contentText = ''
           for (let i = 0; i < requestCount; i += 1) {
@@ -335,7 +367,7 @@ export function useModelSessions() {
               model: modelName,
               messages: [
                 ...chatHistory,
-                { role: 'user' as const, content: requestPrompt },
+                { role: 'user' as const, content: userContent },
               ],
               stream: false,
             })
@@ -512,10 +544,16 @@ export function useModelSessions() {
     async (model: ModelUsageItem, message: ModelUsageMessage) => {
       const prompt = message.prompt?.trim()
       if (!prompt) return
+      const session =
+        useModelUsageSessionsStore.getState().sessions[model.model_name]
+      const userTurn = session?.messages.find(
+        (item) => item.turnId === message.turnId && item.role === 'user'
+      )
       await runGeneration(model, prompt, {
         turnId: message.turnId,
         imageConfig: message.imageConfig,
         videoConfig: message.videoConfig,
+        attachments: userTurn?.attachments,
       })
     },
     [runGeneration]

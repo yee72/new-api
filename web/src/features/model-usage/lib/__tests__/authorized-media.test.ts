@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { describe, expect, it } from 'vitest'
 
-import { isModelUsageMediaURL } from '../../hooks/use-authorized-media-src'
+import { isModelUsageMediaURL } from '../media-download'
 
 describe('isModelUsageMediaURL', () => {
   it('detects relative and absolute model-usage media paths', () => {

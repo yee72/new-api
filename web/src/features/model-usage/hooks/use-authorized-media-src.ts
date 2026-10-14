@@ -19,29 +19,12 @@ For commercial licensing, please contact support@quantumnous.com
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 
-import { api } from '@/lib/api'
+import {
+  fetchModelUsageMediaBlob,
+  isModelUsageMediaURL,
+} from '../lib/media-download'
 
-/** 模型使用媒体短链：<img>/<video> 无法带 Bearer，需经 api 拉取再转 blob。 */
-export function isModelUsageMediaURL(url: string): boolean {
-  const trimmed = url.trim()
-  if (!trimmed) return false
-  if (trimmed.startsWith('/api/model-usage/media/')) return true
-  try {
-    const parsed = new URL(trimmed, window.location.origin)
-    return parsed.pathname.startsWith('/api/model-usage/media/')
-  } catch {
-    return false
-  }
-}
-
-function mediaRequestPath(url: string): string {
-  try {
-    const parsed = new URL(url, window.location.origin)
-    return `${parsed.pathname}${parsed.search}`
-  } catch {
-    return url
-  }
-}
+export { isModelUsageMediaURL }
 
 export function useAuthorizedMediaSrc(url: string | undefined): {
   src: string | undefined
@@ -53,20 +36,14 @@ export function useAuthorizedMediaSrc(url: string | undefined): {
     queryKey: ['model-usage-media', url],
     enabled: needsAuth && Boolean(url),
     queryFn: async ({ signal }) => {
-      const response = await api.get<Blob>(mediaRequestPath(url!), {
-        responseType: 'blob',
-        signal,
-        disableDuplicate: true,
-        skipErrorHandler: true,
-        skipBusinessError: true,
-      })
-      const type = response.data.type || ''
+      const blob = await fetchModelUsageMediaBlob(url!, signal)
+      const type = blob.type || ''
       if (
         type.startsWith('image/') ||
         type.startsWith('video/') ||
         type === 'application/octet-stream'
       ) {
-        return response.data
+        return blob
       }
       return null
     },

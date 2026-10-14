@@ -16,10 +16,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Loader2, RefreshCw, Trash2 } from 'lucide-react'
+import { Download, Loader2, RefreshCw, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 
+import { CopyButton } from '@/components/copy-button'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -28,6 +30,7 @@ import {
   displayTypeFromAttachment,
   isModelUsageAttachmentExpired,
 } from '../lib/attachments'
+import { downloadModelUsageMedia } from '../lib/media-download'
 import type { ModelUsageMessage } from '../types'
 import { ModelUsageAttachmentIcon } from './model-usage-attachment-icon'
 import { ModelUsageAttachmentTooltip } from './model-usage-attachment-tooltip'
@@ -51,6 +54,9 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
     items: { url: string; kind: 'image' | 'video' }[]
     index: number
   } | null>(null)
+  const [downloadingMessageId, setDownloadingMessageId] = useState<
+    string | null
+  >(null)
 
   if (props.messages.length === 0) {
     return (
@@ -84,6 +90,22 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
               !hasImages &&
               !hasVideos) ||
             (isUser && Boolean(message.content))
+          // 可复制正文：生成中占位不复制；用户与助手文本均可
+          const copyText =
+            !showGenerating && message.content.trim()
+              ? message.content
+              : ''
+          const showCopy = Boolean(copyText)
+          // 生成结果图/视频可下载（按需拉 blob，不预取）
+          const downloadItems: { url: string; kind: 'image' | 'video' }[] = [
+            ...images.map((url) => ({ url, kind: 'image' as const })),
+            ...videos
+              .filter((item) => item.url)
+              .map((item) => ({ url: item.url!, kind: 'video' as const })),
+          ]
+          const showDownload = downloadItems.length > 0
+          const showActions = canAct || showCopy || showDownload
+          const downloading = downloadingMessageId === message.id
 
           return (
             <div
@@ -210,7 +232,7 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
                           key={attachment.id}
                           name={attachment.name}
                           type={displayType}
-                          hint={t('Expired')}
+                          hint={t('Attachment expired')}
                         >
                           <div className='bg-muted/60 text-muted-foreground flex size-14 flex-col items-center justify-center gap-0.5 rounded-lg border border-dashed opacity-70'>
                             <ModelUsageAttachmentIcon
@@ -263,14 +285,56 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
                 </div>
               )}
 
-              {canAct && (
+              {showActions && (
                 <div
                   className={cn(
                     'flex gap-1 opacity-70 transition-opacity group-hover:opacity-100',
                     isUser ? 'justify-end' : 'justify-start'
                   )}
                 >
-                  {!isUser && message.prompt && (
+                  {showCopy && (
+                    <CopyButton
+                      value={copyText}
+                      size='sm'
+                      className='h-7 gap-1 px-2 text-xs'
+                      aria-label={t('Copy')}
+                    >
+                      <span>{t('Copy')}</span>
+                    </CopyButton>
+                  )}
+                  {showDownload && (
+                    <Button
+                      type='button'
+                      variant='ghost'
+                      size='sm'
+                      className='h-7 px-2 text-xs'
+                      disabled={downloading}
+                      onClick={() => {
+                        setDownloadingMessageId(message.id)
+                        void (async () => {
+                          try {
+                            for (const item of downloadItems) {
+                              await downloadModelUsageMedia(item.url, {
+                                kind: item.kind,
+                              })
+                            }
+                          } catch {
+                            toast.error(t('Download failed'))
+                          } finally {
+                            setDownloadingMessageId(null)
+                          }
+                        })()
+                      }}
+                    >
+                      {downloading ? (
+                        <Loader2 className='mr-1 size-3 animate-spin' />
+                      ) : (
+                        <Download className='mr-1 size-3' />
+                      )}
+                      {t('Download')}
+                    </Button>
+                  )}
+                  {canAct && !isUser && message.prompt && (
                     <Button
                       type='button'
                       variant='ghost'
@@ -283,17 +347,19 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
                       {t('Regenerate')}
                     </Button>
                   )}
-                  <Button
-                    type='button'
-                    variant='ghost'
-                    size='sm'
-                    className='text-destructive h-7 px-2 text-xs'
-                    disabled={props.busy}
-                    onClick={() => props.onDelete(message.turnId)}
-                  >
-                    <Trash2 className='mr-1 size-3' />
-                    {t('Delete')}
-                  </Button>
+                  {canAct && (
+                    <Button
+                      type='button'
+                      variant='ghost'
+                      size='sm'
+                      className='text-destructive h-7 px-2 text-xs'
+                      disabled={props.busy}
+                      onClick={() => props.onDelete(message.turnId)}
+                    >
+                      <Trash2 className='mr-1 size-3' />
+                      {t('Delete')}
+                    </Button>
+                  )}
                 </div>
               )}
             </div>

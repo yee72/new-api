@@ -52,4 +52,11 @@ describe('aspectRatioToVideoSize', () => {
     expect(aspectRatioToVideoSize('16:9', '1080p')).toBe('1920x1080')
     expect(aspectRatioToVideoSize('9:16', 'auto')).toBe('720x1280')
   })
+
+  it('falls back to 720P when quality is empty', () => {
+    expect(aspectRatioToVideoSize('16:9', '')).toBe('1280x720')
+    expect(
+      aspectRatioToVideoSize('16:9', undefined as unknown as string)
+    ).toBe('1280x720')
+  })
 })

@@ -241,7 +241,8 @@ const VIDEO_SIZE_BY_RESOLUTION: Record<string, Record<string, string>> = {
 }
 
 function normalizeVideoResolution(quality: string): string {
-  const q = quality.trim().toLowerCase()
+  // 兼容异常/旧会话里 quality 缺失，避免 .trim 抛错；缺省回落 720P
+  const q = String(quality ?? '').trim().toLowerCase()
   if (!q || q === 'auto') return '720P'
   if (q.endsWith('p')) return q.toUpperCase()
   return `${q.toUpperCase()}P`

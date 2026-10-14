@@ -16,13 +16,16 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, Loader2 } from 'lucide-react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 
 import { Dialog } from '@/components/dialog'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 
+import { downloadModelUsageMedia } from '../lib/media-download'
 import {
   ModelUsageAuthImage,
   ModelUsageAuthVideo,
@@ -43,6 +46,7 @@ type ModelUsageMediaPreviewProps = {
 
 export function ModelUsageMediaPreview(props: ModelUsageMediaPreviewProps) {
   const { t } = useTranslation()
+  const [downloading, setDownloading] = useState(false)
   const current = props.items[props.index]
   const hasMultiple = props.items.length > 1
   const isVideo = current?.kind === 'video'
@@ -65,6 +69,34 @@ export function ModelUsageMediaPreview(props: ModelUsageMediaPreviewProps) {
       contentClassName='sm:max-w-6xl'
       contentHeight='auto'
       bodyClassName='space-y-3'
+      footer={
+        current?.url ? (
+          <Button
+            type='button'
+            variant='outline'
+            disabled={downloading}
+            onClick={() => {
+              setDownloading(true)
+              void downloadModelUsageMedia(current.url, {
+                kind: current.kind,
+              })
+                .catch(() => {
+                  toast.error(t('Download failed'))
+                })
+                .finally(() => {
+                  setDownloading(false)
+                })
+            }}
+          >
+            {downloading ? (
+              <Loader2 className='mr-1 size-4 animate-spin' />
+            ) : (
+              <Download className='mr-1 size-4' />
+            )}
+            {t('Download')}
+          </Button>
+        ) : null
+      }
     >
       <div className='bg-muted/40 relative flex min-h-[280px] items-center justify-center rounded-lg border p-2 sm:min-h-[420px]'>
         {!current?.url ? (
