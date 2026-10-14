@@ -199,6 +199,19 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
                   {attachments.map((attachment) => {
                     const expired = isModelUsageAttachmentExpired(attachment)
                     const canPreview = canPreviewModelUsageAttachment(attachment)
+                    // 过期：仅文件名标识；未过期：缩略图/图标，不展示名称类型
+                    if (expired) {
+                      return (
+                        <div
+                          key={attachment.id}
+                          className='bg-muted/60 text-muted-foreground flex max-w-[14rem] items-center gap-1.5 rounded-lg border border-dashed px-2 py-1.5 text-xs opacity-70'
+                          title={t('Attachment expired')}
+                        >
+                          <FileText className='size-3.5 shrink-0' />
+                          <span className='truncate'>{attachment.name}</span>
+                        </div>
+                      )
+                    }
                     return (
                       <button
                         key={attachment.id}
@@ -212,37 +225,23 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
                           })
                         }}
                         className={cn(
-                          'bg-background flex max-w-[14rem] items-center gap-2 rounded-lg border px-2 py-1.5 text-left text-xs',
-                          expired && 'opacity-60',
+                          'bg-background size-14 overflow-hidden rounded-lg border',
                           canPreview && 'hover:ring-primary/40 hover:ring-2'
                         )}
-                        title={
-                          expired
-                            ? t('Attachment expired')
-                            : attachment.name
-                        }
+                        title={attachment.name}
+                        aria-label={attachment.name}
                       >
                         {canPreview ? (
                           <ModelUsageAuthImage
                             url={attachment.url!}
-                            alt={attachment.name}
-                            className='size-9 shrink-0 rounded-md object-cover'
+                            alt=''
+                            className='size-full object-cover'
                           />
                         ) : (
-                          <span className='bg-muted text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-md'>
-                            <FileText className='size-3.5' />
+                          <span className='bg-muted text-muted-foreground flex size-full items-center justify-center'>
+                            <FileText className='size-5' />
                           </span>
                         )}
-                        <span className='min-w-0'>
-                          <span className='block truncate font-medium'>
-                            {attachment.name}
-                          </span>
-                          <span className='text-muted-foreground block text-[10px]'>
-                            {expired
-                              ? t('Expired')
-                              : attachment.kind.toUpperCase()}
-                          </span>
-                        </span>
                       </button>
                     )
                   })}

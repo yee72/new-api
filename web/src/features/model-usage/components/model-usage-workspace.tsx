@@ -37,6 +37,7 @@ import {
   type ReactNode,
 } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -217,8 +218,26 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
     const list = Array.from(files)
     if (list.length === 0) return
 
+    const maxAttachments = 5
+    const remaining = maxAttachments - attachments.length
+    if (remaining <= 0) {
+      toast.info(
+        t('You can upload up to {{count}} attachments', {
+          count: maxAttachments,
+        })
+      )
+      return
+    }
+    const accepted = list.slice(0, remaining)
+    if (accepted.length < list.length) {
+      toast.info(
+        t('You can upload up to {{count}} attachments', {
+          count: maxAttachments,
+        })
+      )
+    }
     const next: LocalAttachment[] = []
-    for (const file of list) {
+    for (const file of accepted) {
       const kind = attachmentKind(file)
       const previewUrl =
         kind === 'image' || kind === 'video'
@@ -235,7 +254,7 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
         previewUrl,
       })
     }
-    setAttachments((current) => [...current, ...next])
+    setAttachments((current) => [...current, ...next].slice(0, maxAttachments))
   }
 
   const removeAttachment = (id: string) => {
@@ -391,25 +410,26 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
                   {attachments.map((file) => (
                     <div
                       key={file.id}
-                      className='bg-background relative flex max-w-[11rem] items-center gap-2 rounded-lg border p-1.5'
+                      className='bg-background relative size-14 overflow-hidden rounded-lg border'
+                      title={file.name}
                     >
                       {file.kind === 'image' && file.previewUrl ? (
                         <button
                           type='button'
-                          className='size-10 shrink-0 overflow-hidden rounded-md'
+                          className='size-full'
                           onClick={() => openAttachmentPreview(file)}
                           aria-label={t('Image Preview')}
                         >
                           <img
                             src={file.previewUrl}
-                            alt={file.name}
+                            alt=''
                             className='size-full object-cover'
                           />
                         </button>
                       ) : file.kind === 'video' && file.previewUrl ? (
                         <button
                           type='button'
-                          className='bg-muted relative size-10 shrink-0 overflow-hidden rounded-md'
+                          className='bg-muted size-full'
                           onClick={() => openAttachmentPreview(file)}
                           aria-label={t('Video Preview')}
                         >
@@ -422,21 +442,16 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
                           />
                         </button>
                       ) : (
-                        <div className='bg-muted text-muted-foreground flex size-10 shrink-0 items-center justify-center rounded-md'>
-                          <FileText className='size-4' />
+                        <div
+                          className='bg-muted text-muted-foreground flex size-full items-center justify-center'
+                          aria-label={file.name}
+                        >
+                          <FileText className='size-5' />
                         </div>
                       )}
-                      <div className='min-w-0 flex-1 pr-4'>
-                        <p className='truncate text-xs font-medium'>
-                          {file.name}
-                        </p>
-                        <p className='text-muted-foreground text-[10px] uppercase'>
-                          {file.ext || t('File')}
-                        </p>
-                      </div>
                       <button
                         type='button'
-                        className='text-muted-foreground hover:text-foreground absolute top-1 right-1 rounded-sm p-0.5'
+                        className='bg-background/90 text-muted-foreground hover:text-foreground absolute top-0.5 right-0.5 rounded-full p-0.5 shadow-sm'
                         onClick={() => removeAttachment(file.id)}
                         aria-label={t('Remove attachment')}
                       >
@@ -466,13 +481,9 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
                   type='button'
                   size='icon'
                   className='rounded-full'
-                  disabled={busy || !prompt.trim() || hasAttachments}
+                  disabled={busy || (!prompt.trim() && !hasAttachments)}
                   onClick={() => void handleSubmit()}
-                  title={
-                    hasAttachments
-                      ? t('Attachments are not available yet')
-                      : t('Send')
-                  }
+                  title={t('Send')}
                 >
                   {busy ? (
                     <Loader2 className='size-4 animate-spin' />

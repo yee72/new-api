@@ -21,7 +21,7 @@ const (
 	modelUsageOutputTTL          = 90 * 24 * time.Hour
 	maxModelUsageAttachmentBytes = 20 << 20
 	maxModelUsageAttachmentImage = 10 << 20
-	maxModelUsageAttachmentsMsg  = 8
+	maxModelUsageAttachmentsMsg  = 5
 )
 
 // UploadModelUsageAttachment 将用户附件写入 R2 attachments 前缀，返回可落库的元数据。
