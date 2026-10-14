@@ -44,6 +44,7 @@ import {
   buildChatUserContent,
   usableChatAttachments,
 } from '../lib/chat-attachments'
+import { selectChatHistoryMessages } from '../lib/chat-history'
 import { clearModelUsageMediaCache } from '../lib/media-cache'
 import {
   mapToImagesGenerations,
@@ -317,13 +318,10 @@ export function useModelSessions() {
         videoConfig: model.model_type === 'video' ? videoConfig : undefined,
       }
 
-      const historyMessages = (
-        isRegenerate
-          ? latest.messages.filter((message) => message.turnId !== turnId)
-          : latest.messages
-      ).filter(
-        (message) => message.status === 'done' && message.mediaType === 'text'
-      )
+      // 失败轮次用户附件不拼进历史，避免 PPT 等持续污染后续对话
+      const historyMessages = selectChatHistoryMessages(latest.messages, {
+        excludeTurnId: isRegenerate ? turnId : undefined,
+      })
 
       patchSession(
         modelName,

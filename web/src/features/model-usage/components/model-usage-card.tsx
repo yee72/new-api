@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Check, Loader2, Pin } from 'lucide-react'
+import { Check, Loader2, Star } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -98,10 +98,7 @@ export function ModelUsageCard(props: ModelUsageCardProps) {
                   />
                 }
               >
-                <Pin
-                  className={cn('size-2.5', props.pinned && 'fill-current')}
-                  aria-hidden
-                />
+                <Star className='size-2.5 fill-none' aria-hidden />
               </TooltipTrigger>
               <TooltipContent side='right'>{pinLabel}</TooltipContent>
             </Tooltip>
