@@ -34,18 +34,22 @@ import {
   replaceModelUsageSession,
   sendAnthropicMessages,
 } from '../api'
+import { ATTACHMENT_EXTRACT_FAILED } from '../lib/attachment-text-extract'
 import {
   resolveGenerationCapabilities,
   validateImageConfig,
   validateVideoConfig,
 } from '../lib/capabilities'
-import { ATTACHMENT_EXTRACT_FAILED } from '../lib/attachment-text-extract'
 import {
   buildChatUserContent,
   usableChatAttachments,
 } from '../lib/chat-attachments'
 import { selectChatHistoryMessages } from '../lib/chat-history'
-import { clearModelUsageMediaCache } from '../lib/media-cache'
+import {
+  textFromAnthropicResponse,
+  toAnthropicMessages,
+  type AnthropicMessagesResponse,
+} from '../lib/claude-messages'
 import {
   mapToImagesGenerations,
   mapToVideosCreate,
@@ -55,14 +59,10 @@ import {
   hydrateGenerationForm,
 } from '../lib/generation-request'
 import {
-  textFromAnthropicResponse,
-  toAnthropicMessages,
-  type AnthropicMessagesResponse,
-} from '../lib/claude-messages'
-import {
   extractImagesFromChatMessage,
   resolveInvokeProtocol,
 } from '../lib/invoke-protocol'
+import { clearModelUsageMediaCache } from '../lib/media-cache'
 import {
   createEmptySession,
   markUnresumedMessages,
@@ -640,6 +640,24 @@ export function useModelSessions() {
     [runGeneration, setLastModelName, t]
   )
 
+  const resendEdited = useCallback(
+    async (model: ModelUsageItem, message: ModelUsageMessage, text: string) => {
+      const prompt = text.trim()
+      if (!prompt) return
+      const defaults = createEmptySession(model)
+      // 不传 turnId：作为最新一轮追加，原用户文本和模型输出都保留
+      await runGeneration(model, prompt, {
+        imageConfig: message.imageConfig
+          ? hydrateGenerationForm(message.imageConfig, defaults.imageConfig)
+          : undefined,
+        videoConfig: message.videoConfig
+          ? hydrateGenerationForm(message.videoConfig, defaults.videoConfig)
+          : undefined,
+      })
+    },
+    [runGeneration]
+  )
+
   const regenerate = useCallback(
     async (model: ModelUsageItem, message: ModelUsageMessage) => {
       const prompt = message.prompt?.trim()
@@ -700,6 +718,7 @@ export function useModelSessions() {
     setVideoConfig,
     send,
     deleteTurn,
+    resendEdited,
     regenerate,
     isModelSending,
     lastModelName,

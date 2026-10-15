@@ -16,14 +16,14 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Download, Loader2, RefreshCw, Trash2 } from 'lucide-react'
+import { Download, Loader2, Pencil, RefreshCw, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { CopyButton } from '@/components/copy-button'
 import { Button } from '@/components/ui/button'
-import { useAuthStore } from '@/stores/auth-store'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Tooltip,
   TooltipContent,
@@ -31,6 +31,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
+import { useAuthStore } from '@/stores/auth-store'
 
 import {
   canPreviewModelUsageAttachment,
@@ -54,6 +55,7 @@ type ModelUsageMessageListProps = {
   busy: boolean
   onDelete: (turnId: string) => void
   onRegenerate: (message: ModelUsageMessage) => void
+  onEditUserMessage: (message: ModelUsageMessage, text: string) => Promise<void>
 }
 
 export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
@@ -66,6 +68,8 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
   const [downloadingMessageId, setDownloadingMessageId] = useState<
     string | null
   >(null)
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
+  const [editDraft, setEditDraft] = useState('')
 
   if (props.messages.length === 0) {
     return (
@@ -116,13 +120,22 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
           // 生成结果图/视频可下载（按需拉 blob，不预取）
           const downloadItems: { url: string; kind: 'image' | 'video' }[] = [
             ...images.map((url) => ({ url, kind: 'image' as const })),
-            ...videos
-              .filter((item) => item.url)
-              .map((item) => ({ url: item.url!, kind: 'video' as const })),
+            ...videos.flatMap((item) =>
+              item.url ? [{ url: item.url, kind: 'video' as const }] : []
+            ),
           ]
           const showDownload = downloadItems.length > 0
           const showActions = canAct || showCopy || showDownload
           const downloading = downloadingMessageId === message.id
+          const isEditing = editingMessageId === message.id
+          const canEdit =
+            isUser && canAct && Boolean(message.content.trim()) && !isEditing
+          let bubbleTone = 'bg-muted'
+          if (isUser) {
+            bubbleTone = 'bg-primary text-primary-foreground'
+          } else if (message.status === 'error') {
+            bubbleTone = 'bg-destructive/10 text-destructive'
+          }
 
           return (
             <div
@@ -132,26 +145,72 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
                 isUser ? 'items-end' : 'items-start'
               )}
             >
-              {showTextBubble && (
-                <div
-                  className={cn(
-                    'max-w-[min(100%,36rem)] rounded-2xl px-3.5 py-2 text-sm whitespace-pre-wrap',
-                    isUser
-                      ? 'bg-primary text-primary-foreground'
-                      : message.status === 'error'
-                        ? 'bg-destructive/10 text-destructive'
-                        : 'bg-muted'
-                  )}
-                >
-                  {showGeneratingText ? (
-                    <span className='inline-flex items-center gap-2'>
-                      <Loader2 className='size-3.5 shrink-0 animate-spin' />
-                      {message.content || t('Your work is being generated...')}
-                    </span>
-                  ) : (
-                    message.content
-                  )}
+              {isEditing ? (
+                <div className='flex w-full max-w-[min(100%,36rem)] flex-col gap-2'>
+                  <Textarea
+                    value={editDraft}
+                    aria-label={t('Edit')}
+                    rows={3}
+                    disabled={props.busy}
+                    onChange={(event) => setEditDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Escape') {
+                        event.preventDefault()
+                        setEditingMessageId(null)
+                        return
+                      }
+                      if (event.key === 'Enter' && !event.shiftKey) {
+                        event.preventDefault()
+                        if (!editDraft.trim() || props.busy) return
+                        void props
+                          .onEditUserMessage(message, editDraft.trim())
+                          .then(() => setEditingMessageId(null))
+                      }
+                    }}
+                  />
+                  <div className='flex justify-end gap-2'>
+                    <Button
+                      type='button'
+                      variant='outline'
+                      size='sm'
+                      onClick={() => setEditingMessageId(null)}
+                    >
+                      {t('Cancel')}
+                    </Button>
+                    <Button
+                      type='button'
+                      size='sm'
+                      disabled={props.busy || !editDraft.trim()}
+                      onClick={() => {
+                        if (!editDraft.trim() || props.busy) return
+                        void props
+                          .onEditUserMessage(message, editDraft.trim())
+                          .then(() => setEditingMessageId(null))
+                      }}
+                    >
+                      {t('Submit')}
+                    </Button>
+                  </div>
                 </div>
+              ) : (
+                showTextBubble && (
+                  <div
+                    className={cn(
+                      'max-w-[min(100%,36rem)] rounded-2xl px-3.5 py-2 text-sm whitespace-pre-wrap',
+                      bubbleTone
+                    )}
+                  >
+                    {showGeneratingText ? (
+                      <span className='inline-flex items-center gap-2'>
+                        <Loader2 className='size-3.5 shrink-0 animate-spin' />
+                        {message.content ||
+                          t('Your work is being generated...')}
+                      </span>
+                    ) : (
+                      message.content
+                    )}
+                  </div>
+                )
               )}
 
               {showGeneratingMedia && (
@@ -172,9 +231,9 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
                       : 'grid w-full grid-cols-2 gap-2'
                   )}
                 >
-                  {images.map((url, index) => (
+                  {images.map((url) => (
                     <button
-                      key={`${message.id}-${index}`}
+                      key={`${message.id}-${url}`}
                       type='button'
                       className={cn(
                         'bg-background/40 hover:ring-primary/50 focus-visible:ring-ring block overflow-hidden rounded-xl text-left transition hover:ring-2 focus-visible:ring-2 focus-visible:outline-none',
@@ -182,11 +241,11 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
                       )}
                       onClick={() =>
                         setPreview({
-                          items: images.map((url) => ({
-                            url,
+                          items: images.map((item) => ({
+                            url: item,
                             kind: 'image' as const,
                           })),
-                          index,
+                          index: images.indexOf(url),
                         })
                       }
                       aria-label={t('Image Preview')}
@@ -211,34 +270,41 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
                       : 'grid w-full grid-cols-2 gap-2'
                   )}
                 >
-                  {videos.map((video, index) => (
-                    <button
-                      key={`${message.id}-video-${index}`}
-                      type='button'
-                      className={cn(
-                        'bg-background/40 hover:ring-primary/50 focus-visible:ring-ring block overflow-hidden rounded-xl text-left transition hover:ring-2 focus-visible:ring-2 focus-visible:outline-none',
-                        videos.length === 1 ? 'w-fit max-w-full' : 'w-full'
-                      )}
-                      onClick={() =>
-                        setPreview({
-                          items: videos.map((item) => ({
-                            url: item.url!,
-                            kind: 'video' as const,
-                          })),
-                          index,
-                        })
-                      }
-                      aria-label={t('Video Preview')}
-                    >
-                      <ModelUsageAuthVideo
-                        url={video.url!}
-                        fitContent={videos.length === 1}
-                        className={videos.length === 1 ? undefined : 'w-full'}
-                        controls={false}
-                        muted
-                      />
-                    </button>
-                  ))}
+                  {videos.map((video) => {
+                    const url = video.url
+                    if (!url) return null
+                    const playable = videos.flatMap((item) =>
+                      item.url ? [item.url] : []
+                    )
+                    return (
+                      <button
+                        key={`${message.id}-video-${url}`}
+                        type='button'
+                        className={cn(
+                          'bg-background/40 hover:ring-primary/50 focus-visible:ring-ring block overflow-hidden rounded-xl text-left transition hover:ring-2 focus-visible:ring-2 focus-visible:outline-none',
+                          videos.length === 1 ? 'w-fit max-w-full' : 'w-full'
+                        )}
+                        onClick={() =>
+                          setPreview({
+                            items: playable.map((item) => ({
+                              url: item,
+                              kind: 'video' as const,
+                            })),
+                            index: playable.indexOf(url),
+                          })
+                        }
+                        aria-label={t('Video Preview')}
+                      >
+                        <ModelUsageAuthVideo
+                          url={url}
+                          fitContent={videos.length === 1}
+                          className={videos.length === 1 ? undefined : 'w-full'}
+                          controls={false}
+                          muted
+                        />
+                      </button>
+                    )
+                  })}
                 </div>
               )}
 
@@ -254,6 +320,7 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
                     const canPreview =
                       canPreviewModelUsageAttachment(attachment)
                     const displayType = displayTypeFromAttachment(attachment)
+                    const attachmentUrl = attachment.url
                     // 过期：文件名标识；未过期：类型图标/缩略图，悬停看名称与类型
                     if (expired) {
                       return (
@@ -286,9 +353,9 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
                           type='button'
                           disabled={!canPreview}
                           onClick={() => {
-                            if (!canPreview || !attachment.url) return
+                            if (!canPreview || !attachmentUrl) return
                             setPreview({
-                              items: [{ url: attachment.url, kind: 'image' }],
+                              items: [{ url: attachmentUrl, kind: 'image' }],
                               index: 0,
                             })
                           }}
@@ -298,9 +365,9 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
                           )}
                           aria-label={attachment.name}
                         >
-                          {canPreview ? (
+                          {canPreview && attachmentUrl ? (
                             <ModelUsageAuthImage
-                              url={attachment.url!}
+                              url={attachmentUrl}
                               alt=''
                               compact
                               className='size-full object-cover'
@@ -323,6 +390,30 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
                       isUser ? 'justify-end' : 'justify-start'
                     )}
                   >
+                    {canEdit && (
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <Button
+                              type='button'
+                              variant='ghost'
+                              size='icon-sm'
+                              disabled={props.busy}
+                              aria-label={t('Edit')}
+                              onClick={() => {
+                                setEditingMessageId(message.id)
+                                setEditDraft(message.content)
+                              }}
+                            >
+                              <Pencil className='size-3.5' />
+                            </Button>
+                          }
+                        />
+                        <TooltipContent>
+                          <p>{t('Edit')}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
                     {showCopy && (
                       <CopyButton
                         value={copyText}

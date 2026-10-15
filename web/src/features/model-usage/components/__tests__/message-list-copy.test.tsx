@@ -35,9 +35,7 @@ vi.mock('../model-usage-media-preview', () => ({
   ModelUsageMediaPreview: () => null,
 }))
 
-function baseMessage(
-  overrides: Partial<ModelUsageMessage>
-): ModelUsageMessage {
+function baseMessage(overrides: Partial<ModelUsageMessage>): ModelUsageMessage {
   return {
     id: 'a1',
     turnId: 't1',
@@ -80,6 +78,7 @@ async function renderList(messages: ModelUsageMessage[]) {
         busy={false}
         onDelete={vi.fn()}
         onRegenerate={vi.fn()}
+        onEditUserMessage={vi.fn()}
       />
     </I18nextProvider>
   )
@@ -101,10 +100,10 @@ describe('ModelUsageMessageList copy actions', () => {
     ])
 
     expect(screen.getByTestId('auth-video')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Copy' })).not.toBeInTheDocument()
     expect(
-      screen.getByRole('button', { name: 'Download' })
-    ).toBeInTheDocument()
+      screen.queryByRole('button', { name: 'Copy' })
+    ).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Download' })).toBeInTheDocument()
   })
 
   it('keeps Copy on visible chat text bubbles', async () => {

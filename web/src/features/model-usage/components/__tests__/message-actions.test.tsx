@@ -91,6 +91,7 @@ async function renderActions() {
         busy={false}
         onDelete={vi.fn()}
         onRegenerate={vi.fn()}
+        onEditUserMessage={vi.fn()}
       />
     </I18nextProvider>
   )

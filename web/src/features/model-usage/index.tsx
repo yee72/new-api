@@ -18,7 +18,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useNavigate, useSearch } from '@tanstack/react-router'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Dialog } from '@/components/dialog'
@@ -54,6 +54,7 @@ export function ModelUsagePage() {
     setVideoConfig,
     send,
     deleteTurn,
+    resendEdited,
     regenerate,
     isModelSending,
     lastModelName,
@@ -94,10 +95,13 @@ export function ModelUsagePage() {
   )
   const [loginOpen, setLoginOpen] = useState(false)
 
-  const selectModel = (modelName: string) => {
-    setSelectedModelName(modelName)
-    if (modelName) setLastModelName(modelName)
-  }
+  const selectModel = useCallback(
+    (modelName: string) => {
+      setSelectedModelName(modelName)
+      if (modelName) setLastModelName(modelName)
+    },
+    [setLastModelName]
+  )
 
   const listQuery = useQuery({
     queryKey: [
@@ -147,7 +151,7 @@ export function ModelUsagePage() {
         models.find((item) => item.model_name === lastModelName)?.model_name) ||
       models[0].model_name
     selectModel(preferred)
-  }, [models, selectedModelName, lastModelName, setLastModelName])
+  }, [models, selectedModelName, lastModelName, setLastModelName, selectModel])
 
   useEffect(() => {
     if (selectedModel) {
@@ -231,6 +235,10 @@ export function ModelUsagePage() {
             onRegenerate={async (message) => {
               if (!selectedModel) return
               await regenerate(selectedModel, message)
+            }}
+            onEditUserMessage={async (message, text) => {
+              if (!selectedModel) return
+              await resendEdited(selectedModel, message, text)
             }}
             onImageConfigChange={(config) => {
               if (!selectedModel) return

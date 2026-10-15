@@ -70,6 +70,9 @@ import { generationOptionLabelKey } from '../lib/generation-option-labels'
 import {
   DEFAULT_PROMPT_ENHANCE_MAX_TOKENS,
   promptEnhanceSystemPrompt,
+  promptEnhanceUserContent,
+  withAttachmentUsage,
+  type PromptEnhanceAttachment,
 } from '../lib/prompt-enhance'
 import type {
   ImageGenerationConfig,
@@ -99,6 +102,7 @@ type ModelUsageWorkspaceProps = {
   onSend: (text: string, attachments?: ModelUsageAttachment[]) => Promise<void>
   onDeleteTurn: (turnId: string) => void
   onRegenerate: (message: ModelUsageMessage) => Promise<void>
+  onEditUserMessage: (message: ModelUsageMessage, text: string) => Promise<void>
   onImageConfigChange: (config: ImageGenerationConfig) => void
   onVideoConfigChange: (config: VideoGenerationConfig) => void
 }
@@ -230,7 +234,7 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
 
   const addFiles = (files: FileList | File[] | null) => {
     if (!files || (files instanceof FileList && files.length === 0)) return
-    const list = Array.from(files)
+    const list = [...files]
     if (list.length === 0) return
 
     const maxAttachments = 5
@@ -283,12 +287,18 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
   const openAttachmentPreview = (attachment: LocalAttachment) => {
     if (attachment.kind === 'file' || !attachment.previewUrl) return
     const media = attachments.filter(
-      (item) =>
-        (item.kind === 'image' || item.kind === 'video') && item.previewUrl
+      (
+        item
+      ): item is LocalAttachment & {
+        kind: 'image' | 'video'
+        previewUrl: string
+      } =>
+        (item.kind === 'image' || item.kind === 'video') &&
+        Boolean(item.previewUrl)
     )
     const items: ModelUsagePreviewItem[] = media.map((item) => ({
-      url: item.previewUrl!,
-      kind: item.kind === 'video' ? 'video' : 'image',
+      url: item.previewUrl,
+      kind: item.kind,
     }))
     const index = media.findIndex((item) => item.id === attachment.id)
     setPreview({ items, index: Math.max(0, index) })
@@ -304,7 +314,7 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
     const items = event.clipboardData?.items
     if (!items) return
     const files: File[] = []
-    for (const item of Array.from(items)) {
+    for (const item of items) {
       if (item.kind !== 'file') continue
       const file = item.getAsFile()
       if (file) files.push(file)
@@ -326,6 +336,15 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
       return
     }
     if (!model) return
+    const enhanceAttachments: PromptEnhanceAttachment[] = attachments.map(
+      (item) => ({
+        name: item.name,
+        kind:
+          item.kind === 'image' || item.kind === 'video'
+            ? item.kind
+            : displayTypeFromExt(item.ext),
+      })
+    )
     setEnhancing(true)
     try {
       const response = await sendChatCompletion({
@@ -333,9 +352,14 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
         messages: [
           {
             role: 'system',
-            content: promptEnhanceSystemPrompt(model.model_type),
+            content: promptEnhanceSystemPrompt(model.model_type, {
+              hasAttachments: enhanceAttachments.length > 0,
+            }),
           },
-          { role: 'user', content: text },
+          {
+            role: 'user',
+            content: promptEnhanceUserContent(text, enhanceAttachments),
+          },
         ],
         stream: false,
         max_tokens: enhanceMaxTokens,
@@ -352,7 +376,7 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
         toast.error(t('Prompt enhance returned empty content'))
         return
       }
-      setPrompt(enhanced)
+      setPrompt(withAttachmentUsage(enhanced, enhanceAttachments))
       toast.success(t('Prompt optimized'))
     } catch (error) {
       handleServerError(error, t('Failed to optimize prompt'))
@@ -404,6 +428,9 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
           busy={busy}
           onDelete={props.onDeleteTurn}
           onRegenerate={(message) => void props.onRegenerate(message)}
+          onEditUserMessage={(message, text) =>
+            props.onEditUserMessage(message, text)
+          }
         />
       </div>
 
@@ -453,6 +480,42 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
                       file.kind === 'image' || file.kind === 'video'
                         ? file.kind
                         : displayTypeFromExt(file.ext)
+                    let attachmentPreview = (
+                      <ModelUsageAttachmentIcon type={displayType} />
+                    )
+                    if (file.kind === 'image' && file.previewUrl) {
+                      attachmentPreview = (
+                        <button
+                          type='button'
+                          className='size-full'
+                          onClick={() => openAttachmentPreview(file)}
+                          aria-label={t('Image Preview')}
+                        >
+                          <img
+                            src={file.previewUrl}
+                            alt=''
+                            className='size-full object-cover'
+                          />
+                        </button>
+                      )
+                    } else if (file.kind === 'video' && file.previewUrl) {
+                      attachmentPreview = (
+                        <button
+                          type='button'
+                          className='bg-muted size-full'
+                          onClick={() => openAttachmentPreview(file)}
+                          aria-label={t('Video Preview')}
+                        >
+                          <video
+                            src={file.previewUrl}
+                            className='size-full object-cover'
+                            muted
+                            playsInline
+                            preload='metadata'
+                          />
+                        </button>
+                      )
+                    }
                     return (
                       <ModelUsageAttachmentTooltip
                         key={file.id}
@@ -460,37 +523,7 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
                         type={displayType}
                       >
                         <div className='bg-background relative size-14 overflow-hidden rounded-lg border'>
-                          {file.kind === 'image' && file.previewUrl ? (
-                            <button
-                              type='button'
-                              className='size-full'
-                              onClick={() => openAttachmentPreview(file)}
-                              aria-label={t('Image Preview')}
-                            >
-                              <img
-                                src={file.previewUrl}
-                                alt=''
-                                className='size-full object-cover'
-                              />
-                            </button>
-                          ) : file.kind === 'video' && file.previewUrl ? (
-                            <button
-                              type='button'
-                              className='bg-muted size-full'
-                              onClick={() => openAttachmentPreview(file)}
-                              aria-label={t('Video Preview')}
-                            >
-                              <video
-                                src={file.previewUrl}
-                                className='size-full object-cover'
-                                muted
-                                playsInline
-                                preload='metadata'
-                              />
-                            </button>
-                          ) : (
-                            <ModelUsageAttachmentIcon type={displayType} />
-                          )}
+                          {attachmentPreview}
                           <button
                             type='button'
                             className='bg-background/90 text-muted-foreground hover:text-foreground absolute top-0.5 right-0.5 rounded-full p-0.5 shadow-sm'
@@ -530,12 +563,10 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
                             <Button
                               type='button'
                               size='icon'
-                              variant='default'
-                              className='size-9 rounded-md'
+                              variant='outline'
+                              className='border-border size-9 rounded-md bg-white text-yellow-500 hover:bg-white hover:text-yellow-500 dark:bg-white dark:hover:bg-white'
                               disabled={composerLocked}
-                              aria-disabled={
-                                composerLocked || !hasPromptText
-                              }
+                              aria-disabled={composerLocked || !hasPromptText}
                               onClick={() => {
                                 if (!hasPromptText || composerLocked) return
                                 void handleEnhancePrompt()
@@ -546,17 +577,14 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
                         >
                           {enhancing ? (
                             <Loader2
-                              className='size-4 animate-spin'
+                              className='size-4 animate-spin text-yellow-500'
                               aria-hidden
                             />
                           ) : (
-                            <span
-                              className='relative inline-flex size-4 items-center justify-center'
+                            <Sparkle
+                              className='size-4 fill-yellow-400 text-yellow-500'
                               aria-hidden
-                            >
-                              <Sparkle className='size-3.5 fill-current' />
-                              <Sparkle className='absolute -top-0.5 -right-0.5 size-2 fill-current' />
-                            </span>
+                            />
                           )}
                         </TooltipTrigger>
                         <TooltipContent>
