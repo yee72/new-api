@@ -108,8 +108,14 @@ export interface ChatCompletionResponse {
     index: number
     message: {
       role: MessageRole
-      content: string
+      content: string | null
       reasoning_content?: string
+      /** Gemini 等 chat 生图：图在 images，不在 content */
+      images?: Array<{
+        type?: string
+        image_url?: { url?: string }
+        index?: number
+      }>
     }
     finish_reason: string
   }>

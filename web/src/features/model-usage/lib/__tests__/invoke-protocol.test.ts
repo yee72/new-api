@@ -20,6 +20,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   extractImagesFromChatContent,
+  extractImagesFromChatMessage,
   resolveInvokeProtocol,
 } from '../invoke-protocol'
 
@@ -108,6 +109,41 @@ describe('extractImagesFromChatContent', () => {
       '![image](/api/model-usage/media/model-usage/1/gemini/req/0.png?access=abc)'
     expect(extractImagesFromChatContent(content)).toEqual([
       '/api/model-usage/media/model-usage/1/gemini/req/0.png?access=abc',
+    ])
+  })
+})
+
+describe('extractImagesFromChatMessage', () => {
+  it('reads message.images when content is null', () => {
+    expect(
+      extractImagesFromChatMessage({
+        content: null,
+        images: [
+          {
+            type: 'image_url',
+            image_url: { url: 'data:image/png;base64,abc==' },
+          },
+        ],
+      })
+    ).toEqual(['data:image/png;base64,abc=='])
+  })
+
+  it('merges content urls and message.images', () => {
+    expect(
+      extractImagesFromChatMessage({
+        content: '![a](https://cdn.example.com/a.png)',
+        images: [
+          {
+            type: 'image_url',
+            image_url: {
+              url: '/api/model-usage/media/model-usage/1/m/r/0.png?access=x',
+            },
+          },
+        ],
+      })
+    ).toEqual([
+      'https://cdn.example.com/a.png',
+      '/api/model-usage/media/model-usage/1/m/r/0.png?access=x',
     ])
   })
 })

@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Search } from 'lucide-react'
+import { Search, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
@@ -35,7 +35,7 @@ type ModelUsageSidebarProps = {
   onToggleVendor: (vendorId: number) => void
   searchInput: string
   onSearchInputChange: (value: string) => void
-  onSearchSubmit: () => void
+  onSearchSubmit: (query?: string) => void
   models: ModelUsageItem[]
   selectedModelName?: string
   onSelectModel: (modelName: string) => void
@@ -102,8 +102,21 @@ export function ModelUsageSidebar(props: ModelUsageSidebarProps) {
             value={props.searchInput}
             onChange={(event) => props.onSearchInputChange(event.target.value)}
             placeholder={t('Search model name')}
-            className='pl-8'
+            className={cn('pl-8', props.searchInput.trim() && 'pr-8')}
           />
+          {props.searchInput.trim() ? (
+            <button
+              type='button'
+              className='text-muted-foreground hover:text-foreground absolute top-1/2 right-2 inline-flex size-5 -translate-y-1/2 items-center justify-center rounded-sm'
+              aria-label={t('Clear')}
+              onClick={() => {
+                props.onSearchInputChange('')
+                props.onSearchSubmit('')
+              }}
+            >
+              <X className='size-3.5' aria-hidden />
+            </button>
+          ) : null}
         </div>
         <Button type='submit' size='sm' variant='secondary'>
           {t('Search')}

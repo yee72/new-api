@@ -60,7 +60,7 @@ import {
   type AnthropicMessagesResponse,
 } from '../lib/claude-messages'
 import {
-  extractImagesFromChatContent,
+  extractImagesFromChatMessage,
   resolveInvokeProtocol,
 } from '../lib/invoke-protocol'
 import {
@@ -437,6 +437,9 @@ export function useModelSessions() {
             { role: 'user' as const, content: userContent },
           ]
           for (let i = 0; i < requestCount; i += 1) {
+            let messageImages:
+              | Array<{ type?: string; image_url?: { url?: string } }>
+              | undefined
             if (useAnthropicMessages) {
               const response = (await sendAnthropicMessages({
                 model: modelName,
@@ -451,7 +454,8 @@ export function useModelSessions() {
                 messages: openAIMessages,
                 stream: false,
               })
-              const rawContent = response.choices?.[0]?.message?.content
+              const assistantMessage = response.choices?.[0]?.message
+              const rawContent = assistantMessage?.content
               if (typeof rawContent === 'string') {
                 contentText = rawContent
               } else if (rawContent == null) {
@@ -459,9 +463,13 @@ export function useModelSessions() {
               } else {
                 contentText = String(rawContent)
               }
+              messageImages = assistantMessage?.images
             }
             if (chatImage) {
-              for (const src of extractImagesFromChatContent(contentText)) {
+              for (const src of extractImagesFromChatMessage({
+                content: contentText,
+                images: messageImages,
+              })) {
                 if (!chatImages.includes(src)) chatImages.push(src)
               }
             }

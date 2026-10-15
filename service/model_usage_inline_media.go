@@ -137,6 +137,7 @@ func rewriteMessageInlineImages(ctx context.Context, userId int, modelName, batc
 	if msg == nil {
 		return 0, nil
 	}
+	replaced := 0
 	if msg.IsStringContent() {
 		text := msg.StringContent()
 		newText, n, err := replaceDataImagesInText(ctx, userId, modelName, batchID, text, nextIndex)
@@ -145,49 +146,74 @@ func rewriteMessageInlineImages(ctx context.Context, userId int, modelName, batc
 		}
 		if n > 0 {
 			msg.SetStringContent(newText)
+			replaced += n
 		}
-		return n, nil
-	}
-	parts := msg.ParseContent()
-	if len(parts) == 0 {
-		return 0, nil
-	}
-	replaced := 0
-	changed := false
-	for i := range parts {
-		if parts[i].Type == dto.ContentTypeText {
-			newText, n, err := replaceDataImagesInText(ctx, userId, modelName, batchID, parts[i].Text, nextIndex)
-			if err != nil {
-				return 0, err
-			}
-			if n > 0 {
-				parts[i].Text = newText
+	} else {
+		parts := msg.ParseContent()
+		if len(parts) > 0 {
+			changed := false
+			for i := range parts {
+				n, partChanged, err := rewriteMediaContentInlineImage(ctx, userId, modelName, batchID, &parts[i], nextIndex)
+				if err != nil {
+					return 0, err
+				}
 				replaced += n
-				changed = true
+				if partChanged {
+					changed = true
+				}
 			}
-			continue
+			if changed {
+				msg.SetMediaContent(parts)
+			}
 		}
-		if parts[i].Type != dto.ContentTypeImageURL {
-			continue
-		}
-		img := parts[i].GetImageMedia()
-		if img == nil || !strings.HasPrefix(strings.TrimSpace(img.Url), "data:image/") {
-			continue
-		}
-		url, err := persistModelUsageImageAt(ctx, userId, modelName, batchID, *nextIndex, img.Url)
+	}
+	// message.images（Gemini chat 生图等）：content 常为 null
+	for i := range msg.Images {
+		n, _, err := rewriteMediaContentInlineImage(ctx, userId, modelName, batchID, &msg.Images[i], nextIndex)
 		if err != nil {
 			return 0, err
 		}
-		*nextIndex++
-		img.Url = url
-		parts[i].ImageUrl = img
-		replaced++
-		changed = true
-	}
-	if changed {
-		msg.SetMediaContent(parts)
+		replaced += n
 	}
 	return replaced, nil
+}
+
+func rewriteMediaContentInlineImage(
+	ctx context.Context,
+	userId int,
+	modelName, batchID string,
+	part *dto.MediaContent,
+	nextIndex *int,
+) (int, bool, error) {
+	if part == nil {
+		return 0, false, nil
+	}
+	if part.Type == dto.ContentTypeText {
+		newText, n, err := replaceDataImagesInText(ctx, userId, modelName, batchID, part.Text, nextIndex)
+		if err != nil {
+			return 0, false, err
+		}
+		if n > 0 {
+			part.Text = newText
+			return n, true, nil
+		}
+		return 0, false, nil
+	}
+	img := part.GetImageMedia()
+	if img == nil || !strings.HasPrefix(strings.TrimSpace(img.Url), "data:image/") {
+		return 0, false, nil
+	}
+	url, err := persistModelUsageImageAt(ctx, userId, modelName, batchID, *nextIndex, img.Url)
+	if err != nil {
+		return 0, false, err
+	}
+	*nextIndex++
+	img.Url = url
+	part.ImageUrl = img
+	if part.Type == "" {
+		part.Type = dto.ContentTypeImageURL
+	}
+	return 1, true, nil
 }
 
 func replaceDataImagesInText(ctx context.Context, userId int, modelName, batchID, text string, nextIndex *int) (string, int, error) {

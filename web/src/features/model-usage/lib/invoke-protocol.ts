@@ -71,6 +71,14 @@ function looksLikeImageUrl(url: string): boolean {
   }
 }
 
+function pushImageCandidate(found: string[], raw: string) {
+  const url = raw.trim().replace(/[),.;]+$/, '')
+  if (!url || found.includes(url)) return
+  if (url.startsWith('data:image/') || looksLikeImageUrl(url)) {
+    found.push(url)
+  }
+}
+
 /** 从 chat completions 文本中提取可持久化的图片源 */
 export function extractImagesFromChatContent(content: unknown): string[] {
   const text =
@@ -82,25 +90,35 @@ export function extractImagesFromChatContent(content: unknown): string[] {
   if (!text.trim()) return []
 
   const found: string[] = []
-  const push = (raw: string) => {
-    const url = raw.trim().replace(/[),.;]+$/, '')
-    if (!url || found.includes(url)) return
-    if (url.startsWith('data:image/') || looksLikeImageUrl(url)) {
-      found.push(url)
-    }
-  }
-
   for (const match of text.matchAll(markdownImageRe)) {
-    push(match[1] ?? '')
+    pushImageCandidate(found, match[1] ?? '')
   }
   for (const match of text.matchAll(dataImageRe)) {
-    push((match[1] ?? '').replace(/\s+/g, ''))
+    pushImageCandidate(found, (match[1] ?? '').replace(/\s+/g, ''))
   }
   for (const match of text.matchAll(angleUrlRe)) {
-    push(match[1] ?? '')
+    pushImageCandidate(found, match[1] ?? '')
   }
   for (const match of text.matchAll(bareUrlRe)) {
-    push(match[1] ?? '')
+    pushImageCandidate(found, match[1] ?? '')
+  }
+  return found
+}
+
+type ChatMessageImagePart = {
+  type?: string
+  image_url?: { url?: string }
+}
+
+/** content 文本 + message.images（Gemini 等 chat 生图） */
+export function extractImagesFromChatMessage(message: {
+  content?: unknown
+  images?: ChatMessageImagePart[] | null
+}): string[] {
+  const found = extractImagesFromChatContent(message?.content)
+  for (const item of message?.images ?? []) {
+    const url = item?.image_url?.url
+    if (typeof url === 'string') pushImageCandidate(found, url)
   }
   return found
 }

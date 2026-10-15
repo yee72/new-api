@@ -201,8 +201,9 @@ export function ModelUsagePage() {
             }}
             searchInput={searchInput}
             onSearchInputChange={setSearchInput}
-            onSearchSubmit={() => {
-              const q = searchInput.trim()
+            onSearchSubmit={(query) => {
+              const q = (query ?? searchInput).trim()
+              setSearchInput(q)
               setSelectedVendorIds([])
               setActiveQuery({ mode: 'search', q, vendorIds: [] })
             }}

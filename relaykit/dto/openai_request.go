@@ -451,7 +451,10 @@ type Message struct {
 	Tools json.RawMessage `json:"tools,omitempty"`
 	// Annotations is an official Chat response field. Keeping it on the shared
 	// message type also preserves annotations when clients replay assistant output.
-	Annotations   json.RawMessage `json:"annotations,omitempty"`
+	Annotations json.RawMessage `json:"annotations,omitempty"`
+	// Images 部分上游（如 Gemini 生图经 OpenAI chat 兼容）把图放在 message.images，
+	// 而 content 为 null；请求侧一般不用此字段。
+	Images        []MediaContent `json:"images,omitempty"`
 	parsedContent []MediaContent
 	//parsedStringContent *string
 }

@@ -28,6 +28,32 @@ func TestRewritePlaygroundInlineImagesChatMarkdown(t *testing.T) {
 	assert.NotEmpty(t, store.objects)
 }
 
+func TestRewritePlaygroundInlineImagesChatMessageImages(t *testing.T) {
+	common.CryptoSecret = "test-secret-for-model-usage"
+	store := withMemoryBlobStore(t)
+
+	body := []byte(`{
+		"id":"BGzQaqeB",
+		"object":"chat.completion",
+		"choices":[{
+			"index":0,
+			"message":{
+				"role":"assistant",
+				"content":null,
+				"images":[{"type":"image_url","image_url":{"url":"data:image/png;base64,aGVsbG8="},"index":0}]
+			},
+			"finish_reason":"stop"
+		}],
+		"usage":{"prompt_tokens":24,"completion_tokens":10,"total_tokens":34}
+	}`)
+	out, err := RewritePlaygroundInlineImages(context.Background(), 9, "gemini-3.1-flash-image", "req-img", body)
+	require.NoError(t, err)
+	require.NotContains(t, string(out), "data:image/")
+	require.Contains(t, string(out), `"images"`)
+	require.Contains(t, string(out), modelUsageMediaURLPrefix)
+	assert.NotEmpty(t, store.objects)
+}
+
 func TestRewritePlaygroundInlineImagesImagesAPI(t *testing.T) {
 	common.CryptoSecret = "test-secret-for-model-usage"
 	withMemoryBlobStore(t)
