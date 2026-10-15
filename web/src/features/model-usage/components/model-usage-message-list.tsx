@@ -165,15 +165,21 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
               {hasImages && (
                 <div
                   className={cn(
-                    'bg-muted w-full max-w-[min(100%,36rem)] overflow-hidden rounded-2xl p-2',
-                    images.length === 1 ? 'flex' : 'grid grid-cols-2 gap-2'
+                    'bg-muted max-w-[min(100%,36rem)] overflow-hidden rounded-2xl p-2',
+                    // 单图气泡随作品尺寸收缩，避免右侧大块空白
+                    images.length === 1
+                      ? 'w-fit'
+                      : 'grid w-full grid-cols-2 gap-2'
                   )}
                 >
                   {images.map((url, index) => (
                     <button
                       key={`${message.id}-${index}`}
                       type='button'
-                      className='bg-background/40 hover:ring-primary/50 focus-visible:ring-ring block overflow-hidden rounded-xl text-left transition hover:ring-2 focus-visible:ring-2 focus-visible:outline-none'
+                      className={cn(
+                        'bg-background/40 hover:ring-primary/50 focus-visible:ring-ring block overflow-hidden rounded-xl text-left transition hover:ring-2 focus-visible:ring-2 focus-visible:outline-none',
+                        images.length === 1 ? 'w-fit max-w-full' : 'w-full'
+                      )}
                       onClick={() =>
                         setPreview({
                           items: images.map((url) => ({
@@ -188,9 +194,8 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
                       <ModelUsageAuthImage
                         url={url}
                         alt={t('Generated image')}
-                        className={
-                          images.length === 1 ? 'max-w-full' : 'w-full'
-                        }
+                        fitContent={images.length === 1}
+                        className={images.length === 1 ? undefined : 'w-full'}
                       />
                     </button>
                   ))}
@@ -200,15 +205,20 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
               {hasVideos && (
                 <div
                   className={cn(
-                    'bg-muted w-full max-w-[min(100%,36rem)] overflow-hidden rounded-2xl p-2',
-                    videos.length === 1 ? 'flex' : 'grid grid-cols-2 gap-2'
+                    'bg-muted max-w-[min(100%,36rem)] overflow-hidden rounded-2xl p-2',
+                    videos.length === 1
+                      ? 'w-fit'
+                      : 'grid w-full grid-cols-2 gap-2'
                   )}
                 >
                   {videos.map((video, index) => (
                     <button
                       key={`${message.id}-video-${index}`}
                       type='button'
-                      className='bg-background/40 hover:ring-primary/50 focus-visible:ring-ring block overflow-hidden rounded-xl text-left transition hover:ring-2 focus-visible:ring-2 focus-visible:outline-none'
+                      className={cn(
+                        'bg-background/40 hover:ring-primary/50 focus-visible:ring-ring block overflow-hidden rounded-xl text-left transition hover:ring-2 focus-visible:ring-2 focus-visible:outline-none',
+                        videos.length === 1 ? 'w-fit max-w-full' : 'w-full'
+                      )}
                       onClick={() =>
                         setPreview({
                           items: videos.map((item) => ({
@@ -222,9 +232,8 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
                     >
                       <ModelUsageAuthVideo
                         url={video.url!}
-                        className={
-                          videos.length === 1 ? 'max-w-full' : 'w-full'
-                        }
+                        fitContent={videos.length === 1}
+                        className={videos.length === 1 ? undefined : 'w-full'}
                         controls={false}
                         muted
                       />

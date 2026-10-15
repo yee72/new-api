@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/model"
 )
@@ -48,8 +49,28 @@ type ModelUsageItem struct {
 }
 
 type ModelUsageListResponse struct {
-	Models  []ModelUsageItem      `json:"models"`
-	Vendors []model.PricingVendor `json:"vendors"`
+	Models        []ModelUsageItem        `json:"models"`
+	Vendors       []model.PricingVendor   `json:"vendors"`
+	PromptEnhance ModelUsagePromptEnhance `json:"prompt_enhance"`
+}
+
+// ModelUsagePromptEnhance 模型使用页提示词扩写配置（管理员后台配置）。
+type ModelUsagePromptEnhance struct {
+	Enabled   bool   `json:"enabled"`
+	Model     string `json:"model"`
+	MaxTokens int    `json:"max_tokens"`
+}
+
+func GetModelUsagePromptEnhance() ModelUsagePromptEnhance {
+	maxTokens := common.PromptEnhanceMaxTokens
+	if maxTokens <= 0 {
+		maxTokens = 512
+	}
+	return ModelUsagePromptEnhance{
+		Enabled:   common.PromptEnhanceEnabled,
+		Model:     strings.TrimSpace(common.PromptEnhanceModel),
+		MaxTokens: maxTokens,
+	}
 }
 
 type modelUsageCacheEntry struct {
@@ -129,7 +150,11 @@ func GetModelUsageCatalog(userId int, typeFilter, keyword, rawVendorIDs string) 
 	}
 
 	sortModelUsageItems(filtered)
-	return &ModelUsageListResponse{Models: filtered, Vendors: vendors}, nil
+	return &ModelUsageListResponse{
+		Models:        filtered,
+		Vendors:       vendors,
+		PromptEnhance: GetModelUsagePromptEnhance(),
+	}, nil
 }
 
 func loadModelUsageCatalog() ([]ModelUsageItem, []model.PricingVendor, error) {

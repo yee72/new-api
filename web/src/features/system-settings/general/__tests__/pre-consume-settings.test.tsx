@@ -44,6 +44,9 @@ function Fixture() {
             QuotaForNewUser: 0,
             QuotaForInviter: 0,
             QuotaForInvitee: 0,
+            PromptEnhanceEnabled: false,
+            PromptEnhanceModel: '',
+            PromptEnhanceMaxTokens: 512,
             TopUpLink: '',
             quota_setting: {
               enable_free_model_pre_consume: true,

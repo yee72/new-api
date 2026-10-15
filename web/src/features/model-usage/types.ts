@@ -23,11 +23,7 @@ export type { GenerationFormConfig } from './lib/generation-request'
 export type ModelUsageType = 'chat' | 'image' | 'video'
 
 /** 实际调用协议：与 model_type（Tab）解耦 */
-export type ModelUsageInvokeProtocol =
-  | 'chat'
-  | 'messages'
-  | 'images'
-  | 'videos'
+export type ModelUsageInvokeProtocol = 'chat' | 'messages' | 'images' | 'videos'
 
 export type ModelUsageTab = 'all' | ModelUsageType
 
@@ -59,9 +55,17 @@ export type ModelUsageItem = {
   generation_capabilities?: string
 }
 
+/** 管理员配置的提示词扩写（润色）能力 */
+export type ModelUsagePromptEnhance = {
+  enabled: boolean
+  model: string
+  max_tokens: number
+}
+
 export type ModelUsageListData = {
   models: ModelUsageItem[]
   vendors: ModelUsageVendor[]
+  prompt_enhance?: ModelUsagePromptEnhance
 }
 
 /** 生图表单配置（schema_version 1.0） */

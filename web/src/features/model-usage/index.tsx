@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query'
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -17,7 +18,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useNavigate, useSearch } from '@tanstack/react-router'
-import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -144,8 +144,7 @@ export function ModelUsagePage() {
     // 优先恢复上次对话模型，否则落到列表第一项
     const preferred =
       (lastModelName &&
-        models.find((item) => item.model_name === lastModelName)
-          ?.model_name) ||
+        models.find((item) => item.model_name === lastModelName)?.model_name) ||
       models[0].model_name
     selectModel(preferred)
   }, [models, selectedModelName, lastModelName, setLastModelName])
@@ -219,6 +218,7 @@ export function ModelUsagePage() {
             model={selectedModel}
             session={activeSession}
             isAuthenticated={Boolean(user)}
+            promptEnhance={listQuery.data?.prompt_enhance}
             onRequireLogin={() => setLoginOpen(true)}
             onSend={async (text, attachments) => {
               if (!selectedModel) return

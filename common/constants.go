@@ -125,6 +125,11 @@ var TelegramBotName = ""
 var QuotaForNewUser = 0
 var QuotaForInviter = 0
 var QuotaForInvitee = 0
+
+// 模型使用页「提示词扩写」：走独立便宜 chat 模型，由用户付费。
+var PromptEnhanceEnabled = false
+var PromptEnhanceModel = ""
+var PromptEnhanceMaxTokens = 512
 var ChannelDisableThreshold = 5.0
 var AutomaticDisableChannelEnabled = false
 var AutomaticEnableChannelEnabled = false

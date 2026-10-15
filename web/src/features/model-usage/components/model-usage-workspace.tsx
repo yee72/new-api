@@ -26,6 +26,7 @@ import {
   Send,
   Sparkles,
   Timer,
+  WandSparkles,
   X,
 } from 'lucide-react'
 import {
@@ -54,6 +55,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { sendChatCompletion } from '@/features/playground/api'
 import { handleServerError } from '@/lib/handle-server-error'
 import { cn } from '@/lib/utils'
 
@@ -65,6 +67,11 @@ import {
   resolveGenerationCapabilities,
 } from '../lib/capabilities'
 import { generationOptionLabelKey } from '../lib/generation-option-labels'
+import {
+  DEFAULT_PROMPT_ENHANCE_MAX_TOKENS,
+  estimatePromptEnhanceTokens,
+  promptEnhanceSystemPrompt,
+} from '../lib/prompt-enhance'
 import type {
   ImageGenerationConfig,
   LocalAttachment,
@@ -72,6 +79,7 @@ import type {
   ModelUsageAttachment,
   ModelUsageItem,
   ModelUsageMessage,
+  ModelUsagePromptEnhance,
   ModelUsageSession,
   VideoGenerationConfig,
 } from '../types'
@@ -88,6 +96,7 @@ type ModelUsageWorkspaceProps = {
   session: ModelUsageSession
   isAuthenticated: boolean
   onRequireLogin: () => void
+  promptEnhance?: ModelUsagePromptEnhance
   onSend: (text: string, attachments?: ModelUsageAttachment[]) => Promise<void>
   onDeleteTurn: (turnId: string) => void
   onRegenerate: (message: ModelUsageMessage) => Promise<void>
@@ -150,6 +159,7 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
   const { t } = useTranslation()
   const [prompt, setPrompt] = useState('')
   const [attachments, setAttachments] = useState<LocalAttachment[]>([])
+  const [enhancing, setEnhancing] = useState(false)
   const [preview, setPreview] = useState<{
     items: ModelUsagePreviewItem[]
     index: number
@@ -160,6 +170,18 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
   attachmentsRef.current = attachments
 
   const model = props.model
+  const promptEnhance = props.promptEnhance
+  const enhanceEnabled = Boolean(promptEnhance?.enabled)
+  const enhanceModel = promptEnhance?.model?.trim() ?? ''
+  const enhanceMaxTokens =
+    promptEnhance?.max_tokens && promptEnhance.max_tokens > 0
+      ? promptEnhance.max_tokens
+      : DEFAULT_PROMPT_ENHANCE_MAX_TOKENS
+  const estimatedEnhanceTokens = estimatePromptEnhanceTokens({
+    userText: prompt,
+    modelType: model?.model_type ?? 'chat',
+    maxTokens: enhanceMaxTokens,
+  })
   const imageCaps = useMemo(
     () =>
       resolveGenerationCapabilities(model?.generation_capabilities, 'image'),
@@ -295,6 +317,53 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
     addFiles(files)
   }
 
+  const handleEnhancePrompt = async () => {
+    const text = prompt.trim()
+    if (!text || enhancing || busy) return
+    if (!props.isAuthenticated) {
+      props.onRequireLogin()
+      return
+    }
+    if (!enhanceModel) {
+      toast.error(t('Prompt enhance model is not configured'))
+      return
+    }
+    if (!model) return
+    setEnhancing(true)
+    try {
+      const response = await sendChatCompletion({
+        model: enhanceModel,
+        messages: [
+          {
+            role: 'system',
+            content: promptEnhanceSystemPrompt(model.model_type),
+          },
+          { role: 'user', content: text },
+        ],
+        stream: false,
+        max_tokens: enhanceMaxTokens,
+        temperature: 0.7,
+      })
+      const raw = response.choices?.[0]?.message?.content
+      let enhanced = ''
+      if (typeof raw === 'string') {
+        enhanced = raw.trim()
+      } else if (raw != null) {
+        enhanced = String(raw).trim()
+      }
+      if (!enhanced) {
+        toast.error(t('Prompt enhance returned empty content'))
+        return
+      }
+      setPrompt(enhanced)
+      toast.success(t('Prompt optimized'))
+    } catch (error) {
+      handleServerError(error, t('Failed to optimize prompt'))
+    } finally {
+      setEnhancing(false)
+    }
+  }
+
   const handleSubmit = async () => {
     const text = prompt.trim()
     if ((!text && !hasAttachments) || busy) return
@@ -322,12 +391,12 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
     }
   }
 
-  const emptyHint =
-    model.model_type === 'chat'
-      ? t('Ask anything about this model')
-      : model.model_type === 'image'
-        ? t('Generated images will appear here')
-        : t('Generated videos will appear here')
+  let emptyHint = t('Generated videos will appear here')
+  if (model.model_type === 'chat') {
+    emptyHint = t('Ask anything about this model')
+  } else if (model.model_type === 'image') {
+    emptyHint = t('Generated images will appear here')
+  }
 
   return (
     <div className='flex min-h-0 min-w-0 flex-1 flex-col'>
@@ -441,25 +510,82 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
               )}
 
               <div className='flex items-end gap-2'>
-                <Textarea
-                  value={prompt}
-                  onChange={(event) => setPrompt(event.target.value)}
-                  onPaste={handlePaste}
-                  placeholder={promptPlaceholder}
-                  rows={2}
-                  className='min-h-[64px] flex-1 resize-none border-0 bg-transparent px-0 shadow-none focus-visible:ring-0'
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' && !event.shiftKey) {
-                      event.preventDefault()
-                      void handleSubmit()
-                    }
-                  }}
-                />
+                <div className='relative min-w-0 flex-1'>
+                  {enhanceEnabled && (
+                    <div className='absolute top-0 right-0 z-10'>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger
+                            render={
+                              <button
+                                type='button'
+                                disabled={
+                                  busy ||
+                                  enhancing ||
+                                  !prompt.trim() ||
+                                  !enhanceModel
+                                }
+                                onClick={() => void handleEnhancePrompt()}
+                                aria-label={t('Optimize prompt')}
+                                className={cn(
+                                  'text-muted-foreground hover:text-foreground',
+                                  'inline-flex size-7 items-center justify-center rounded-md transition-colors',
+                                  'focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none',
+                                  'disabled:pointer-events-none disabled:opacity-40'
+                                )}
+                              />
+                            }
+                          >
+                            {enhancing ? (
+                              <Loader2
+                                className='size-3.5 animate-spin'
+                                aria-hidden
+                              />
+                            ) : (
+                              <WandSparkles className='size-3.5' aria-hidden />
+                            )}
+                          </TooltipTrigger>
+                          <TooltipContent className='max-w-xs text-left'>
+                            <p className='font-medium'>
+                              {t('Optimize prompt')}
+                            </p>
+                            <p className='text-primary-foreground/80 mt-0.5 text-xs'>
+                              {enhanceModel
+                                ? t('Est. about {{count}} tokens', {
+                                    count: estimatedEnhanceTokens,
+                                  })
+                                : t('Prompt enhance model is not configured')}
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                  )}
+                  <Textarea
+                    value={prompt}
+                    onChange={(event) => setPrompt(event.target.value)}
+                    onPaste={handlePaste}
+                    placeholder={promptPlaceholder}
+                    rows={2}
+                    className={cn(
+                      'min-h-[64px] w-full resize-none border-0 bg-transparent px-0 shadow-none focus-visible:ring-0',
+                      enhanceEnabled && 'pr-8'
+                    )}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' && !event.shiftKey) {
+                        event.preventDefault()
+                        void handleSubmit()
+                      }
+                    }}
+                  />
+                </div>
                 <Button
                   type='button'
                   size='icon'
                   className='rounded-full'
-                  disabled={busy || (!prompt.trim() && !hasAttachments)}
+                  disabled={
+                    busy || enhancing || (!prompt.trim() && !hasAttachments)
+                  }
                   onClick={() => void handleSubmit()}
                   title={t('Send')}
                 >
@@ -646,9 +772,7 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
           if (!open) setPreview(null)
         }}
         onIndexChange={(index) =>
-          setPreview((current) =>
-            current ? { ...current, index } : current
-          )
+          setPreview((current) => (current ? { ...current, index } : current))
         }
       />
     </div>

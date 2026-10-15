@@ -32,6 +32,8 @@ type ModelUsageAuthImageProps = {
   onClick?: () => void
   /** 附件缩略图等填满父级，不用大尺寸作品框架 */
   compact?: boolean
+  /** 按作品固有尺寸收缩，气泡贴合内容（对话区单图） */
+  fitContent?: boolean
 }
 
 export function ModelUsageAuthImage(props: ModelUsageAuthImageProps) {
@@ -44,11 +46,14 @@ export function ModelUsageAuthImage(props: ModelUsageAuthImageProps) {
   }, [src])
 
   if (failed) {
+    let failedSize = 'aspect-video min-h-36 w-full'
+    if (props.compact) failedSize = 'size-full'
+    else if (props.fitContent) failedSize = 'min-h-36 min-w-36'
     return (
       <div
         className={cn(
           'bg-muted text-muted-foreground flex items-center justify-center rounded-xl px-2 text-center text-xs',
-          props.compact ? 'size-full' : 'aspect-video min-h-36 w-full',
+          failedSize,
           props.className
         )}
       >
@@ -82,12 +87,15 @@ export function ModelUsageAuthImage(props: ModelUsageAuthImageProps) {
   }
 
   const showPlaceholder = loading || !src || !mediaReady
+  const fitContent = Boolean(props.fitContent)
 
   return (
     <div
       className={cn(
-        'relative w-full overflow-hidden rounded-xl',
-        showPlaceholder && 'aspect-video min-h-36'
+        'relative overflow-hidden rounded-xl',
+        fitContent ? 'inline-block max-w-full' : 'w-full',
+        showPlaceholder &&
+          (fitContent ? 'min-h-36 min-w-36' : 'aspect-video min-h-36')
       )}
     >
       {showPlaceholder && (
@@ -104,7 +112,9 @@ export function ModelUsageAuthImage(props: ModelUsageAuthImageProps) {
           src={src}
           alt={props.alt}
           className={cn(
-            'max-h-80 w-full bg-black/20 object-contain',
+            fitContent
+              ? 'block h-auto max-h-[min(70vh,36rem)] w-auto max-w-full'
+              : 'max-h-80 w-full bg-black/20 object-contain',
             props.className,
             !mediaReady && 'invisible absolute inset-0'
           )}
@@ -122,6 +132,8 @@ type ModelUsageAuthVideoProps = {
   className?: string
   controls?: boolean
   muted?: boolean
+  /** 按作品固有尺寸收缩，气泡贴合内容（对话区单视频） */
+  fitContent?: boolean
 }
 
 export function ModelUsageAuthVideo(props: ModelUsageAuthVideoProps) {
@@ -133,11 +145,16 @@ export function ModelUsageAuthVideo(props: ModelUsageAuthVideoProps) {
     setMediaReady(false)
   }, [src])
 
+  const fitContent = Boolean(props.fitContent)
+
   if (failed) {
     return (
       <div
         className={cn(
-          'bg-muted text-muted-foreground flex aspect-video min-h-36 w-full items-center justify-center rounded-xl px-3 text-center text-xs',
+          'bg-muted text-muted-foreground flex items-center justify-center rounded-xl px-3 text-center text-xs',
+          fitContent
+            ? 'min-h-36 min-w-48'
+            : 'aspect-video min-h-36 w-full',
           props.className
         )}
       >
@@ -151,8 +168,10 @@ export function ModelUsageAuthVideo(props: ModelUsageAuthVideoProps) {
   return (
     <div
       className={cn(
-        'relative w-full overflow-hidden rounded-xl',
-        showPlaceholder && 'aspect-video min-h-36'
+        'relative overflow-hidden rounded-xl',
+        fitContent ? 'inline-block max-w-full' : 'w-full',
+        showPlaceholder &&
+          (fitContent ? 'aspect-video min-h-36 w-64' : 'aspect-video min-h-36')
       )}
     >
       {showPlaceholder && (
@@ -170,7 +189,9 @@ export function ModelUsageAuthVideo(props: ModelUsageAuthVideoProps) {
           controls={props.controls ?? true}
           muted={props.muted}
           className={cn(
-            'max-h-80 w-full bg-black/20 object-contain',
+            fitContent
+              ? 'block h-auto max-h-[min(70vh,36rem)] w-auto max-w-full'
+              : 'max-h-80 w-full bg-black/20 object-contain',
             props.className,
             !mediaReady && 'invisible absolute inset-0'
           )}

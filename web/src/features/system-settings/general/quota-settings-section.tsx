@@ -55,6 +55,9 @@ const quotaSchema = z.object({
   QuotaForNewUser: z.coerce.number().min(0),
   QuotaForInviter: z.coerce.number().min(0),
   QuotaForInvitee: z.coerce.number().min(0),
+  PromptEnhanceEnabled: z.boolean(),
+  PromptEnhanceModel: z.string(),
+  PromptEnhanceMaxTokens: z.coerce.number().int().min(64).max(4096),
   TopUpLink: z.string(),
   quota_setting: z.object({
     enable_free_model_pre_consume: z.boolean(),
@@ -319,6 +322,76 @@ export function QuotaSettingsSection({
                   </FormControl>
                   <FormDescription>
                     {t('External link for users to purchase quota')}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <SettingsFormGridItem span='full'>
+              <FormField
+                control={form.control}
+                name='PromptEnhanceEnabled'
+                render={({ field }) => (
+                  <SettingsSwitchItem>
+                    <SettingsSwitchContent>
+                      <FormLabel>{t('Enable prompt enhance')}</FormLabel>
+                      <FormDescription>
+                        {t(
+                          'Show an optimize-prompt button on the model usage page. Users pay for the dedicated chat model below.'
+                        )}
+                      </FormDescription>
+                    </SettingsSwitchContent>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        disabled={updateOption.isPending}
+                      />
+                    </FormControl>
+                  </SettingsSwitchItem>
+                )}
+              />
+            </SettingsFormGridItem>
+
+            <FormField
+              control={form.control}
+              name='PromptEnhanceModel'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Prompt enhance model')}</FormLabel>
+                  <FormControl>
+                    <Input placeholder={t('e.g. gpt-4o-mini')} {...field} />
+                  </FormControl>
+                  <FormDescription>
+                    {t(
+                      'Must be an available chat model. Image or video-only models are not supported.'
+                    )}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name='PromptEnhanceMaxTokens'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Prompt enhance max tokens')}</FormLabel>
+                  <FormControl>
+                    <Input
+                      type='number'
+                      min={64}
+                      max={4096}
+                      value={field.value ?? ''}
+                      onChange={handleNumberChange(field.onChange)}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    {t(
+                      'Output cap for each enhance request. Also used for the hover estimate.'
+                    )}
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

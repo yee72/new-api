@@ -63,6 +63,9 @@ const BILLING_SECTIONS = [
           QuotaForNewUser: settings.QuotaForNewUser,
           QuotaForInviter: settings.QuotaForInviter,
           QuotaForInvitee: settings.QuotaForInvitee,
+          PromptEnhanceEnabled: settings.PromptEnhanceEnabled ?? false,
+          PromptEnhanceModel: settings.PromptEnhanceModel ?? '',
+          PromptEnhanceMaxTokens: settings.PromptEnhanceMaxTokens ?? 512,
           TopUpLink: settings.TopUpLink,
           quota_setting: {
             trust_quota_usd: settings['quota_setting.trust_quota_usd'],
