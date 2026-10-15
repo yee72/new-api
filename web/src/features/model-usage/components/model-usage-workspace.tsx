@@ -24,9 +24,9 @@ import {
   Paperclip,
   Ratio,
   Send,
+  Sparkle,
   Sparkles,
   Timer,
-  WandSparkles,
   X,
 } from 'lucide-react'
 import {
@@ -69,7 +69,6 @@ import {
 import { generationOptionLabelKey } from '../lib/generation-option-labels'
 import {
   DEFAULT_PROMPT_ENHANCE_MAX_TOKENS,
-  estimatePromptEnhanceTokens,
   promptEnhanceSystemPrompt,
 } from '../lib/prompt-enhance'
 import type {
@@ -177,11 +176,6 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
     promptEnhance?.max_tokens && promptEnhance.max_tokens > 0
       ? promptEnhance.max_tokens
       : DEFAULT_PROMPT_ENHANCE_MAX_TOKENS
-  const estimatedEnhanceTokens = estimatePromptEnhanceTokens({
-    userText: prompt,
-    modelType: model?.model_type ?? 'chat',
-    maxTokens: enhanceMaxTokens,
-  })
   const imageCaps = useMemo(
     () =>
       resolveGenerationCapabilities(model?.generation_capabilities, 'image'),
@@ -224,6 +218,9 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
   const hasAttachments = attachments.length > 0
   // 仅当前模型发送中时禁用输入，其他模型进行中的请求互不影响
   const busy = props.session.sending
+  const hasPromptText = Boolean(prompt.trim())
+  // 无内容时仍保持高亮外观，点击由 handler 直接 return
+  const composerLocked = busy || enhancing
   const promptPlaceholder =
     model.model_type === 'image'
       ? t(
@@ -510,91 +507,91 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
               )}
 
               <div className='flex items-end gap-2'>
-                <div className='relative min-w-0 flex-1'>
+                <Textarea
+                  value={prompt}
+                  onChange={(event) => setPrompt(event.target.value)}
+                  onPaste={handlePaste}
+                  placeholder={promptPlaceholder}
+                  rows={2}
+                  className='min-h-[64px] w-full min-w-0 flex-1 resize-none border-0 bg-transparent px-0 shadow-none focus-visible:ring-0'
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && !event.shiftKey) {
+                      event.preventDefault()
+                      void handleSubmit()
+                    }
+                  }}
+                />
+                <div className='flex shrink-0 flex-col gap-1.5'>
                   {enhanceEnabled && (
-                    <div className='absolute top-0 right-0 z-10'>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger
-                            render={
-                              <button
-                                type='button'
-                                disabled={
-                                  busy ||
-                                  enhancing ||
-                                  !prompt.trim() ||
-                                  !enhanceModel
-                                }
-                                onClick={() => void handleEnhancePrompt()}
-                                aria-label={t('Optimize prompt')}
-                                className={cn(
-                                  'text-muted-foreground hover:text-foreground',
-                                  'inline-flex size-7 items-center justify-center rounded-md transition-colors',
-                                  'focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none',
-                                  'disabled:pointer-events-none disabled:opacity-40'
-                                )}
-                              />
-                            }
-                          >
-                            {enhancing ? (
-                              <Loader2
-                                className='size-3.5 animate-spin'
-                                aria-hidden
-                              />
-                            ) : (
-                              <WandSparkles className='size-3.5' aria-hidden />
-                            )}
-                          </TooltipTrigger>
-                          <TooltipContent className='max-w-xs text-left'>
-                            <p className='font-medium'>
-                              {t('Optimize prompt')}
-                            </p>
-                            <p className='text-primary-foreground/80 mt-0.5 text-xs'>
-                              {enhanceModel
-                                ? t('Est. about {{count}} tokens', {
-                                    count: estimatedEnhanceTokens,
-                                  })
-                                : t('Prompt enhance model is not configured')}
-                            </p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <Button
+                              type='button'
+                              size='icon'
+                              variant='default'
+                              className='size-9 rounded-md'
+                              disabled={composerLocked}
+                              aria-disabled={
+                                composerLocked || !hasPromptText
+                              }
+                              onClick={() => {
+                                if (!hasPromptText || composerLocked) return
+                                void handleEnhancePrompt()
+                              }}
+                              aria-label={t('AI help write prompt')}
+                            />
+                          }
+                        >
+                          {enhancing ? (
+                            <Loader2
+                              className='size-4 animate-spin'
+                              aria-hidden
+                            />
+                          ) : (
+                            <span
+                              className='relative inline-flex size-4 items-center justify-center'
+                              aria-hidden
+                            >
+                              <Sparkle className='size-3.5 fill-current' />
+                              <Sparkle className='absolute -top-0.5 -right-0.5 size-2 fill-current' />
+                            </span>
+                          )}
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {t('AI help write prompt')}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   )}
-                  <Textarea
-                    value={prompt}
-                    onChange={(event) => setPrompt(event.target.value)}
-                    onPaste={handlePaste}
-                    placeholder={promptPlaceholder}
-                    rows={2}
-                    className={cn(
-                      'min-h-[64px] w-full resize-none border-0 bg-transparent px-0 shadow-none focus-visible:ring-0',
-                      enhanceEnabled && 'pr-8'
-                    )}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' && !event.shiftKey) {
-                        event.preventDefault()
-                        void handleSubmit()
+                  <Button
+                    type='button'
+                    size='icon'
+                    variant='default'
+                    className='size-9 rounded-md'
+                    disabled={composerLocked}
+                    aria-disabled={
+                      composerLocked || (!hasPromptText && !hasAttachments)
+                    }
+                    onClick={() => {
+                      if (
+                        composerLocked ||
+                        (!hasPromptText && !hasAttachments)
+                      ) {
+                        return
                       }
+                      void handleSubmit()
                     }}
-                  />
+                    title={t('Send')}
+                  >
+                    {busy ? (
+                      <Loader2 className='size-4 animate-spin' />
+                    ) : (
+                      <Send className='size-4' />
+                    )}
+                  </Button>
                 </div>
-                <Button
-                  type='button'
-                  size='icon'
-                  className='rounded-full'
-                  disabled={
-                    busy || enhancing || (!prompt.trim() && !hasAttachments)
-                  }
-                  onClick={() => void handleSubmit()}
-                  title={t('Send')}
-                >
-                  {busy ? (
-                    <Loader2 className='size-4 animate-spin' />
-                  ) : (
-                    <Send className='size-4' />
-                  )}
-                </Button>
               </div>
             </div>
           </div>
