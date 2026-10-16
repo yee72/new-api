@@ -28,6 +28,7 @@ import {
 import { getLobeIcon } from '@/lib/lobe-icon'
 import { cn } from '@/lib/utils'
 
+import { formatModelUsageShortName } from '../lib/model-display-name'
 import type { ModelUsageItem } from '../types'
 import { ModelUsageTypeIcon } from './model-usage-type-icon'
 
@@ -44,21 +45,25 @@ export function ModelUsageCard(props: ModelUsageCardProps) {
   const { t } = useTranslation()
   const iconKey = props.model.icon || props.model.vendor_icon
   const icon = iconKey ? getLobeIcon(iconKey, 28) : null
-  const initial = props.model.model_name?.charAt(0).toUpperCase() || '?'
+  const fullName = props.model.model_name
+  const shortName = formatModelUsageShortName(fullName)
+  const initial = fullName?.charAt(0).toUpperCase() || '?'
   const pinLabel = props.pinned ? t('Unpin model') : t('Pin model')
+  const vendorName = props.model.vendor_name?.trim() || '—'
 
   return (
     <div
       role='button'
       tabIndex={0}
-      onClick={() => props.onSelect(props.model.model_name)}
+      onClick={() => props.onSelect(fullName)}
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault()
-          props.onSelect(props.model.model_name)
+          props.onSelect(fullName)
         }
       }}
       aria-pressed={props.selected}
+      aria-label={fullName}
       className={cn(
         'relative w-full cursor-pointer rounded-lg border bg-card p-3 text-left transition-colors',
         'hover:bg-accent/40 focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none',
@@ -93,7 +98,7 @@ export function ModelUsageCard(props: ModelUsageCardProps) {
                     aria-pressed={Boolean(props.pinned)}
                     onClick={(event) => {
                       event.stopPropagation()
-                      props.onTogglePin(props.model.model_name)
+                      props.onTogglePin(fullName)
                     }}
                   />
                 }
@@ -104,22 +109,29 @@ export function ModelUsageCard(props: ModelUsageCardProps) {
             </Tooltip>
           </TooltipProvider>
         </div>
-        <div className='min-w-0 flex-1'>
-          <p className='text-muted-foreground truncate text-xs'>
-            {props.model.vendor_name?.trim() || '—'}
-          </p>
-          <div className='mt-0.5 flex items-center gap-2'>
-            <span className='truncate text-sm font-medium'>
-              {props.model.model_name}
-            </span>
-            {props.sending && (
-              <Loader2
-                className='text-muted-foreground size-3.5 shrink-0 animate-spin'
-                aria-label={t('Your work is being generated...')}
-              />
-            )}
-          </div>
-        </div>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <div className='min-w-0 flex-1' />
+              }
+            >
+              <p className='text-muted-foreground truncate text-xs'>
+                {vendorName}
+              </p>
+              <div className='mt-0.5 flex items-center gap-2'>
+                <span className='truncate text-sm font-medium'>{shortName}</span>
+                {props.sending && (
+                  <Loader2
+                    className='text-muted-foreground size-3.5 shrink-0 animate-spin'
+                    aria-label={t('Your work is being generated...')}
+                  />
+                )}
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side='right'>{fullName}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
         <ModelUsageTypeIcon
           type={props.model.model_type}
           className='mt-0.5'
