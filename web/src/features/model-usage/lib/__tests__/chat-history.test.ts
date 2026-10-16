@@ -123,4 +123,42 @@ describe('selectChatHistoryMessages', () => {
     expect(history[0]?.turnId).toBe('t1')
     expect(history[0]?.attachments).toBeUndefined()
   })
+
+  it('keeps only quoted turns when includeTurnIds is set', () => {
+    const messages = [
+      msg({
+        id: 'u1',
+        turnId: 't1',
+        role: 'user',
+        content: '第一轮',
+        status: 'done',
+      }),
+      msg({
+        id: 'a1',
+        turnId: 't1',
+        role: 'assistant',
+        content: '答复一',
+        status: 'done',
+      }),
+      msg({
+        id: 'u2',
+        turnId: 't2',
+        role: 'user',
+        content: '第二轮',
+        status: 'done',
+      }),
+      msg({
+        id: 'a2',
+        turnId: 't2',
+        role: 'assistant',
+        content: '答复二',
+        status: 'done',
+      }),
+    ]
+
+    const history = selectChatHistoryMessages(messages, {
+      includeTurnIds: ['t2'],
+    })
+    expect(history.map((item) => item.id)).toEqual(['u2', 'a2'])
+  })
 })

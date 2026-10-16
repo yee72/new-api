@@ -224,9 +224,9 @@ export function ModelUsagePage() {
             isAuthenticated={Boolean(user)}
             promptEnhance={listQuery.data?.prompt_enhance}
             onRequireLogin={() => setLoginOpen(true)}
-            onSend={async (text, attachments) => {
+            onSend={async (text, attachments, quoteTurnIds) => {
               if (!selectedModel) return
-              await send(selectedModel, text, attachments)
+              await send(selectedModel, text, attachments, quoteTurnIds)
             }}
             onDeleteTurn={(turnId) => {
               if (!selectedModel) return

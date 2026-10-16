@@ -24,7 +24,6 @@ import {
   Paperclip,
   Ratio,
   Send,
-  Sparkle,
   Sparkles,
   Timer,
   X,
@@ -60,6 +59,11 @@ import { handleServerError } from '@/lib/handle-server-error'
 import { cn } from '@/lib/utils'
 
 import { uploadModelUsageAttachment } from '../api'
+import {
+  ATTACHMENT_EXTRACT_FAILED,
+  extractAttachmentText,
+  isTextExtractableAttachment,
+} from '../lib/attachment-text-extract'
 import { displayTypeFromExt } from '../lib/attachments'
 import {
   durationValues,
@@ -68,10 +72,12 @@ import {
 } from '../lib/capabilities'
 import { generationOptionLabelKey } from '../lib/generation-option-labels'
 import {
+  classifyPromptEnhanceAttachments,
   DEFAULT_PROMPT_ENHANCE_MAX_TOKENS,
+  isDocumentAttachmentKind,
+  PROMPT_ENHANCE_EXTRACT_MAX_CHARS,
   promptEnhanceSystemPrompt,
   promptEnhanceUserContent,
-  withAttachmentUsage,
   type PromptEnhanceAttachment,
 } from '../lib/prompt-enhance'
 import type {
@@ -99,12 +105,23 @@ type ModelUsageWorkspaceProps = {
   isAuthenticated: boolean
   onRequireLogin: () => void
   promptEnhance?: ModelUsagePromptEnhance
-  onSend: (text: string, attachments?: ModelUsageAttachment[]) => Promise<void>
+  onSend: (
+    text: string,
+    attachments?: ModelUsageAttachment[],
+    quoteTurnIds?: string[]
+  ) => Promise<void>
   onDeleteTurn: (turnId: string) => void
   onRegenerate: (message: ModelUsageMessage) => Promise<void>
   onEditUserMessage: (message: ModelUsageMessage, text: string) => Promise<void>
   onImageConfigChange: (config: ImageGenerationConfig) => void
   onVideoConfigChange: (config: VideoGenerationConfig) => void
+}
+
+/** 输入框上方展示的引用芯片 */
+type QuoteChip = {
+  turnId: string
+  messageId: string
+  preview: string
 }
 
 function fileExt(name: string) {
@@ -162,6 +179,7 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
   const { t } = useTranslation()
   const [prompt, setPrompt] = useState('')
   const [attachments, setAttachments] = useState<LocalAttachment[]>([])
+  const [quotes, setQuotes] = useState<QuoteChip[]>([])
   const [enhancing, setEnhancing] = useState(false)
   const [preview, setPreview] = useState<{
     items: ModelUsagePreviewItem[]
@@ -173,6 +191,24 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
   attachmentsRef.current = attachments
 
   const model = props.model
+  const quotedMessageIds = useMemo(
+    () => new Set(quotes.map((item) => item.messageId)),
+    [quotes]
+  )
+
+  // 切换模型时清空引用，避免带到另一会话
+  useEffect(() => {
+    setQuotes([])
+  }, [model?.model_name])
+
+  // 被删除的轮次同步从引用芯片中移除
+  useEffect(() => {
+    const alive = new Set(props.session.messages.map((item) => item.id))
+    setQuotes((current) => {
+      const next = current.filter((item) => alive.has(item.messageId))
+      return next.length === current.length ? current : next
+    })
+  }, [props.session.messages])
   const promptEnhance = props.promptEnhance
   const enhanceEnabled = Boolean(promptEnhance?.enabled)
   const enhanceModel = promptEnhance?.model?.trim() ?? ''
@@ -345,20 +381,62 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
             : displayTypeFromExt(item.ext),
       })
     )
+    const mode = classifyPromptEnhanceAttachments(enhanceAttachments)
     setEnhancing(true)
     try {
+      // 文档类：能抽取则先读正文再扩写；抽不出的只带文件名
+      const extractedTexts: string[] = []
+      if (mode === 'document' || mode === 'mixed') {
+        for (let i = 0; i < attachments.length; i += 1) {
+          const local = attachments[i]
+          const meta = enhanceAttachments[i]
+          if (!meta || !isDocumentAttachmentKind(meta.kind)) continue
+          const extractKind =
+            meta.kind === 'sheet' || meta.kind === 'doc' ? meta.kind : 'file'
+          if (
+            !isTextExtractableAttachment({
+              kind: extractKind,
+              name: local.name,
+            })
+          ) {
+            continue
+          }
+          try {
+            const result = await extractAttachmentText(
+              { kind: extractKind, name: local.name },
+              local.file
+            )
+            const capped =
+              result.text.length > PROMPT_ENHANCE_EXTRACT_MAX_CHARS
+                ? result.text.slice(0, PROMPT_ENHANCE_EXTRACT_MAX_CHARS)
+                : result.text
+            if (capped.trim()) extractedTexts.push(capped.trim())
+          } catch (error) {
+            if (
+              !(
+                error instanceof Error &&
+                error.message === ATTACHMENT_EXTRACT_FAILED
+              )
+            ) {
+              throw error
+            }
+          }
+        }
+      }
+
       const response = await sendChatCompletion({
         model: enhanceModel,
         messages: [
           {
             role: 'system',
-            content: promptEnhanceSystemPrompt(model.model_type, {
-              hasAttachments: enhanceAttachments.length > 0,
-            }),
+            content: promptEnhanceSystemPrompt(model.model_type, { mode }),
           },
           {
             role: 'user',
-            content: promptEnhanceUserContent(text, enhanceAttachments),
+            content: promptEnhanceUserContent(text, {
+              attachments: enhanceAttachments,
+              extractedTexts,
+            }),
           },
         ],
         stream: false,
@@ -376,13 +454,45 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
         toast.error(t('Prompt enhance returned empty content'))
         return
       }
-      setPrompt(withAttachmentUsage(enhanced, enhanceAttachments))
+      // 最终只写入优化后的提示词，不再拼接附件用途清单
+      setPrompt(enhanced)
       toast.success(t('Prompt optimized'))
     } catch (error) {
-      handleServerError(error, t('Failed to optimize prompt'))
+      if (
+        error instanceof Error &&
+        error.message === ATTACHMENT_EXTRACT_FAILED
+      ) {
+        toast.error(t('Failed to extract attachment text'))
+      } else {
+        handleServerError(error, t('Failed to optimize prompt'))
+      }
     } finally {
       setEnhancing(false)
     }
+  }
+
+  const toggleQuote = (message: ModelUsageMessage) => {
+    setQuotes((current) => {
+      if (current.some((item) => item.messageId === message.id)) {
+        return current.filter((item) => item.messageId !== message.id)
+      }
+      // 同一轮只保留一条芯片，改为当前点选的气泡预览
+      const withoutTurn = current.filter(
+        (item) => item.turnId !== message.turnId
+      )
+      const previewText = message.content.trim().replaceAll(/\s+/g, ' ')
+      return [
+        ...withoutTurn,
+        {
+          turnId: message.turnId,
+          messageId: message.id,
+          preview:
+            previewText.length > 48
+              ? `${previewText.slice(0, 48)}…`
+              : previewText,
+        },
+      ]
+    })
   }
 
   const handleSubmit = async () => {
@@ -393,8 +503,10 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
       return
     }
     const pending = [...attachments]
+    const quoteTurnIds = quotes.map((item) => item.turnId)
     setPrompt('')
     setAttachments([])
+    setQuotes([])
     for (const item of pending) {
       if (item.previewUrl) URL.revokeObjectURL(item.previewUrl)
     }
@@ -406,7 +518,11 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
           uploaded.push(await uploadModelUsageAttachment(item.file))
         }
       }
-      await props.onSend(text, uploaded)
+      await props.onSend(
+        text,
+        uploaded,
+        quoteTurnIds.length > 0 ? quoteTurnIds : undefined
+      )
     } catch (error) {
       handleServerError(error, t('Failed to upload attachment'))
     }
@@ -426,6 +542,8 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
           messages={props.session.messages}
           emptyHint={emptyHint}
           busy={busy}
+          quotedMessageIds={quotedMessageIds}
+          onQuote={toggleQuote}
           onDelete={props.onDeleteTurn}
           onRegenerate={(message) => void props.onRegenerate(message)}
           onEditUserMessage={(message, text) =>
@@ -448,31 +566,100 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
                 event.target.value = ''
               }}
             />
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <button
-                      type='button'
-                      onClick={() => fileInputRef.current?.click()}
-                      aria-label={t('Upload image or file attachment')}
-                      className={cn(
-                        'bg-muted/80 hover:bg-muted text-muted-foreground hover:text-foreground',
-                        'inline-flex size-9 shrink-0 items-center justify-center rounded-md border border-dashed transition-colors',
-                        'focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none'
+            <div className='flex shrink-0 flex-col items-center gap-1.5 self-end'>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <button
+                        type='button'
+                        onClick={() => fileInputRef.current?.click()}
+                        aria-label={t('Upload image or file attachment')}
+                        className={cn(
+                          'bg-muted/80 hover:bg-muted text-muted-foreground hover:text-foreground',
+                          'inline-flex size-9 shrink-0 items-center justify-center rounded-md border border-dashed transition-colors',
+                          'focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none'
+                        )}
+                      />
+                    }
+                  >
+                    <Paperclip className='size-4' aria-hidden />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {t('Upload image or file attachment')}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              {enhanceEnabled && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <Button
+                          type='button'
+                          size='icon'
+                          variant='outline'
+                          className='border-border size-9 rounded-md bg-white text-blue-600 hover:bg-white hover:text-blue-600 dark:bg-white dark:hover:bg-white'
+                          disabled={composerLocked}
+                          aria-disabled={composerLocked || !hasPromptText}
+                          onClick={() => {
+                            if (!hasPromptText || composerLocked) return
+                            void handleEnhancePrompt()
+                          }}
+                          aria-label={t('AI help write prompt')}
+                        />
+                      }
+                    >
+                      {enhancing ? (
+                        <Loader2
+                          className='size-4 animate-spin text-blue-600'
+                          aria-hidden
+                        />
+                      ) : (
+                        <span
+                          className='text-[11px] leading-none font-semibold tracking-wide text-blue-600'
+                          aria-hidden
+                        >
+                          AI
+                        </span>
                       )}
-                    />
-                  }
-                >
-                  <Paperclip className='size-4' aria-hidden />
-                </TooltipTrigger>
-                <TooltipContent>
-                  {t('Upload image or file attachment')}
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+                    </TooltipTrigger>
+                    <TooltipContent>{t('AI help write prompt')}</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
 
             <div className='flex min-w-0 flex-1 flex-col gap-2'>
+              {quotes.length > 0 && (
+                <div className='flex flex-wrap gap-1.5'>
+                  {quotes.map((quote) => (
+                    <div
+                      key={quote.messageId}
+                      className='bg-background text-muted-foreground inline-flex max-w-full items-center gap-1 rounded-md border px-2 py-1 text-xs'
+                    >
+                      <span className='font-serif' aria-hidden>
+                        "
+                      </span>
+                      <span className='min-w-0 truncate'>{quote.preview}</span>
+                      <button
+                        type='button'
+                        className='hover:text-foreground shrink-0 rounded p-0.5'
+                        aria-label={t('Remove quote')}
+                        onClick={() =>
+                          setQuotes((current) =>
+                            current.filter(
+                              (item) => item.messageId !== quote.messageId
+                            )
+                          )
+                        }
+                      >
+                        <X className='size-3' />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
               {hasAttachments && (
                 <div className='flex flex-wrap gap-2'>
                   {attachments.map((file) => {
@@ -554,72 +741,29 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
                     }
                   }}
                 />
-                <div className='flex shrink-0 flex-col gap-1.5'>
-                  {enhanceEnabled && (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger
-                          render={
-                            <Button
-                              type='button'
-                              size='icon'
-                              variant='outline'
-                              className='border-border size-9 rounded-md bg-white text-yellow-500 hover:bg-white hover:text-yellow-500 dark:bg-white dark:hover:bg-white'
-                              disabled={composerLocked}
-                              aria-disabled={composerLocked || !hasPromptText}
-                              onClick={() => {
-                                if (!hasPromptText || composerLocked) return
-                                void handleEnhancePrompt()
-                              }}
-                              aria-label={t('AI help write prompt')}
-                            />
-                          }
-                        >
-                          {enhancing ? (
-                            <Loader2
-                              className='size-4 animate-spin text-yellow-500'
-                              aria-hidden
-                            />
-                          ) : (
-                            <Sparkle
-                              className='size-4 fill-yellow-400 text-yellow-500'
-                              aria-hidden
-                            />
-                          )}
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          {t('AI help write prompt')}
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  )}
-                  <Button
-                    type='button'
-                    size='icon'
-                    variant='default'
-                    className='size-9 rounded-md'
-                    disabled={composerLocked}
-                    aria-disabled={
-                      composerLocked || (!hasPromptText && !hasAttachments)
+                <Button
+                  type='button'
+                  size='icon'
+                  variant='default'
+                  className='size-9 shrink-0 rounded-md'
+                  disabled={composerLocked}
+                  aria-disabled={
+                    composerLocked || (!hasPromptText && !hasAttachments)
+                  }
+                  onClick={() => {
+                    if (composerLocked || (!hasPromptText && !hasAttachments)) {
+                      return
                     }
-                    onClick={() => {
-                      if (
-                        composerLocked ||
-                        (!hasPromptText && !hasAttachments)
-                      ) {
-                        return
-                      }
-                      void handleSubmit()
-                    }}
-                    title={t('Send')}
-                  >
-                    {busy ? (
-                      <Loader2 className='size-4 animate-spin' />
-                    ) : (
-                      <Send className='size-4' />
-                    )}
-                  </Button>
-                </div>
+                    void handleSubmit()
+                  }}
+                  title={t('Send')}
+                >
+                  {busy ? (
+                    <Loader2 className='size-4 animate-spin' />
+                  ) : (
+                    <Send className='size-4' />
+                  )}
+                </Button>
               </div>
             </div>
           </div>

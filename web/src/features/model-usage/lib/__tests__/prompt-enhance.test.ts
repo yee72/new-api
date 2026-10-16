@@ -19,12 +19,11 @@ For commercial licensing, please contact support@quantumnous.com
 import { describe, expect, it } from 'vitest'
 
 import {
-  attachmentUsageDescription,
+  classifyPromptEnhanceAttachments,
   DEFAULT_PROMPT_ENHANCE_MAX_TOKENS,
   estimatePromptEnhanceTokens,
   promptEnhanceSystemPrompt,
   promptEnhanceUserContent,
-  withAttachmentUsage,
 } from '../prompt-enhance'
 
 describe('estimatePromptEnhanceTokens', () => {
@@ -52,6 +51,24 @@ describe('estimatePromptEnhanceTokens', () => {
   })
 })
 
+describe('classifyPromptEnhanceAttachments', () => {
+  it('classifies media, document and mixed attachment sets', () => {
+    expect(classifyPromptEnhanceAttachments([])).toBe('none')
+    expect(
+      classifyPromptEnhanceAttachments([{ name: 'a.png', kind: 'image' }])
+    ).toBe('media')
+    expect(
+      classifyPromptEnhanceAttachments([{ name: 'a.xlsx', kind: 'sheet' }])
+    ).toBe('document')
+    expect(
+      classifyPromptEnhanceAttachments([
+        { name: 'a.png', kind: 'image' },
+        { name: 'a.xlsx', kind: 'sheet' },
+      ])
+    ).toBe('mixed')
+  })
+})
+
 describe('promptEnhanceSystemPrompt', () => {
   it('returns distinct instructions for image and video', () => {
     expect(promptEnhanceSystemPrompt('image')).toContain('文生图')
@@ -59,40 +76,48 @@ describe('promptEnhanceSystemPrompt', () => {
     expect(promptEnhanceSystemPrompt('chat')).toContain('对话')
   })
 
-  it('tells the model to use attachments without repeating the usage list', () => {
-    const prompt = promptEnhanceSystemPrompt('image', { hasAttachments: true })
-    expect(prompt).toContain('附件及使用方式')
-    expect(prompt).toContain('不要重复输出')
-    expect(promptEnhanceSystemPrompt('image')).not.toContain('附件及使用方式')
+  it('uses media-first wording for image and video attachments', () => {
+    const prompt = promptEnhanceSystemPrompt('image', { mode: 'media' })
+    expect(prompt).toContain('以作品为主体')
+    expect(prompt).toContain('以附件为准')
+    expect(prompt).not.toContain('附件及使用方式')
+  })
+
+  it('uses document-first wording when text attachments are present', () => {
+    const prompt = promptEnhanceSystemPrompt('chat', { mode: 'document' })
+    expect(prompt).toContain('先依据用户消息中的附件内容')
+    expect(prompt).toContain('不要整段复述附件原文')
   })
 })
 
-describe('attachment usage description', () => {
-  const attachments = [
-    { name: 'ref.png', kind: 'image' as const },
-    { name: 'notes.xlsx', kind: 'sheet' as const },
-  ]
-
-  it('describes how each attachment should be used', () => {
-    const usage = attachmentUsageDescription(attachments)
-    expect(usage).toContain('1. ref.png：作为画面、构图或风格参考')
-    expect(usage).toContain('2. notes.xlsx：依据表格中的数据')
+describe('promptEnhanceUserContent', () => {
+  it('keeps only the user text for media attachments', () => {
+    expect(
+      promptEnhanceUserContent('一只猪', {
+        attachments: [{ name: 'ref.png', kind: 'image' }],
+      })
+    ).toBe('一只猪')
   })
 
-  it('appends the usage block when enhancing a prompt that has attachments', () => {
-    const content = promptEnhanceUserContent('一只猪', attachments)
-    expect(content.startsWith('一只猪')).toBe(true)
-    expect(content).toContain('附件及使用方式：')
-    expect(content).toContain('ref.png')
+  it('appends extracted document text for document attachments', () => {
+    const content = promptEnhanceUserContent('总结这份表', {
+      attachments: [{ name: 'notes.xlsx', kind: 'sheet' }],
+      extractedTexts: ['## file: notes.xlsx\na,b'],
+    })
+    expect(content.startsWith('总结这份表')).toBe(true)
+    expect(content).toContain('附件内容：')
+    expect(content).toContain('notes.xlsx')
   })
 
-  it('leaves the prompt unchanged when there are no attachments', () => {
-    expect(promptEnhanceUserContent('一只猪', [])).toBe('一只猪')
-    expect(withAttachmentUsage('扩写后的提示词', [])).toBe('扩写后的提示词')
+  it('falls back to filenames when document text cannot be extracted', () => {
+    const content = promptEnhanceUserContent('总结这份材料', {
+      attachments: [{ name: 'deck.pptx', kind: 'ppt' }],
+    })
+    expect(content).toContain('未能解析正文')
+    expect(content).toContain('deck.pptx')
   })
 
-  it('does not duplicate a usage block that is already present', () => {
-    const once = withAttachmentUsage('扩写后的提示词', attachments)
-    expect(withAttachmentUsage(once, attachments)).toBe(once)
+  it('leaves plain text unchanged when there are no attachments', () => {
+    expect(promptEnhanceUserContent('一只猪', {})).toBe('一只猪')
   })
 })

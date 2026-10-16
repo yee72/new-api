@@ -105,7 +105,10 @@ export function ModelUsageCard(props: ModelUsageCardProps) {
           </TooltipProvider>
         </div>
         <div className='min-w-0 flex-1'>
-          <div className='flex items-center gap-2'>
+          <p className='text-muted-foreground truncate text-xs'>
+            {props.model.vendor_name?.trim() || '—'}
+          </p>
+          <div className='mt-0.5 flex items-center gap-2'>
             <span className='truncate text-sm font-medium'>
               {props.model.model_name}
             </span>
@@ -116,9 +119,6 @@ export function ModelUsageCard(props: ModelUsageCardProps) {
               />
             )}
           </div>
-          <p className='text-muted-foreground mt-1 line-clamp-2 text-xs'>
-            {props.model.description || t('No description')}
-          </p>
         </div>
         <ModelUsageTypeIcon
           type={props.model.model_type}

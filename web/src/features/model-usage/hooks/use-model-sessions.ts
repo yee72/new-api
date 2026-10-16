@@ -22,7 +22,10 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { sendChatCompletion } from '@/features/playground/api'
-import { handleServerError } from '@/lib/handle-server-error'
+import {
+  handleServerError,
+  markServerErrorHandled,
+} from '@/lib/handle-server-error'
 import { useAuthStore } from '@/stores/auth-store'
 
 import {
@@ -44,6 +47,7 @@ import {
   buildChatUserContent,
   usableChatAttachments,
 } from '../lib/chat-attachments'
+import { resolveChatFailurePresentation } from '../lib/chat-failure'
 import { selectChatHistoryMessages } from '../lib/chat-history'
 import {
   textFromAnthropicResponse,
@@ -250,6 +254,8 @@ export function useModelSessions() {
         imageConfig?: GenerationFormConfig
         videoConfig?: GenerationFormConfig
         attachments?: ModelUsageAttachment[]
+        /** 有值时只把这些轮次拼进上游历史（引用模式） */
+        quoteTurnIds?: string[]
       }
     ) => {
       const modelName = model.model_name
@@ -318,9 +324,12 @@ export function useModelSessions() {
         videoConfig: model.model_type === 'video' ? videoConfig : undefined,
       }
 
-      // 失败轮次用户附件不拼进历史，避免 PPT 等持续污染后续对话
+      // 失败轮次用户附件不拼进历史；有引用时只带选中轮次，避免全量历史
+      const quoteTurnIds = options?.quoteTurnIds?.filter(Boolean)
       const historyMessages = selectChatHistoryMessages(latest.messages, {
         excludeTurnId: isRegenerate ? turnId : undefined,
+        includeTurnIds:
+          quoteTurnIds && quoteTurnIds.length > 0 ? quoteTurnIds : undefined,
       })
 
       patchSession(
@@ -339,7 +348,7 @@ export function useModelSessions() {
         model
       )
 
-      const failAssistant = (content: string) => {
+      const failAssistant = (content: string, errorDetail?: string) => {
         patchSession(
           modelName,
           (current) => ({
@@ -347,7 +356,12 @@ export function useModelSessions() {
             sending: false,
             messages: current.messages.map((message) =>
               message.id === assistantId
-                ? { ...message, status: 'error', content }
+                ? {
+                    ...message,
+                    status: 'error',
+                    content,
+                    errorDetail: errorDetail?.trim() || undefined,
+                  }
                 : message
             ),
           }),
@@ -613,13 +627,15 @@ export function useModelSessions() {
         const isTextChat =
           (invokeProtocol === 'chat' || invokeProtocol === 'messages') &&
           model.model_type === 'chat'
-        const fallback = isTextChat
-          ? t('Chat request failed')
-          : t('Generation failed')
-        handleServerError(error, fallback)
         if (isTextChat) {
-          toast.error(fallback)
+          // 对话失败在气泡内展示原因，避免再弹一层 toast
+          markServerErrorHandled(error)
+          const presentation = resolveChatFailurePresentation(error, t)
+          failAssistant(presentation.title, presentation.detail)
+          return
         }
+        const fallback = t('Generation failed')
+        handleServerError(error, fallback)
         failAssistant(fallback)
       }
     },
@@ -630,12 +646,16 @@ export function useModelSessions() {
     async (
       model: ModelUsageItem,
       prompt: string,
-      attachments?: ModelUsageAttachment[]
+      attachments?: ModelUsageAttachment[],
+      quoteTurnIds?: string[]
     ) => {
       const text = prompt.trim()
       if (!text && (!attachments || attachments.length === 0)) return
       setLastModelName(model.model_name)
-      await runGeneration(model, text || t('Attachment'), { attachments })
+      await runGeneration(model, text || t('Attachment'), {
+        attachments,
+        quoteTurnIds,
+      })
     },
     [runGeneration, setLastModelName, t]
   )

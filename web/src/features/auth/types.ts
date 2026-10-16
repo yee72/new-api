@@ -133,6 +133,8 @@ export interface SystemStatus {
     wechat_qr_code_image_url?: string
     wechat_account_qrcode_image_url?: string
     WeChatAccountQRCodeImageURL?: string
+    customer_service_enabled?: boolean
+    customer_service_qrcode?: string
     turnstile_check?: boolean
     turnstile_site_key?: string
     email_verification?: boolean
@@ -183,6 +185,8 @@ export interface SystemStatus {
   wechat_qr_code_image_url?: string
   wechat_account_qrcode_image_url?: string
   WeChatAccountQRCodeImageURL?: string
+  customer_service_enabled?: boolean
+  customer_service_qrcode?: string
   turnstile_check?: boolean
   turnstile_site_key?: string
   email_verification?: boolean

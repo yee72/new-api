@@ -17,6 +17,10 @@ var Footer = ""
 var Logo = ""
 var TopUpLink = ""
 
+// 站点右侧客服二维码：开关关闭或图片为空时不展示悬浮入口。
+var CustomerServiceEnabled = false
+var CustomerServiceQRCodeImage = ""
+
 // var ChatLink = ""
 // var ChatLink2 = ""
 var QuotaPerUnit = 500 * 1000.0 // $0.002 / 1K tokens

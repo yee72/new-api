@@ -28,6 +28,7 @@ import { NoticeSection } from '../maintenance/notice-section'
 import { SidebarModulesSection } from '../maintenance/sidebar-modules-section'
 import type { SiteSettings } from '../types'
 import { createSectionRegistry } from '../utils/section-registry'
+import { CustomerServiceSection } from './customer-service-section'
 
 const SITE_SECTIONS = [
   {
@@ -55,6 +56,18 @@ const SITE_SECTIONS = [
     titleKey: 'System Notice',
     build: (settings: SiteSettings) => (
       <NoticeSection defaultValue={settings.Notice ?? ''} />
+    ),
+  },
+  {
+    id: 'customer-service',
+    titleKey: 'Customer Service',
+    build: (settings: SiteSettings) => (
+      <CustomerServiceSection
+        defaultValues={{
+          CustomerServiceEnabled: settings.CustomerServiceEnabled,
+          CustomerServiceQRCodeImage: settings.CustomerServiceQRCodeImage,
+        }}
+      />
     ),
   },
   {

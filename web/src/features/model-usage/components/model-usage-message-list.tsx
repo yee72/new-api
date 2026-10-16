@@ -46,6 +46,7 @@ import {
   ModelUsageAuthImage,
   ModelUsageAuthVideo,
 } from './model-usage-auth-media'
+import { ModelUsageChatFailureCard } from './model-usage-chat-failure-card'
 import { ModelUsageMediaPlaceholder } from './model-usage-media-placeholder'
 import { ModelUsageMediaPreview } from './model-usage-media-preview'
 
@@ -53,6 +54,9 @@ type ModelUsageMessageListProps = {
   messages: ModelUsageMessage[]
   emptyHint: string
   busy: boolean
+  /** 已引用的消息 id，用于按钮高亮 */
+  quotedMessageIds?: ReadonlySet<string>
+  onQuote?: (message: ModelUsageMessage) => void
   onDelete: (turnId: string) => void
   onRegenerate: (message: ModelUsageMessage) => void
   onEditUserMessage: (message: ModelUsageMessage, text: string) => Promise<void>
@@ -111,11 +115,20 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
               !hasImages &&
               !hasVideos) ||
             (isUser && Boolean(message.content))
-          // 可复制正文：仅对可见文本气泡；生成中占位与纯图/视频结果不复制
-          const copyText =
-            showTextBubble && !showGeneratingText && message.content.trim()
-              ? message.content
-              : ''
+          // 可复制正文：文本气泡或失败卡片；失败优先复制接口原文
+          let copyText = ''
+          if (
+            message.status === 'error' &&
+            (message.errorDetail?.trim() || message.content.trim())
+          ) {
+            copyText = message.errorDetail?.trim() || message.content.trim()
+          } else if (
+            showTextBubble &&
+            !showGeneratingText &&
+            message.content.trim()
+          ) {
+            copyText = message.content
+          }
           const showCopy = Boolean(copyText)
           // 生成结果图/视频可下载（按需拉 blob，不预取）
           const downloadItems: { url: string; kind: 'image' | 'video' }[] = [
@@ -125,7 +138,14 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
             ),
           ]
           const showDownload = downloadItems.length > 0
-          const showActions = canAct || showCopy || showDownload
+          // 仅可进上游历史的 done 文本气泡支持引用
+          const canQuote =
+            Boolean(props.onQuote) &&
+            message.status === 'done' &&
+            message.mediaType === 'text' &&
+            Boolean(message.content.trim())
+          const isQuoted = Boolean(props.quotedMessageIds?.has(message.id))
+          const showActions = canAct || showCopy || showDownload || canQuote
           const downloading = downloadingMessageId === message.id
           const isEditing = editingMessageId === message.id
           const canEdit =
@@ -136,6 +156,10 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
           } else if (message.status === 'error') {
             bubbleTone = 'bg-destructive/10 text-destructive'
           }
+          const showFailureCard =
+            !isUser &&
+            message.status === 'error' &&
+            Boolean(message.content.trim())
 
           return (
             <div
@@ -191,6 +215,13 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
                       {t('Submit')}
                     </Button>
                   </div>
+                </div>
+              ) : showFailureCard ? (
+                <div className='pb-2'>
+                  <ModelUsageChatFailureCard
+                    title={message.content}
+                    detail={message.errorDetail}
+                  />
                 </div>
               ) : (
                 showTextBubble && (
@@ -423,6 +454,36 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
                         aria-label={t('Copy')}
                         iconClassName='size-3.5'
                       />
+                    )}
+                    {canQuote && (
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <Button
+                              type='button'
+                              variant='ghost'
+                              size='icon-sm'
+                              disabled={props.busy}
+                              aria-label={t('Quote')}
+                              aria-pressed={isQuoted}
+                              className={cn(
+                                isQuoted && 'bg-accent text-accent-foreground'
+                              )}
+                              onClick={() => props.onQuote?.(message)}
+                            >
+                              <span
+                                className='text-base leading-none font-serif'
+                                aria-hidden
+                              >
+                                "
+                              </span>
+                            </Button>
+                          }
+                        />
+                        <TooltipContent>
+                          <p>{t('Quote')}</p>
+                        </TooltipContent>
+                      </Tooltip>
                     )}
                     {showDownload && (
                       <Tooltip>

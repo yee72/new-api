@@ -39,8 +39,10 @@ type ModelUsageMessage struct {
 	Videos      []ModelUsageVideo      `json:"videos,omitempty"`
 	Attachments []ModelUsageAttachment `json:"attachments,omitempty"`
 	Prompt      string                 `json:"prompt,omitempty"`
-	ImageConfig map[string]any         `json:"imageConfig,omitempty"`
-	VideoConfig map[string]any         `json:"videoConfig,omitempty"`
+	// ErrorDetail 对话失败时接口原文，前端折叠展示；余额不足等友好文案可不带。
+	ErrorDetail string         `json:"errorDetail,omitempty"`
+	ImageConfig map[string]any `json:"imageConfig,omitempty"`
+	VideoConfig map[string]any `json:"videoConfig,omitempty"`
 }
 
 type ModelUsageVideo struct {

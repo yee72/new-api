@@ -38,6 +38,8 @@ const defaultSiteSettings: SiteSettings = {
   'legal.privacy_policy': '',
   HeaderNavModules: '',
   SidebarModulesAdmin: '',
+  CustomerServiceEnabled: false,
+  CustomerServiceQRCodeImage: '',
 }
 
 export function SiteSettings() {

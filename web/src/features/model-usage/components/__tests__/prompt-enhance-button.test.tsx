@@ -81,16 +81,28 @@ async function renderWorkspace() {
 }
 
 describe('prompt enhance button', () => {
-  it('keeps a square white button with a single yellow four-point star', async () => {
+  it('places a square blue AI label under the attachment upload button', async () => {
     await renderWorkspace()
 
-    const button = screen.getByRole('button', { name: 'AI help write prompt' })
-    expect(button.className).toContain('size-9')
-    expect(button.className).toContain('rounded-md')
-    expect(button.className).toContain('bg-white')
+    const upload = screen.getByRole('button', {
+      name: 'Upload image or file attachment',
+    })
+    const enhance = screen.getByRole('button', {
+      name: 'AI help write prompt',
+    })
 
-    const stars = button.querySelectorAll('svg')
-    expect(stars).toHaveLength(1)
-    expect(stars[0]?.getAttribute('class')).toContain('fill-yellow-400')
+    expect(enhance.className).toContain('size-9')
+    expect(enhance.className).toContain('rounded-md')
+    expect(enhance.className).toContain('bg-white')
+    expect(enhance.className).toContain('text-blue-600')
+    expect(enhance).toHaveTextContent('AI')
+    expect(enhance.querySelector('svg')).not.toBeInTheDocument()
+
+    // 附件按钮与 AI 按钮同列，且 AI 在附件下方
+    const column = upload.closest('.flex-col')
+    expect(column).toContainElement(enhance)
+    expect(
+      upload.compareDocumentPosition(enhance) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
   })
 })

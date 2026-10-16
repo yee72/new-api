@@ -1,6 +1,7 @@
 package model
 
 import (
+	"errors"
 	"maps"
 	"strconv"
 	"strings"
@@ -80,6 +81,8 @@ func InitOptionMap() {
 	common.OptionMap["Footer"] = common.Footer
 	common.OptionMap["SystemName"] = common.SystemName
 	common.OptionMap["Logo"] = common.Logo
+	common.OptionMap["CustomerServiceEnabled"] = strconv.FormatBool(common.CustomerServiceEnabled)
+	common.OptionMap["CustomerServiceQRCodeImage"] = common.CustomerServiceQRCodeImage
 	common.OptionMap["ServerAddress"] = ""
 	common.OptionMap["TaskPublicAddress"] = system_setting.TaskPublicAddress
 	common.OptionMap["WorkerUrl"] = system_setting.WorkerUrl
@@ -242,6 +245,10 @@ func validateOptionValue(key string, value string) error {
 	}
 	if key == "MaxTokenAutoGroups" {
 		return setting.ValidateMaxTokenAutoGroups(value)
+	}
+	// 客服二维码支持 URL 或 data URL，限制体积避免 options 表膨胀。
+	if key == "CustomerServiceQRCodeImage" && len(value) > 512*1024 {
+		return errors.New("customer service QR image must be 512 KB or smaller")
 	}
 	return nil
 }
@@ -417,6 +424,8 @@ func updateOptionMap(key string, value string) (err error) {
 			common.DisplayTokenStatEnabled = boolValue
 		case "DrawingEnabled":
 			common.DrawingEnabled = boolValue
+		case "CustomerServiceEnabled":
+			common.CustomerServiceEnabled = boolValue
 		case "TaskEnabled":
 			common.TaskEnabled = boolValue
 		case "TaskPluginEnabled":
@@ -591,6 +600,8 @@ func updateOptionMap(key string, value string) (err error) {
 		common.SystemName = value
 	case "Logo":
 		common.Logo = value
+	case "CustomerServiceQRCodeImage":
+		common.CustomerServiceQRCodeImage = value
 	case "WeChatServerAddress":
 		common.WeChatServerAddress = value
 	case "WeChatServerToken":

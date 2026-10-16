@@ -9,25 +9,46 @@ function stableStringify(obj) {
 
 const newKeys = {
   en: {
-    'AI help write prompt': 'AI help write prompt',
+    'Your compute balance is not enough for this chat. Top up to continue chatting~':
+      'Your compute balance is not enough for this chat. Top up to continue chatting~',
+    'Show error details': 'Show error details',
+    'Hide error details': 'Hide error details',
   },
   zh: {
-    'AI help write prompt': 'AI 帮写提示词',
+    'Your compute balance is not enough for this chat. Top up to continue chatting~':
+      '您的算力余额不够本次对话啦，充值后即可继续畅聊～',
+    'Show error details': '展开错误详情',
+    'Hide error details': '收起错误详情',
   },
   'zh-TW': {
-    'AI help write prompt': 'AI 幫寫提示詞',
+    'Your compute balance is not enough for this chat. Top up to continue chatting~':
+      '您的算力餘額不夠本次對話啦，儲值後即可繼續暢聊～',
+    'Show error details': '展開錯誤詳情',
+    'Hide error details': '收起錯誤詳情',
   },
   ja: {
-    'AI help write prompt': 'AI でプロンプト作成',
+    'Your compute balance is not enough for this chat. Top up to continue chatting~':
+      '今回の会話には計算クレジットが足りません。チャージ後に続けてチャットできます～',
+    'Show error details': 'エラー詳細を表示',
+    'Hide error details': 'エラー詳細を隠す',
   },
   fr: {
-    'AI help write prompt': 'AI aide à rédiger le prompt',
+    'Your compute balance is not enough for this chat. Top up to continue chatting~':
+      'Votre solde de calcul ne suffit pas pour cette conversation. Rechargez pour continuer à discuter～',
+    'Show error details': 'Afficher les détails',
+    'Hide error details': 'Masquer les détails',
   },
   ru: {
-    'AI help write prompt': 'AI поможет написать промпт',
+    'Your compute balance is not enough for this chat. Top up to continue chatting~':
+      'Баланса вычислительных ресурсов недостаточно для этого чата. Пополните, чтобы продолжить～',
+    'Show error details': 'Показать детали ошибки',
+    'Hide error details': 'Скрыть детали ошибки',
   },
   vi: {
-    'AI help write prompt': 'AI giúp viết prompt',
+    'Your compute balance is not enough for this chat. Top up to continue chatting~':
+      'Số dư tính toán không đủ cho cuộc trò chuyện này. Nạp thêm để tiếp tục chat nhé～',
+    'Show error details': 'Hiện chi tiết lỗi',
+    'Hide error details': 'Ẩn chi tiết lỗi',
   },
 }
 

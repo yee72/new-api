@@ -154,6 +154,8 @@ export type SiteSettings = {
   'legal.privacy_policy': string
   HeaderNavModules: string
   SidebarModulesAdmin: string
+  CustomerServiceEnabled: boolean
+  CustomerServiceQRCodeImage: string
 }
 
 export type AuthSettings = {
