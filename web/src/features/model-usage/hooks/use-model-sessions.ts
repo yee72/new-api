@@ -348,7 +348,8 @@ export function useModelSessions() {
         model
       )
 
-      const failAssistant = (content: string, errorDetail?: string) => {
+      // 失败必须落库：否则切页再进会用服务端仍为 pending 的旧快照覆盖，丢失 errorDetail
+      const failAssistant = async (content: string, errorDetail?: string) => {
         patchSession(
           modelName,
           (current) => ({
@@ -367,6 +368,20 @@ export function useModelSessions() {
           }),
           model
         )
+        if (!userId) return
+        const snapshot = useModelUsageSessionsStore
+          .getState()
+          .getSessionSnapshot(modelName, model)
+        try {
+          await replaceModelUsageSession(modelName, {
+            model_name: modelName,
+            messages: snapshot.messages,
+            image_config: generationFormToRecord(snapshot.imageConfig),
+            video_config: generationFormToRecord(snapshot.videoConfig),
+          })
+        } catch (saveError) {
+          handleServerError(saveError, t('Failed to save conversation'))
+        }
       }
 
       // 上游返回前先落库，切换窗口或重新进入页面时仍能看到刚提交的对话
@@ -405,7 +420,7 @@ export function useModelSessions() {
             attachments.length > 0 &&
             usableChatAttachments(attachments).length !== attachments.length
           ) {
-            failAssistant(t('Attachment expired'))
+            await failAssistant(t('Attachment expired'))
             toast.error(t('Attachment expired'))
             return
           }
@@ -437,7 +452,7 @@ export function useModelSessions() {
             const message = extractFailed
               ? t('Failed to extract attachment text')
               : t('Failed to load attachment')
-            failAssistant(message)
+            await failAssistant(message)
             toast.error(message)
             return
           }
@@ -495,11 +510,11 @@ export function useModelSessions() {
 
           if (chatImage) {
             if (!userId) {
-              failAssistant(t('Please sign in to save generated works'))
+              await failAssistant(t('Please sign in to save generated works'))
               return
             }
             if (chatImages.length === 0) {
-              failAssistant(contentText.trim() || t('Generation failed'))
+              await failAssistant(contentText.trim() || t('Generation failed'))
               return
             }
             // 优先提交短链/URL；若仍有 data: 则由后端落库
@@ -564,7 +579,7 @@ export function useModelSessions() {
           )
           const sources = extractImageUrls(data)
           if (!userId) {
-            failAssistant(t('Please sign in to save generated works'))
+            await failAssistant(t('Please sign in to save generated works'))
             return
           }
           const dto = await commitModelUsageTurn(modelName, {
@@ -601,11 +616,11 @@ export function useModelSessions() {
         const result = (await generateVideo(videoPayload)) as { id?: string }
         const taskIds = result?.id ? [result.id] : []
         if (!userId) {
-          failAssistant(t('Please sign in to save generated works'))
+          await failAssistant(t('Please sign in to save generated works'))
           return
         }
         if (taskIds.length === 0) {
-          failAssistant(t('Generation failed'))
+          await failAssistant(t('Generation failed'))
           return
         }
         const dto = await commitModelUsageTurn(modelName, {
@@ -631,12 +646,12 @@ export function useModelSessions() {
           // 对话失败在气泡内展示原因，避免再弹一层 toast
           markServerErrorHandled(error)
           const presentation = resolveChatFailurePresentation(error, t)
-          failAssistant(presentation.title, presentation.detail)
+          await failAssistant(presentation.title, presentation.detail)
           return
         }
         const fallback = t('Generation failed')
         handleServerError(error, fallback)
-        failAssistant(fallback)
+        await failAssistant(fallback)
       }
     },
     [patchSession, t, userId]

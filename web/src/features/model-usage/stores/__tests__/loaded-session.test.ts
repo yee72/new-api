@@ -154,6 +154,25 @@ describe('markUnresumedMessages', () => {
     })
   })
 
+  it('keeps persisted chat failure detail so the expand control can return', () => {
+    const failedAssistant: ModelUsageMessage = {
+      ...pendingAssistant,
+      status: 'error',
+      content: 'Chat request failed',
+      errorDetail: 'upstream refused the model',
+    }
+    const settled = markUnresumedMessages(
+      [userMessage, failedAssistant],
+      'Generation failed'
+    )
+
+    expect(settled[1]).toMatchObject({
+      status: 'error',
+      content: 'Chat request failed',
+      errorDetail: 'upstream refused the model',
+    })
+  })
+
   it('keeps polling a video that already has a task id', () => {
     const videoPending: ModelUsageMessage = {
       ...pendingAssistant,

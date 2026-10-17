@@ -16,7 +16,14 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Download, Loader2, Pencil, RefreshCw, Trash2 } from 'lucide-react'
+import {
+  Download,
+  Loader2,
+  Pencil,
+  Quote,
+  RefreshCw,
+  Trash2,
+} from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -169,7 +176,7 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
                 isUser ? 'items-end' : 'items-start'
               )}
             >
-              {isEditing ? (
+              {isEditing && (
                 <div className='flex w-full max-w-[min(100%,36rem)] flex-col gap-2'>
                   <Textarea
                     value={editDraft}
@@ -216,32 +223,29 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
                     </Button>
                   </div>
                 </div>
-              ) : showFailureCard ? (
-                <div className='pb-2'>
-                  <ModelUsageChatFailureCard
-                    title={message.content}
-                    detail={message.errorDetail}
-                  />
+              )}
+              {!isEditing && showFailureCard && (
+                <ModelUsageChatFailureCard
+                  title={message.content}
+                  detail={message.errorDetail}
+                />
+              )}
+              {!isEditing && !showFailureCard && showTextBubble && (
+                <div
+                  className={cn(
+                    'max-w-[min(100%,36rem)] rounded-2xl px-3.5 py-2 text-sm whitespace-pre-wrap',
+                    bubbleTone
+                  )}
+                >
+                  {showGeneratingText ? (
+                    <span className='inline-flex items-center gap-2'>
+                      <Loader2 className='size-3.5 shrink-0 animate-spin' />
+                      {message.content || t('Your work is being generated...')}
+                    </span>
+                  ) : (
+                    message.content
+                  )}
                 </div>
-              ) : (
-                showTextBubble && (
-                  <div
-                    className={cn(
-                      'max-w-[min(100%,36rem)] rounded-2xl px-3.5 py-2 text-sm whitespace-pre-wrap',
-                      bubbleTone
-                    )}
-                  >
-                    {showGeneratingText ? (
-                      <span className='inline-flex items-center gap-2'>
-                        <Loader2 className='size-3.5 shrink-0 animate-spin' />
-                        {message.content ||
-                          t('Your work is being generated...')}
-                      </span>
-                    ) : (
-                      message.content
-                    )}
-                  </div>
-                )
               )}
 
               {showGeneratingMedia && (
@@ -471,12 +475,12 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
                               )}
                               onClick={() => props.onQuote?.(message)}
                             >
-                              <span
-                                className='text-base leading-none font-serif'
+                              {/* 镂空双引号，略大于同行图标以便辨认 */}
+                              <Quote
+                                className='size-4'
+                                strokeWidth={1.75}
                                 aria-hidden
-                              >
-                                "
-                              </span>
+                              />
                             </Button>
                           }
                         />
