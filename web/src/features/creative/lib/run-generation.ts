@@ -139,14 +139,12 @@ function emitDetail(
 }
 
 type AnalyzeOptions = {
-  group?: string
   platform?: string
   style?: string
   styleCustom?: string
   extraText?: string
   imageKind?: string
   imageCount?: number
-  imageModel?: string
   onLog?: ProcessLogger
 }
 
@@ -180,16 +178,6 @@ function emitSubmittedParameters(
   if (options?.imageCount && options.imageCount > 0) {
     emitDetail(onLog, 'prepare', 'Quantity: {{count}}', 'done', {
       count: options.imageCount,
-    })
-  }
-  if (options?.imageModel?.trim()) {
-    emitDetail(onLog, 'prepare', 'Image model: {{value}}', 'done', {
-      value: options.imageModel.trim(),
-    })
-  }
-  if (options?.group?.trim()) {
-    emitDetail(onLog, 'prepare', 'Group: {{value}}', 'done', {
-      value: options.group.trim(),
     })
   }
   emitDetail(onLog, 'prepare', 'Reference images: {{count}}', 'done', {
@@ -285,7 +273,6 @@ export async function runCreativeAnalyze(
     try {
       const res = await sendChatCompletion({
         model: modelName,
-        group: options?.group || undefined,
         stream: false,
         messages: [
           { role: 'system', content: system_prompt },
@@ -341,12 +328,11 @@ type GenerationLoopOptions = {
   onLog?: ProcessLogger
   /** 每张资产完成后回调，用于右侧结果跟随 */
   onAssetSettled?: () => void | Promise<void>
-  /** 用户选择的生图模型，优先于管理端绑定 */
-  imageModel?: string
-  /** 模型协议元数据：决定走 /images 还是 chat 生图 */
-  imageModelMeta?: CreativeImageModelMeta
-  /** 用户选择的分组 */
-  group?: string
+  /**
+   * 按管理员绑定的模型名解析协议元数据（chat / images）
+   * 不传则默认按 image 类型处理
+   */
+  resolveImageModelMeta?: (modelName: string) => CreativeImageModelMeta
   /** 计划生成张数，用于进度文案 */
   imageCount?: number
 }
@@ -355,7 +341,6 @@ type GenerationLoopOptions = {
 async function generateCreativeImageUrls(params: {
   modelName: string
   prompt: string
-  group?: string
   width?: number
   height?: number
   references?: string[]
@@ -369,7 +354,6 @@ async function generateCreativeImageUrls(params: {
       model: params.modelName,
       prompt: params.prompt,
       n: 1,
-      group: params.group || undefined,
       size:
         params.width && params.height
           ? `${params.width}x${params.height}`
@@ -393,7 +377,6 @@ async function generateCreativeImageUrls(params: {
   }
   const response = await sendChatCompletion({
     model: params.modelName,
-    group: params.group || undefined,
     stream: false,
     // 声明需要图片输出；否则 Gemini 等可能只回文本（日志仍成功）
     modalities: ['text', 'image'],
@@ -441,7 +424,11 @@ export async function runCreativeGenerationLoop(
       return
     }
     const asset = prepared.data.asset
-    const modelName = options.imageModel?.trim() || prepared.data.model
+    // 固定使用管理端绑定的生图模型，不接受用户侧覆盖
+    const modelName = prepared.data.model
+    const modelMeta = modelName
+      ? options.resolveImageModelMeta?.(modelName)
+      : undefined
     const prompt = prepared.data.prompt || ''
     const kindKey = kindLabelKey(asset.kind)
     const index = asset.slot_index + 1
@@ -499,11 +486,10 @@ export async function runCreativeGenerationLoop(
       const urls = await generateCreativeImageUrls({
         modelName,
         prompt,
-        group: options.group,
         width: prepared.data.width,
         height: prepared.data.height,
         references: prepared.data.references,
-        modelMeta: options.imageModelMeta,
+        modelMeta,
       })
       if (urls.length === 0) {
         await completeCreativeAsset(taskId, {

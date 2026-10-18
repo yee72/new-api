@@ -24,7 +24,6 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { PublicLayout } from '@/components/layout'
-import { ModelGroupSelector } from '@/components/model-group-selector'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -39,10 +38,6 @@ import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 import { ModelUsageAuthImage } from '@/features/model-usage/components/model-usage-auth-media'
 import { fetchModelUsageModels } from '@/features/model-usage/api'
-import {
-  getUserGroups,
-  getUserModels,
-} from '@/features/playground/api'
 import { requireServerSuccess } from '@/lib/server-error-message'
 import { cn } from '@/lib/utils'
 
@@ -113,8 +108,6 @@ export function EcommerceSuitePage() {
   const [processEvents, setProcessEvents] = useState<CreativeProcessEvent[]>(
     []
   )
-  const [group, setGroup] = useState('')
-  const [imageModel, setImageModel] = useState('')
   const [imageCount, setImageCount] = useState(2)
   // 进入分析中后输入与规划全部锁定
   const locked = step !== 'input'
@@ -170,67 +163,23 @@ export function EcommerceSuitePage() {
     saveCreativeProcessEvents(task.id, processEvents)
   }, [task?.id, processEvents])
 
-  const groupsQuery = useQuery({
-    queryKey: ['creative-groups'],
-    queryFn: async () => requireServerSuccess(await getUserGroups()),
-  })
-  const groups = groupsQuery.data ?? []
-
-  useEffect(() => {
-    const first = groupsQuery.data?.[0]?.value
-    if (!group && first) {
-      setGroup(first)
-    }
-  }, [group, groupsQuery.data])
-
+  // 仅用于按管理员绑定模型名解析协议（Gemini→chat，image-generation→/images）
   const imageCatalogQuery = useQuery({
     queryKey: ['creative-image-catalog'],
     queryFn: async () => fetchModelUsageModels({ type: 'image' }),
   })
-  const imageNameSet = useMemo(() => {
-    const set = new Set<string>()
-    for (const item of imageCatalogQuery.data?.models ?? []) {
-      set.add(item.model_name)
+  const resolveImageModelMeta = useMemo(() => {
+    const models = imageCatalogQuery.data?.models ?? []
+    return (modelName: string) => {
+      const item = models.find((model) => model.model_name === modelName)
+      if (!item) return { model_type: 'image' as const }
+      return {
+        model_type: item.model_type,
+        invoke_protocol: item.invoke_protocol,
+        supported_endpoint_types: item.supported_endpoint_types,
+      }
     }
-    return set
-  }, [imageCatalogQuery.data])
-
-  // 用于按协议分流生图（Gemini→chat，image-generation→/images）
-  const imageModelMeta = useMemo(() => {
-    const item = imageCatalogQuery.data?.models?.find(
-      (model) => model.model_name === imageModel
-    )
-    if (!item) return { model_type: 'image' as const }
-    return {
-      model_type: item.model_type,
-      invoke_protocol: item.invoke_protocol,
-      supported_endpoint_types: item.supported_endpoint_types,
-    }
-  }, [imageCatalogQuery.data?.models, imageModel])
-
-  const modelsQuery = useQuery({
-    queryKey: ['creative-image-models', group],
-    queryFn: async () => requireServerSuccess(await getUserModels(group)),
-    enabled: Boolean(group),
-  })
-  const models = useMemo(() => {
-    const all = modelsQuery.data ?? []
-    if (imageNameSet.size === 0) return all
-    const filtered = all.filter((item) => imageNameSet.has(item.value))
-    return filtered.length > 0 ? filtered : all
-  }, [modelsQuery.data, imageNameSet])
-
-  useEffect(() => {
-    if (!imageModel && models.length > 0) {
-      setImageModel(models[0].value)
-    } else if (
-      imageModel &&
-      models.length > 0 &&
-      !models.some((item) => item.value === imageModel)
-    ) {
-      setImageModel(models[0].value)
-    }
-  }, [imageModel, models])
+  }, [imageCatalogQuery.data?.models])
 
   const pkg: CreativeTypePackage | undefined = typeCard?.package
 
@@ -338,7 +287,6 @@ export function EcommerceSuitePage() {
     if (!task?.id) return
     // review 也可能残留未完成槽位（误判 done 后）
     if (step !== 'generate' && step !== 'review') return
-    if (!imageModel || !group) return
     if (!hasPendingGenerationAssets(assets)) return
     resumeStartedRef.current = true
     const taskId = task.id
@@ -352,9 +300,7 @@ export function EcommerceSuitePage() {
           onAssetSettled: async () => {
             await refreshTask(taskId)
           },
-          imageModel,
-          imageModelMeta,
-          group,
+          resolveImageModelMeta,
           imageCount: count,
         })
         await refreshTask(taskId)
@@ -376,7 +322,7 @@ export function EcommerceSuitePage() {
         setBusy(false)
       }
     })()
-  }, [assets, busy, group, imageCount, imageModel, imageModelMeta, step, t, task])
+  }, [assets, busy, imageCount, resolveImageModelMeta, step, t, task])
 
   const clearAndStartNew = () => {
     const previousId = task?.id
@@ -452,10 +398,6 @@ export function EcommerceSuitePage() {
       toast.error(t('Please upload reference images first'))
       return
     }
-    if (!imageModel) {
-      toast.error(t('Please select an image model'))
-      return
-    }
     if (locked) return
     setBusy(true)
     setProcessEvents([])
@@ -463,14 +405,12 @@ export function EcommerceSuitePage() {
     try {
       const result = requireServerSuccess(
         await runCreativeAnalyze(task.id, {
-          group,
           platform,
           style,
           styleCustom,
           extraText,
           imageKind: primaryTab,
           imageCount,
-          imageModel,
           onLog: appendProcessEvent,
         })
       )
@@ -526,9 +466,7 @@ export function EcommerceSuitePage() {
         onAssetSettled: async () => {
           await refreshTask(task.id)
         },
-        imageModel,
-        imageModelMeta,
-        group,
+        resolveImageModelMeta,
         imageCount,
       })
       await refreshTask(task.id)
@@ -816,24 +754,6 @@ export function EcommerceSuitePage() {
               />
             </div>
 
-            <div className='space-y-2'>
-              <Label>{t('Model & group')}</Label>
-              <ModelGroupSelector
-                selectedModel={imageModel}
-                models={models}
-                onModelChange={setImageModel}
-                selectedGroup={group}
-                groups={groups}
-                onGroupChange={setGroup}
-                disabled={
-                  locked ||
-                  busy ||
-                  groupsQuery.isLoading ||
-                  modelsQuery.isLoading
-                }
-              />
-            </div>
-
             {locked && profile && (
               <div className='space-y-2 rounded-xl border p-3'>
                 <p className='text-sm font-medium'>{t('Product profile')}</p>
@@ -854,11 +774,7 @@ export function EcommerceSuitePage() {
                 type='button'
                 className='w-full'
                 disabled={
-                  locked ||
-                  busy ||
-                  isUploading ||
-                  references.length === 0 ||
-                  !imageModel
+                  locked || busy || isUploading || references.length === 0
                 }
                 onClick={() => void onAnalyzeAndGenerate()}
               >
