@@ -195,6 +195,19 @@ export function EcommerceSuitePage() {
     return set
   }, [imageCatalogQuery.data])
 
+  // 用于按协议分流生图（Gemini→chat，image-generation→/images）
+  const imageModelMeta = useMemo(() => {
+    const item = imageCatalogQuery.data?.models?.find(
+      (model) => model.model_name === imageModel
+    )
+    if (!item) return { model_type: 'image' as const }
+    return {
+      model_type: item.model_type,
+      invoke_protocol: item.invoke_protocol,
+      supported_endpoint_types: item.supported_endpoint_types,
+    }
+  }, [imageCatalogQuery.data?.models, imageModel])
+
   const modelsQuery = useQuery({
     queryKey: ['creative-image-models', group],
     queryFn: async () => requireServerSuccess(await getUserModels(group)),
@@ -340,6 +353,7 @@ export function EcommerceSuitePage() {
             await refreshTask(taskId)
           },
           imageModel,
+          imageModelMeta,
           group,
           imageCount: count,
         })
@@ -362,7 +376,7 @@ export function EcommerceSuitePage() {
         setBusy(false)
       }
     })()
-  }, [assets, busy, group, imageCount, imageModel, step, t, task])
+  }, [assets, busy, group, imageCount, imageModel, imageModelMeta, step, t, task])
 
   const clearAndStartNew = () => {
     const previousId = task?.id
@@ -513,6 +527,7 @@ export function EcommerceSuitePage() {
           await refreshTask(task.id)
         },
         imageModel,
+        imageModelMeta,
         group,
         imageCount,
       })

@@ -17,7 +17,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { generateImages } from '@/features/model-usage/api'
+import {
+  extractImagesFromChatMessage,
+  resolveInvokeProtocol,
+} from '@/features/model-usage/lib/invoke-protocol'
 import { fetchModelUsageMediaBlobCached } from '@/features/model-usage/lib/media-download'
+import type { ModelUsageItem } from '@/features/model-usage/types'
 import { sendChatCompletion } from '@/features/playground/api'
 
 import {
@@ -33,6 +38,11 @@ import {
   type CreativeProcessEvent,
   type CreativeProcessStage,
 } from './process-log'
+
+type CreativeImageModelMeta = Pick<
+  ModelUsageItem,
+  'invoke_protocol' | 'supported_endpoint_types' | 'model_type'
+>
 
 function extractImageUrls(data: unknown): string[] {
   if (!data || typeof data !== 'object') return []
@@ -333,10 +343,74 @@ type GenerationLoopOptions = {
   onAssetSettled?: () => void | Promise<void>
   /** 用户选择的生图模型，优先于管理端绑定 */
   imageModel?: string
+  /** 模型协议元数据：决定走 /images 还是 chat 生图 */
+  imageModelMeta?: CreativeImageModelMeta
   /** 用户选择的分组 */
   group?: string
   /** 计划生成张数，用于进度文案 */
   imageCount?: number
+}
+
+/** 按模型协议生图：Gemini 等走 chat，声明 image-generation 的走 /pg/images */
+async function generateCreativeImageUrls(params: {
+  modelName: string
+  prompt: string
+  group?: string
+  width?: number
+  height?: number
+  references?: string[]
+  modelMeta?: CreativeImageModelMeta
+}): Promise<string[]> {
+  const protocol = resolveInvokeProtocol(
+    params.modelMeta ?? { model_type: 'image' }
+  )
+  if (protocol === 'images') {
+    const data = await generateImages({
+      model: params.modelName,
+      prompt: params.prompt,
+      n: 1,
+      group: params.group || undefined,
+      size:
+        params.width && params.height
+          ? `${params.width}x${params.height}`
+          : undefined,
+    })
+    return extractImageUrls(data)
+  }
+
+  // chat 生图（Gemini flash-image 等不支持 /v1/images/generations）
+  let requestPrompt = params.prompt
+  if (params.width && params.height) {
+    requestPrompt = `${params.prompt}\n\n[image settings: size=${params.width}x${params.height}]`
+  }
+  const content: Array<
+    | { type: 'text'; text: string }
+    | { type: 'image_url'; image_url: { url: string } }
+  > = [{ type: 'text', text: requestPrompt }]
+  const imageUrls = await resolveReferenceDataUrls(params.references || [])
+  for (const url of imageUrls) {
+    content.push({ type: 'image_url', image_url: { url } })
+  }
+  const response = await sendChatCompletion({
+    model: params.modelName,
+    group: params.group || undefined,
+    stream: false,
+    messages: [{ role: 'user', content }],
+  })
+  const assistantMessage = (
+    response as {
+      choices?: Array<{
+        message?: {
+          content?: unknown
+          images?: Array<{ type?: string; image_url?: { url?: string } }>
+        }
+      }>
+    }
+  )?.choices?.[0]?.message
+  return extractImagesFromChatMessage({
+    content: assistantMessage?.content,
+    images: assistantMessage?.images,
+  })
 }
 
 /** 循环处理待生成资产：经 /pg 生图并回传，直到 done */
@@ -420,17 +494,15 @@ export async function runCreativeGenerationLoop(
       continue
     }
     try {
-      const data = await generateImages({
-        model: modelName,
+      const urls = await generateCreativeImageUrls({
+        modelName,
         prompt,
-        n: 1,
-        group: options.group || undefined,
-        size:
-          prepared.data.width && prepared.data.height
-            ? `${prepared.data.width}x${prepared.data.height}`
-            : undefined,
+        group: options.group,
+        width: prepared.data.width,
+        height: prepared.data.height,
+        references: prepared.data.references,
+        modelMeta: options.imageModelMeta,
       })
-      const urls = extractImageUrls(data)
       if (urls.length === 0) {
         await completeCreativeAsset(taskId, {
           asset_id: asset.id,
@@ -459,8 +531,7 @@ export async function runCreativeGenerationLoop(
         )
       }
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'image generation failed'
+      const message = chatErrorMessage(error)
       await completeCreativeAsset(taskId, {
         asset_id: asset.id,
         error: message,
