@@ -395,6 +395,8 @@ async function generateCreativeImageUrls(params: {
     model: params.modelName,
     group: params.group || undefined,
     stream: false,
+    // 声明需要图片输出；否则 Gemini 等可能只回文本（日志仍成功）
+    modalities: ['text', 'image'],
     messages: [{ role: 'user', content }],
   })
   const assistantMessage = (

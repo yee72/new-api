@@ -81,6 +81,8 @@ export interface ChatCompletionRequest {
   frequency_penalty?: number
   presence_penalty?: number
   seed?: number
+  /** Gemini 等 chat 生图需声明输出模态，否则上游可能只回文本 */
+  modalities?: Array<'text' | 'image'>
 }
 
 export interface ChatCompletionChunk {

@@ -42,7 +42,8 @@ func OpenAIChatRequestToGeminiGenerateContent(c context.Context, textRequest dto
 		upstreamModelName = modelName
 	}
 
-	if opts.Gemini.SupportsImagineModel(upstreamModelName) {
+	if opts.Gemini.SupportsImagineModel(upstreamModelName) ||
+		openAIRequestWantsImageModality(textRequest.Modalities) {
 		geminiRequest.GenerationConfig.ResponseModalities = []string{
 			"TEXT",
 			"IMAGE",
@@ -376,4 +377,21 @@ func OpenAIChatRequestToGeminiGenerateContent(c context.Context, textRequest dto
 	}
 
 	return &geminiRequest, nil
+}
+
+// openAIRequestWantsImageModality 请求 modalities 含 image 时，强制开启图片输出
+func openAIRequestWantsImageModality(raw []byte) bool {
+	if len(raw) == 0 {
+		return false
+	}
+	var items []string
+	if err := kitutil.Unmarshal(raw, &items); err != nil {
+		return false
+	}
+	for _, item := range items {
+		if strings.EqualFold(strings.TrimSpace(item), "image") {
+			return true
+		}
+	}
+	return false
 }

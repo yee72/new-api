@@ -482,6 +482,7 @@ export function useModelSessions() {
                 model: modelName,
                 messages: openAIMessages,
                 stream: false,
+                ...(chatImage ? { modalities: ['text', 'image'] as const } : {}),
               })
               const assistantMessage = response.choices?.[0]?.message
               const rawContent = assistantMessage?.content

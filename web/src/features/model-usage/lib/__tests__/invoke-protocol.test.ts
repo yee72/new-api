@@ -114,6 +114,22 @@ describe('extractImagesFromChatContent', () => {
 })
 
 describe('extractImagesFromChatMessage', () => {
+  it('reads image_url parts from multimodal content arrays', () => {
+    expect(
+      extractImagesFromChatMessage({
+        content: [
+          { type: 'text', text: 'ok' },
+          {
+            type: 'image_url',
+            image_url: {
+              url: '/api/model-usage/media/model-usage/1/m/r/0.png?access=x',
+            },
+          },
+        ],
+      })
+    ).toEqual(['/api/model-usage/media/model-usage/1/m/r/0.png?access=x'])
+  })
+
   it('reads message.images when content is null', () => {
     expect(
       extractImagesFromChatMessage({

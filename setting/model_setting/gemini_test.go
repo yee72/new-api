@@ -69,6 +69,14 @@ func TestGeminiSafetySettingsReadNormalization(t *testing.T) {
 	}
 }
 
+func TestIsGeminiModelSupportImagine(t *testing.T) {
+	assert.True(t, IsGeminiModelSupportImagine("gemini-3.1-flash-image"))
+	assert.True(t, IsGeminiModelSupportImagine("provider/gemini-3.1-flash-image"))
+	assert.True(t, IsGeminiModelSupportImagine("gemini-2.5-flash-image-preview"))
+	assert.False(t, IsGeminiModelSupportImagine("gemini-2.0-flash"))
+	assert.False(t, IsGeminiModelSupportImagine(""))
+}
+
 func TestValidateGeminiSafetySettings(t *testing.T) {
 	valid := []string{
 		`{}`,

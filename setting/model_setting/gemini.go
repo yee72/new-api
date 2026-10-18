@@ -3,6 +3,7 @@ package model_setting
 import (
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/setting/config"
@@ -109,5 +110,28 @@ func GetGeminiVersionSetting(key string) string {
 }
 
 func IsGeminiModelSupportImagine(model string) bool {
-	return slices.Contains(geminiSettings.SupportedImagineModels, model)
+	name := strings.TrimSpace(model)
+	if name == "" {
+		return false
+	}
+	if slices.Contains(geminiSettings.SupportedImagineModels, name) {
+		return true
+	}
+	// 渠道前缀：provider/gemini-xxx
+	base := name
+	if i := strings.LastIndex(name, "/"); i >= 0 && i+1 < len(name) {
+		base = name[i+1:]
+		if slices.Contains(geminiSettings.SupportedImagineModels, base) {
+			return true
+		}
+	}
+	lower := strings.ToLower(base)
+	// 未录入列表的新版生图模型名启发（避免只回文本）
+	if strings.Contains(lower, "flash-image") ||
+		strings.Contains(lower, "pro-image") ||
+		strings.Contains(lower, "image-generation") {
+		return true
+	}
+	return strings.HasSuffix(lower, "-image") ||
+		strings.HasSuffix(lower, "-image-preview")
 }

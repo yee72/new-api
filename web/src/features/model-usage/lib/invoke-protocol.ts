@@ -79,17 +79,8 @@ function pushImageCandidate(found: string[], raw: string) {
   }
 }
 
-/** 从 chat completions 文本中提取可持久化的图片源 */
-export function extractImagesFromChatContent(content: unknown): string[] {
-  const text =
-    typeof content === 'string'
-      ? content
-      : content == null
-        ? ''
-        : String(content)
-  if (!text.trim()) return []
-
-  const found: string[] = []
+function extractImagesFromText(text: string, found: string[]) {
+  if (!text.trim()) return
   for (const match of text.matchAll(markdownImageRe)) {
     pushImageCandidate(found, match[1] ?? '')
   }
@@ -102,6 +93,36 @@ export function extractImagesFromChatContent(content: unknown): string[] {
   for (const match of text.matchAll(bareUrlRe)) {
     pushImageCandidate(found, match[1] ?? '')
   }
+}
+
+/** 从 chat completions 文本中提取可持久化的图片源 */
+export function extractImagesFromChatContent(content: unknown): string[] {
+  const found: string[] = []
+  if (content == null) return found
+  if (typeof content === 'string') {
+    extractImagesFromText(content, found)
+    return found
+  }
+  // 多模态 content 数组：[{type:'text',...},{type:'image_url',...}]
+  if (Array.isArray(content)) {
+    for (const part of content) {
+      if (!part || typeof part !== 'object') continue
+      const record = part as {
+        type?: string
+        text?: string
+        image_url?: { url?: string }
+      }
+      if (typeof record.text === 'string') {
+        extractImagesFromText(record.text, found)
+      }
+      const url = record.image_url?.url
+      if (typeof url === 'string') {
+        pushImageCandidate(found, url)
+      }
+    }
+    return found
+  }
+  extractImagesFromText(String(content), found)
   return found
 }
 
@@ -110,7 +131,7 @@ type ChatMessageImagePart = {
   image_url?: { url?: string }
 }
 
-/** content 文本 + message.images（Gemini 等 chat 生图） */
+/** content 文本/数组 + message.images（Gemini 等 chat 生图） */
 export function extractImagesFromChatMessage(message: {
   content?: unknown
   images?: ChatMessageImagePart[] | null
