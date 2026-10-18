@@ -97,21 +97,21 @@ func creativeTaskUserView(task *model.CreativeTask) gin.H {
 		return gin.H{}
 	}
 	return gin.H{
-		"id":             task.Id,
-		"user_id":        task.UserId,
-		"type_id":        task.TypeId,
-		"status":         task.Status,
-		"platform":       task.Platform,
-		"style":          task.Style,
-		"style_custom":   task.StyleCustom,
-		"extra_text":     task.ExtraText,
+		"id":              task.Id,
+		"user_id":         task.UserId,
+		"type_id":         task.TypeId,
+		"status":          task.Status,
+		"platform":        task.Platform,
+		"style":           task.Style,
+		"style_custom":    task.StyleCustom,
+		"extra_text":      task.ExtraText,
 		"product_profile": task.ProductProfile,
-		"image_kind":     task.ImageKind,
-		"image_count":    task.ImageCount,
-		"completed_at":   task.CompletedAt,
-		"error_message":  task.ErrorMessage,
-		"created_at":     task.CreatedAt,
-		"updated_at":     task.UpdatedAt,
+		"image_kind":      task.ImageKind,
+		"image_count":     task.ImageCount,
+		"completed_at":    task.CompletedAt,
+		"error_message":   task.ErrorMessage,
+		"created_at":      task.CreatedAt,
+		"updated_at":      task.UpdatedAt,
 	}
 }
 
@@ -611,7 +611,7 @@ func PrepareCreativeAssetGeneration(c *gin.Context) {
 	var snap service.CreativeConfigSnapshot
 	_ = common.Unmarshal([]byte(task.ConfigSnapshot), &snap)
 	imgModel := service.CreativeBindingModel(&snap, model.CreativeStageImageGen)
-	copyBody := "为电商套图生成提示词：平台={{platform}} 风格={{style}} 类型={{kind}} 尺寸={{width}}x{{height}} 卖点={{selling_points}} 外观={{appearance}} {{refine}}"
+	copyBody := "根据参考图生成电商套图图片：平台={{platform}} 风格={{style}} 类型={{kind}} 尺寸={{width}}x{{height}} 卖点={{selling_points}} 外观={{appearance}} {{refine}}。直接生成图片，不要只输出文字。"
 	if id := snap.SkillIds[model.CreativeStageCopyLLM]; id > 0 {
 		if body, err := service.LoadCreativeSkillBody(id); err == nil && body != "" {
 			copyBody = body

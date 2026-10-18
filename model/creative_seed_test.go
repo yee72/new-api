@@ -62,6 +62,45 @@ func TestCreativeAutoMigrateAndSeedSQLite(t *testing.T) {
 	require.Equal(t, int64(1), typeCount)
 }
 
+func TestEnsureCreativeSeedRepairsLegacyCopySkill(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Silent),
+	})
+	require.NoError(t, err)
+
+	prev := DB
+	DB = db
+	t.Cleanup(func() { DB = prev })
+
+	require.NoError(t, db.AutoMigrate(&CreativeType{}, &CreativeModelBinding{}, &CreativeSkill{}))
+	common.OptionMapRWMutex.Lock()
+	if common.OptionMap == nil {
+		common.OptionMap = map[string]string{}
+	}
+	common.OptionMapRWMutex.Unlock()
+
+	now := CreativeNow()
+	require.NoError(t, db.Create(&CreativeSkill{
+		SkillId:   "ecommerce_copy",
+		Name:      "文案构图",
+		Version:   1,
+		TypeId:    CreativeTypeEcommerceSuite,
+		Stage:     CreativeStageCopyLLM,
+		Body:      legacyEcommerceCopySkillBody,
+		Enabled:   true,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}).Error)
+
+	require.NoError(t, EnsureCreativeSeed())
+
+	var skill CreativeSkill
+	require.NoError(t, db.Where("skill_id = ? AND version = ?", "ecommerce_copy", 1).First(&skill).Error)
+	require.Equal(t, defaultEcommerceCopySkillBody, skill.Body)
+	require.NotContains(t, skill.Body, "撰写生图提示词")
+	require.Contains(t, skill.Body, "直接生成图片")
+}
+
 func TestApplyUserImageCountDefaultsToTwo(t *testing.T) {
 	plat := CreativePlatformPackage{HeroCount: 1, HeroBgCount: 4, DetailCount: 5}
 	out := plat.ApplyUserImageCount(CreativeAssetKindDetail, 0)

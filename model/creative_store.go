@@ -101,9 +101,8 @@ func ensureDefaultCreativeSkills(now int64) error {
 			name:     "文案构图",
 			stage:    CreativeStageCopyLLM,
 			platform: "",
-			body: `为电商套图第 {{slot_index}} 张（类型={{kind}}）撰写生图提示词。
-平台={{platform}} 风格={{style}} 卖点={{selling_points}} 外观={{appearance}} 尺寸={{width}}x{{height}}
-只输出提示词正文。`,
+			// prepare 会把该模板直接发给生图模型，须要求出图而非「写提示词」
+			body: defaultEcommerceCopySkillBody,
 		},
 		{
 			skillId:  "ecommerce_image",
@@ -139,7 +138,37 @@ func ensureDefaultCreativeSkills(now int64) error {
 			return err
 		}
 	}
-	return nil
+	return repairEcommerceCopySkillIfLegacy(now)
+}
+
+// 旧种子会让生图模型只写文字提示词；已入库的默认版需自动改写
+const (
+	legacyEcommerceCopySkillBody = `为电商套图第 {{slot_index}} 张（类型={{kind}}）撰写生图提示词。
+平台={{platform}} 风格={{style}} 卖点={{selling_points}} 外观={{appearance}} 尺寸={{width}}x{{height}}
+只输出提示词正文。`
+	defaultEcommerceCopySkillBody = `根据参考图生成电商套图第 {{slot_index}} 张图片（类型={{kind}}）。
+平台={{platform}} 风格={{style}} 卖点={{selling_points}} 外观={{appearance}} 尺寸={{width}}x{{height}} {{refine}}
+直接生成图片，不要只输出文字描述或提示词。`
+)
+
+func repairEcommerceCopySkillIfLegacy(now int64) error {
+	var skill CreativeSkill
+	err := DB.Where("skill_id = ? AND version = ?", "ecommerce_copy", 1).First(&skill).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	body := strings.TrimSpace(skill.Body)
+	if body != strings.TrimSpace(legacyEcommerceCopySkillBody) &&
+		!strings.Contains(body, "撰写生图提示词") &&
+		!strings.Contains(body, "只输出提示词正文") {
+		return nil
+	}
+	skill.Body = defaultEcommerceCopySkillBody
+	skill.UpdatedAt = now
+	return DB.Save(&skill).Error
 }
 
 func IsCreativeGloballyEnabled() bool {
