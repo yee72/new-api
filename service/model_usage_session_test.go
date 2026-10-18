@@ -240,6 +240,33 @@ func TestModelUsageOwnerIDSupportsPrefixedPaths(t *testing.T) {
 	id, ok = modelUsageOwnerID("model-usage/8/m/a/0.png")
 	assert.True(t, ok)
 	assert.Equal(t, 8, id)
+	id, ok = modelUsageOwnerID("creative/references/9/abc.webp")
+	assert.True(t, ok)
+	assert.Equal(t, 9, id)
+	_, ok = modelUsageOwnerID("creative/other/9/abc.webp")
+	assert.False(t, ok)
+}
+
+func TestDecodeModelUsageMediaKeyAllowsCreativePrefix(t *testing.T) {
+	key, err := decodeModelUsageMediaKey("creative/references/1/a.webp")
+	require.NoError(t, err)
+	assert.Equal(t, "creative/references/1/a.webp", key)
+	_, err = decodeModelUsageMediaKey("other/references/1/a.webp")
+	require.ErrorIs(t, err, ErrModelUsageInvalidRequest)
+}
+
+func TestResolveCreativeReferenceMediaAccess(t *testing.T) {
+	common.CryptoSecret = "test-secret-for-creative-media"
+	relative := "creative/references/7/shot.webp"
+	access, err := IssueModelUsageMediaAccess(7, relative)
+	require.NoError(t, err)
+	withMemoryBlobStore(t)
+	key, err := ResolveModelUsageMediaObjectKey(0, relative, access)
+	require.NoError(t, err)
+	assert.Equal(t, "test/creative/references/7/shot.webp", key)
+	key, err = ResolveModelUsageMediaObjectKey(7, relative, "")
+	require.NoError(t, err)
+	assert.Equal(t, "test/creative/references/7/shot.webp", key)
 }
 
 func TestSanitizeAndDecodeHelpers(t *testing.T) {

@@ -55,6 +55,8 @@ const headerNavSchema = z.object({
   pricingRequireAuth: z.boolean(),
   modelUsageEnabled: z.boolean(),
   modelUsageRequireAuth: z.boolean(),
+  creativeEnabled: z.boolean(),
+  creativeRequireAuth: z.boolean(),
 })
 
 type HeaderNavFormValues = z.infer<typeof headerNavSchema>
@@ -87,6 +89,14 @@ const toFormValues = (config: HeaderNavModulesConfig): HeaderNavFormValues => ({
     config.model_usage?.requireAuth === undefined
       ? HEADER_NAV_DEFAULT.model_usage.requireAuth
       : Boolean(config.model_usage.requireAuth),
+  creativeEnabled:
+    config.creative?.enabled === undefined
+      ? HEADER_NAV_DEFAULT.creative.enabled
+      : Boolean(config.creative.enabled),
+  creativeRequireAuth:
+    config.creative?.requireAuth === undefined
+      ? HEADER_NAV_DEFAULT.creative.requireAuth
+      : Boolean(config.creative.requireAuth),
 })
 
 export function HeaderNavigationSection({
@@ -120,6 +130,11 @@ export function HeaderNavigationSection({
         ...(config.model_usage ?? HEADER_NAV_DEFAULT.model_usage),
         enabled: values.modelUsageEnabled,
         requireAuth: values.modelUsageRequireAuth,
+      },
+      creative: {
+        ...(config.creative ?? HEADER_NAV_DEFAULT.creative),
+        enabled: values.creativeEnabled,
+        requireAuth: values.creativeRequireAuth,
       },
     }
 
@@ -158,7 +173,10 @@ export function HeaderNavigationSection({
   const accessModules: Array<{
     enabledKey: keyof HeaderNavFormValues
     requireAuthKey: keyof HeaderNavFormValues
-    requireAuthDependsOn: 'pricingEnabled' | 'modelUsageEnabled'
+    requireAuthDependsOn:
+      | 'pricingEnabled'
+      | 'modelUsageEnabled'
+      | 'creativeEnabled'
     title: string
     description: string
     requireAuthTitle: string
@@ -186,6 +204,19 @@ export function HeaderNavigationSection({
       requireAuthTitle: t('Require login to view model usage'),
       requireAuthDescription: t(
         'Visitors must authenticate before accessing the model usage page.'
+      ),
+    },
+    {
+      enabledKey: 'creativeEnabled',
+      requireAuthKey: 'creativeRequireAuth',
+      requireAuthDependsOn: 'creativeEnabled',
+      title: t('Creative Panel'),
+      description: t(
+        'Creative workspace for ecommerce image suites and more.'
+      ),
+      requireAuthTitle: t('Require login for creative panel'),
+      requireAuthDescription: t(
+        'Visitors must authenticate before accessing the creative panel.'
       ),
     },
   ]

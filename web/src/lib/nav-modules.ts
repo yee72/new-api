@@ -22,13 +22,14 @@ import { readCachedStatus, statusQueryOptions } from '@/lib/status-query'
 
 export type ModuleAccess = { enabled: boolean; requireAuth: boolean }
 
-export type HeaderNavModule = 'model_usage' | 'pricing'
+export type HeaderNavModule = 'model_usage' | 'pricing' | 'creative'
 
 export type HeaderNavModules = {
   home: boolean
   console: boolean
   pricing: ModuleAccess
   model_usage: ModuleAccess
+  creative: ModuleAccess
   /** @deprecated 存量配置兼容，读取时映射到 model_usage */
   rankings?: ModuleAccess
   /** @deprecated 顶栏已移除，仅兼容存量 JSON */
@@ -43,6 +44,7 @@ const DEFAULT_HEADER_NAV_MODULES: HeaderNavModules = {
   console: true,
   pricing: { enabled: true, requireAuth: false },
   model_usage: { enabled: true, requireAuth: false },
+  creative: { enabled: true, requireAuth: true },
   docs: false,
   about: false,
 }
@@ -50,6 +52,7 @@ const DEFAULT_HEADER_NAV_MODULES: HeaderNavModules = {
 const DEFAULTS: Record<HeaderNavModule, ModuleAccess> = {
   pricing: DEFAULT_HEADER_NAV_MODULES.pricing,
   model_usage: DEFAULT_HEADER_NAV_MODULES.model_usage,
+  creative: DEFAULT_HEADER_NAV_MODULES.creative,
 }
 
 function cloneHeaderNavDefaults(): HeaderNavModules {
@@ -57,6 +60,7 @@ function cloneHeaderNavDefaults(): HeaderNavModules {
     ...DEFAULT_HEADER_NAV_MODULES,
     pricing: { ...DEFAULT_HEADER_NAV_MODULES.pricing },
     model_usage: { ...DEFAULT_HEADER_NAV_MODULES.model_usage },
+    creative: { ...DEFAULT_HEADER_NAV_MODULES.creative },
   }
 }
 
@@ -122,6 +126,10 @@ export function parseHeaderNavModules(raw: unknown): HeaderNavModules {
     }
     if (key === 'model_usage') {
       result.model_usage = parseAccess(value, result.model_usage)
+      return
+    }
+    if (key === 'creative') {
+      result.creative = parseAccess(value, result.creative)
       return
     }
     if (key === 'rankings') {

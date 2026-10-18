@@ -26,6 +26,7 @@ export type HeaderNavModulesConfig = {
   console: boolean
   pricing: HeaderNavAccessConfig
   model_usage: HeaderNavAccessConfig
+  creative: HeaderNavAccessConfig
   /** @deprecated 读取时映射到 model_usage */
   rankings?: HeaderNavAccessConfig
   /** @deprecated 顶栏已移除，仅兼容存量 JSON */
@@ -52,6 +53,10 @@ export const HEADER_NAV_DEFAULT: HeaderNavModulesConfig = {
   model_usage: {
     enabled: true,
     requireAuth: false,
+  },
+  creative: {
+    enabled: true,
+    requireAuth: true,
   },
   docs: false,
   about: false,
@@ -104,6 +109,7 @@ const cloneHeaderNavDefault = (): HeaderNavModulesConfig => ({
   ...HEADER_NAV_DEFAULT,
   pricing: { ...HEADER_NAV_DEFAULT.pricing },
   model_usage: { ...HEADER_NAV_DEFAULT.model_usage },
+  creative: { ...HEADER_NAV_DEFAULT.creative },
 })
 
 const parseAccessModule = (
@@ -152,6 +158,7 @@ export function parseHeaderNavModules(
       ...base,
       pricing: { ...base.pricing },
       model_usage: { ...base.model_usage },
+      creative: { ...base.creative },
     }
 
     Object.entries(parsed).forEach(([key, raw]) => {
@@ -161,6 +168,10 @@ export function parseHeaderNavModules(
       }
       if (key === 'model_usage') {
         result.model_usage = parseAccessModule(raw, base.model_usage)
+        return
+      }
+      if (key === 'creative') {
+        result.creative = parseAccessModule(raw, base.creative)
         return
       }
       if (key === 'rankings') {

@@ -83,6 +83,9 @@ func InitOptionMap() {
 	common.OptionMap["Logo"] = common.Logo
 	common.OptionMap["CustomerServiceEnabled"] = strconv.FormatBool(common.CustomerServiceEnabled)
 	common.OptionMap["CustomerServiceQRCodeImage"] = common.CustomerServiceQRCodeImage
+	common.OptionMap[OptionCreativeEnabled] = "true"
+	common.OptionMap[OptionCreativeDefaultConcurrency] = "3"
+	common.OptionMap[OptionCreativeSensitiveWords] = "[]"
 	common.OptionMap["ServerAddress"] = ""
 	common.OptionMap["TaskPublicAddress"] = system_setting.TaskPublicAddress
 	common.OptionMap["WorkerUrl"] = system_setting.WorkerUrl

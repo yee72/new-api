@@ -96,7 +96,8 @@ For commercial licensing, please contact support@quantumnous.com
 :root {
   /* 默认暖色 editorial：奶油画布 + clay 强调（与 anthropic preset 对齐） */
   --radius: 0.625rem;
-  --app-header-height: 3rem;
+  /* 与 PublicHeader h-16 对齐 */
+  --app-header-height: 4rem;
   /* Static build-channel fallback consumed when JS hasn't booted yet. */
   --app-rev: '2k6e8r7p';
   /* 默认走衬线；字体轴通过 theme-presets.css 的 data-theme-font 覆盖 */

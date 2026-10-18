@@ -371,6 +371,12 @@ func migrateDB() error {
 		&CasbinRule{},
 		&AuthzRole{},
 		&ModelUsageSession{},
+		&CreativeType{},
+		&CreativeModelBinding{},
+		&CreativeSkill{},
+		&CreativeTask{},
+		&CreativeAsset{},
+		&CreativeAuditLog{},
 	)
 	if err != nil {
 		return err

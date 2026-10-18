@@ -323,16 +323,28 @@ func modelUsageMediaAccessMessage(userId int, relativeKey string) []byte {
 
 func modelUsageOwnerID(relativeKey string) (int, bool) {
 	parts := strings.Split(relativeKey, "/")
-	if len(parts) < 3 || parts[0] != "model-usage" {
+	if len(parts) < 3 {
 		return 0, false
 	}
-	uidPart := parts[1]
-	// model-usage/outputs|{attachments}/{userId}/...
-	if parts[1] == "outputs" || parts[1] == "attachments" {
-		if len(parts) < 4 {
+	var uidPart string
+	switch parts[0] {
+	case "model-usage":
+		uidPart = parts[1]
+		// model-usage/outputs|{attachments}/{userId}/...
+		if parts[1] == "outputs" || parts[1] == "attachments" {
+			if len(parts) < 4 {
+				return 0, false
+			}
+			uidPart = parts[2]
+		}
+	case "creative":
+		// creative/references/{userId}/...
+		if len(parts) < 4 || parts[1] != "references" {
 			return 0, false
 		}
 		uidPart = parts[2]
+	default:
+		return 0, false
 	}
 	id, err := strconv.Atoi(uidPart)
 	if err != nil || id <= 0 {
@@ -351,7 +363,12 @@ func decodeModelUsageMediaKey(raw string) (string, error) {
 		return "", ErrModelUsageInvalidRequest
 	}
 	decoded = strings.TrimPrefix(decoded, "/")
-	if decoded == "" || strings.Contains(decoded, "..") || !strings.HasPrefix(decoded, "model-usage/") {
+	if decoded == "" || strings.Contains(decoded, "..") {
+		return "", ErrModelUsageInvalidRequest
+	}
+	// 创作面板参考图与模型使用输出共用媒体短链前缀
+	if !strings.HasPrefix(decoded, "model-usage/") &&
+		!strings.HasPrefix(decoded, "creative/") {
 		return "", ErrModelUsageInvalidRequest
 	}
 	return decoded, nil

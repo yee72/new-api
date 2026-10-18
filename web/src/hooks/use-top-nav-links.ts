@@ -85,6 +85,23 @@ export function useTopNavLinks(): TopNavLink[] {
     })
   }
 
+  const creative = modules?.creative
+  const statusRecord = status as Record<string, unknown> | null
+  const creativeFeatureOn = statusRecord?.creative_enabled !== false
+  if (
+    creative &&
+    typeof creative === 'object' &&
+    creative.enabled &&
+    creativeFeatureOn
+  ) {
+    const requiresAuth = creative.requireAuth && !isAuthed
+    links.push({
+      title: t('Creative Panel'),
+      href: '/creative',
+      requiresAuth,
+    })
+  }
+
   // 文档 / 关于已从顶栏移除，不再根据 HeaderNavModules 渲染
 
   return links

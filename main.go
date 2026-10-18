@@ -336,6 +336,9 @@ func InitResources() error {
 		}
 	}
 	model.InitOptionMap()
+	if err := model.EnsureCreativeSeed(); err != nil {
+		common.SysError("failed to seed creative panel: " + err.Error())
+	}
 
 	// 清理旧的磁盘缓存文件
 	common.CleanupOldCacheFiles()

@@ -206,7 +206,7 @@ export function PublicHeader(props: PublicHeaderProps) {
 
   return (
     <>
-      <header className='pointer-events-none fixed inset-x-0 top-0 z-50'>
+      <header className='bg-background/80 pointer-events-none fixed inset-x-0 top-0 z-50 border-b border-border/60 backdrop-blur-md'>
         <div className='pointer-events-auto mx-auto max-w-7xl px-4 pt-0 md:px-6'>
           <nav className='flex h-16 items-center justify-between gap-2 px-2'>
             {/* Logo */}

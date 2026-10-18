@@ -53,6 +53,41 @@ func SetApiRouter(router *gin.Engine) {
 			// 媒体：access HMAC 或本人 Bearer；SoftUserAuth 避免过期 Bearer 挡住 access
 			modelUsageSessionRoute.GET("/media/*objectKey", middleware.SoftUserAuth(), controller.GetModelUsageMedia)
 		}
+
+		creativeRoute := apiRouter.Group("/creative")
+		creativeRoute.Use(middleware.DisableCache())
+		{
+			creativeRoute.GET("/types", middleware.HeaderNavModuleAuth("creative"), middleware.UserAuth(), controller.ListCreativeTypesUser)
+			creativeRoute.GET("/tasks", middleware.HeaderNavModuleAuth("creative"), middleware.UserAuth(), controller.ListCreativeTasks)
+			creativeRoute.POST("/tasks", middleware.HeaderNavModuleAuth("creative"), middleware.UserAuth(), controller.CreateCreativeTask)
+			creativeRoute.GET("/tasks/:id", middleware.HeaderNavModuleAuth("creative"), middleware.UserAuth(), controller.GetCreativeTask)
+			creativeRoute.POST("/tasks/:id/references", middleware.HeaderNavModuleAuth("creative"), middleware.UserAuth(), controller.UploadCreativeTaskReference)
+			creativeRoute.POST("/tasks/:id/analyze/prepare", middleware.HeaderNavModuleAuth("creative"), middleware.UserAuth(), controller.PrepareCreativeAnalyze)
+			creativeRoute.POST("/tasks/:id/analyze/result", middleware.HeaderNavModuleAuth("creative"), middleware.UserAuth(), controller.SubmitCreativeAnalyzeResult)
+			creativeRoute.PUT("/tasks/:id/profile", middleware.HeaderNavModuleAuth("creative"), middleware.UserAuth(), controller.UpdateCreativeProfile)
+			creativeRoute.POST("/tasks/:id/confirm", middleware.HeaderNavModuleAuth("creative"), middleware.UserAuth(), controller.ConfirmCreativeTask)
+			creativeRoute.POST("/tasks/:id/assets/prepare", middleware.HeaderNavModuleAuth("creative"), middleware.UserAuth(), controller.PrepareCreativeAssetGeneration)
+			creativeRoute.POST("/tasks/:id/assets/complete", middleware.HeaderNavModuleAuth("creative"), middleware.UserAuth(), controller.CompleteCreativeAssetGeneration)
+			creativeRoute.POST("/tasks/:id/assets/:assetId/refine", middleware.HeaderNavModuleAuth("creative"), middleware.UserAuth(), controller.RefineCreativeAsset)
+			creativeRoute.POST("/tasks/:id/assets/:assetId/approve", middleware.HeaderNavModuleAuth("creative"), middleware.UserAuth(), controller.ApproveCreativeAsset)
+			creativeRoute.POST("/tasks/:id/approve-all", middleware.HeaderNavModuleAuth("creative"), middleware.UserAuth(), controller.ApproveAllCreativeAssets)
+			creativeRoute.GET("/tasks/:id/download.zip", middleware.HeaderNavModuleAuth("creative"), middleware.UserAuth(), controller.DownloadCreativeZip)
+		}
+		creativeAdmin := apiRouter.Group("/creative/admin")
+		creativeAdmin.Use(middleware.AdminAuth(), middleware.DisableCache())
+		{
+			creativeAdmin.GET("/global", controller.AdminGetCreativeGlobal)
+			creativeAdmin.PUT("/global", controller.AdminUpdateCreativeGlobal)
+			creativeAdmin.GET("/types", controller.AdminListCreativeTypes)
+			creativeAdmin.PUT("/types/:typeId", controller.AdminUpdateCreativeType)
+			creativeAdmin.GET("/types/:typeId/bindings", controller.AdminListCreativeBindings)
+			creativeAdmin.PUT("/types/:typeId/bindings", controller.AdminUpsertCreativeBinding)
+			creativeAdmin.GET("/skills", controller.AdminListCreativeSkills)
+			creativeAdmin.POST("/skills", controller.AdminCreateCreativeSkill)
+			creativeAdmin.PUT("/skills/:id", controller.AdminUpdateCreativeSkill)
+			creativeAdmin.POST("/skills/:id/copy", controller.AdminCopyCreativeSkillVersion)
+			creativeAdmin.GET("/audits", controller.AdminListCreativeAudits)
+		}
 		apiRouter.GET("/captcha", middleware.CriticalRateLimit(), middleware.DisableCache(), controller.GetCaptcha)
 		apiRouter.GET("/verification", middleware.EmailVerificationRateLimit(), middleware.TurnstileCheck(), controller.SendEmailVerification)
 		apiRouter.GET("/reset_password", middleware.CriticalRateLimit(), middleware.TurnstileCheck(), controller.SendPasswordResetEmail)

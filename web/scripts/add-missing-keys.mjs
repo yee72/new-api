@@ -9,56 +9,117 @@ function stableStringify(obj) {
 
 const newKeys = {
   en: {
-    'Your compute balance is not enough for this chat. Top up to continue chatting~':
-      'Your compute balance is not enough for this chat. Top up to continue chatting~',
-    'Show error details': 'Show error details',
-    'Hide error details': 'Hide error details',
+    'Submitted parameters': 'Submitted parameters',
+    'Platform: {{value}}': 'Platform: {{value}}',
+    'Style: {{value}}': 'Style: {{value}}',
+    'Image type: {{kind}}': 'Image type: {{kind}}',
+    'Quantity: {{count}}': 'Quantity: {{count}}',
+    'Image model: {{value}}': 'Image model: {{value}}',
+    'Group: {{value}}': 'Group: {{value}}',
+    'Reference images: {{count}}': 'Reference images: {{count}}',
+    Requirements: 'Requirements',
+    'Using model: {{value}}': 'Using model: {{value}}',
+    'Output size: {{value}}': 'Output size: {{value}}',
+    'Model prompt ({{kind}} {{current}}/{{total}})':
+      'Model prompt ({{kind}} {{current}}/{{total}})',
   },
   zh: {
-    'Your compute balance is not enough for this chat. Top up to continue chatting~':
-      '您的算力余额不够本次对话啦，充值后即可继续畅聊～',
-    'Show error details': '展开错误详情',
-    'Hide error details': '收起错误详情',
+    'Submitted parameters': '提交参数',
+    'Platform: {{value}}': '平台：{{value}}',
+    'Style: {{value}}': '风格：{{value}}',
+    'Image type: {{kind}}': '图片类型：{{kind}}',
+    'Quantity: {{count}}': '数量：{{count}}',
+    'Image model: {{value}}': '生图模型：{{value}}',
+    'Group: {{value}}': '分组：{{value}}',
+    'Reference images: {{count}}': '参考图：{{count}} 张',
+    Requirements: '需求说明',
+    'Using model: {{value}}': '使用模型：{{value}}',
+    'Output size: {{value}}': '输出尺寸：{{value}}',
+    'Model prompt ({{kind}} {{current}}/{{total}})':
+      '模型提示词（{{kind}} {{current}}/{{total}}）',
   },
   'zh-TW': {
-    'Your compute balance is not enough for this chat. Top up to continue chatting~':
-      '您的算力餘額不夠本次對話啦，儲值後即可繼續暢聊～',
-    'Show error details': '展開錯誤詳情',
-    'Hide error details': '收起錯誤詳情',
+    'Submitted parameters': '提交參數',
+    'Platform: {{value}}': '平台：{{value}}',
+    'Style: {{value}}': '風格：{{value}}',
+    'Image type: {{kind}}': '圖片類型：{{kind}}',
+    'Quantity: {{count}}': '數量：{{count}}',
+    'Image model: {{value}}': '生圖模型：{{value}}',
+    'Group: {{value}}': '分組：{{value}}',
+    'Reference images: {{count}}': '參考圖：{{count}} 張',
+    Requirements: '需求說明',
+    'Using model: {{value}}': '使用模型：{{value}}',
+    'Output size: {{value}}': '輸出尺寸：{{value}}',
+    'Model prompt ({{kind}} {{current}}/{{total}})':
+      '模型提示詞（{{kind}} {{current}}/{{total}}）',
   },
   ja: {
-    'Your compute balance is not enough for this chat. Top up to continue chatting~':
-      '今回の会話には計算クレジットが足りません。チャージ後に続けてチャットできます～',
-    'Show error details': 'エラー詳細を表示',
-    'Hide error details': 'エラー詳細を隠す',
+    'Submitted parameters': '送信パラメータ',
+    'Platform: {{value}}': 'プラットフォーム：{{value}}',
+    'Style: {{value}}': 'スタイル：{{value}}',
+    'Image type: {{kind}}': '画像タイプ：{{kind}}',
+    'Quantity: {{count}}': '枚数：{{count}}',
+    'Image model: {{value}}': '画像モデル：{{value}}',
+    'Group: {{value}}': 'グループ：{{value}}',
+    'Reference images: {{count}}': '参照画像：{{count}}',
+    Requirements: '要件',
+    'Using model: {{value}}': '使用モデル：{{value}}',
+    'Output size: {{value}}': '出力サイズ：{{value}}',
+    'Model prompt ({{kind}} {{current}}/{{total}})':
+      'モデルプロンプト（{{kind}} {{current}}/{{total}}）',
   },
   fr: {
-    'Your compute balance is not enough for this chat. Top up to continue chatting~':
-      'Votre solde de calcul ne suffit pas pour cette conversation. Rechargez pour continuer à discuter～',
-    'Show error details': 'Afficher les détails',
-    'Hide error details': 'Masquer les détails',
+    'Submitted parameters': 'Paramètres soumis',
+    'Platform: {{value}}': 'Plateforme : {{value}}',
+    'Style: {{value}}': 'Style : {{value}}',
+    'Image type: {{kind}}': 'Type d’image : {{kind}}',
+    'Quantity: {{count}}': 'Quantité : {{count}}',
+    'Image model: {{value}}': 'Modèle d’image : {{value}}',
+    'Group: {{value}}': 'Groupe : {{value}}',
+    'Reference images: {{count}}': 'Images de référence : {{count}}',
+    Requirements: 'Exigences',
+    'Using model: {{value}}': 'Modèle utilisé : {{value}}',
+    'Output size: {{value}}': 'Taille de sortie : {{value}}',
+    'Model prompt ({{kind}} {{current}}/{{total}})':
+      'Invite du modèle ({{kind}} {{current}}/{{total}})',
   },
   ru: {
-    'Your compute balance is not enough for this chat. Top up to continue chatting~':
-      'Баланса вычислительных ресурсов недостаточно для этого чата. Пополните, чтобы продолжить～',
-    'Show error details': 'Показать детали ошибки',
-    'Hide error details': 'Скрыть детали ошибки',
+    'Submitted parameters': 'Отправленные параметры',
+    'Platform: {{value}}': 'Платформа: {{value}}',
+    'Style: {{value}}': 'Стиль: {{value}}',
+    'Image type: {{kind}}': 'Тип изображения: {{kind}}',
+    'Quantity: {{count}}': 'Количество: {{count}}',
+    'Image model: {{value}}': 'Модель изображения: {{value}}',
+    'Group: {{value}}': 'Группа: {{value}}',
+    'Reference images: {{count}}': 'Справочные изображения: {{count}}',
+    Requirements: 'Требования',
+    'Using model: {{value}}': 'Используемая модель: {{value}}',
+    'Output size: {{value}}': 'Размер выхода: {{value}}',
+    'Model prompt ({{kind}} {{current}}/{{total}})':
+      'Промпт модели ({{kind}} {{current}}/{{total}})',
   },
   vi: {
-    'Your compute balance is not enough for this chat. Top up to continue chatting~':
-      'Số dư tính toán không đủ cho cuộc trò chuyện này. Nạp thêm để tiếp tục chat nhé～',
-    'Show error details': 'Hiện chi tiết lỗi',
-    'Hide error details': 'Ẩn chi tiết lỗi',
+    'Submitted parameters': 'Tham số đã gửi',
+    'Platform: {{value}}': 'Nền tảng: {{value}}',
+    'Style: {{value}}': 'Phong cách: {{value}}',
+    'Image type: {{kind}}': 'Loại ảnh: {{kind}}',
+    'Quantity: {{count}}': 'Số lượng: {{count}}',
+    'Image model: {{value}}': 'Mô hình tạo ảnh: {{value}}',
+    'Group: {{value}}': 'Nhóm: {{value}}',
+    'Reference images: {{count}}': 'Ảnh tham chiếu: {{count}}',
+    Requirements: 'Yêu cầu',
+    'Using model: {{value}}': 'Dùng mô hình: {{value}}',
+    'Output size: {{value}}': 'Kích thước đầu ra: {{value}}',
+    'Model prompt ({{kind}} {{current}}/{{total}})':
+      'Prompt mô hình ({{kind}} {{current}}/{{total}})',
   },
 }
 
 async function main() {
   let totalAdded = 0
-
   for (const [locale, trans] of Object.entries(newKeys)) {
     const filePath = path.join(LOCALES_DIR, `${locale}.json`)
     const json = JSON.parse(await fs.readFile(filePath, 'utf8'))
-
     let count = 0
     for (const [key, value] of Object.entries(trans)) {
       if (!Object.prototype.hasOwnProperty.call(json.translation, key)) {
@@ -69,18 +130,15 @@ async function main() {
         count++
       }
     }
-
     if (count > 0) {
       json.translation = Object.fromEntries(
         Object.entries(json.translation).sort(([a], [b]) => a.localeCompare(b))
       )
       await fs.writeFile(filePath, stableStringify(json), 'utf8')
     }
-
     console.log(`${locale}: ${count} translations applied`)
     totalAdded += count
   }
-
   console.log(`\nTotal: ${totalAdded} translations applied`)
 }
 

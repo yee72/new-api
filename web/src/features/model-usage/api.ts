@@ -136,6 +136,7 @@ export async function generateImages(payload: {
   n: number
   size?: string
   quality?: string
+  group?: string
 }): Promise<unknown> {
   // 与 Playground 一致：走 UserAuth 的 /pg 入口，避免 /v1 TokenAuth 401 被踢到登录页
   const res = await api.post('/pg/images/generations', payload, {
