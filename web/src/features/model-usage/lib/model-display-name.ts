@@ -18,15 +18,13 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 /**
- * 列表短名：去掉第一个 `-` 及之前的前缀。
- * 例如 `claude-fable-5-1` → `fable-5-1`；无 `-` 时返回原名。
+ * 模型使用页展示名：优先元数据 display_name，否则完整 model_name（不截断前缀）。
  */
-export function formatModelUsageShortName(modelName: string): string {
-  const trimmed = modelName.trim()
-  if (!trimmed) return trimmed
-  const dashIndex = trimmed.indexOf('-')
-  if (dashIndex < 0 || dashIndex === trimmed.length - 1) {
-    return trimmed
-  }
-  return trimmed.slice(dashIndex + 1)
+export function formatModelUsageDisplayName(model: {
+  model_name: string
+  display_name?: string
+}): string {
+  const display = model.display_name?.trim()
+  if (display) return display
+  return model.model_name.trim()
 }

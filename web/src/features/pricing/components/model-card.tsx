@@ -66,7 +66,9 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
   const endpoints = props.model.supported_endpoint_types || []
   const modelIconKey = props.model.icon || props.model.vendor_icon
   const modelIcon = modelIconKey ? getLobeIcon(modelIconKey, 20) : null
-  const initial = props.model.model_name?.charAt(0).toUpperCase() || '?'
+  const displayName =
+    props.model.display_name?.trim() || props.model.model_name || ''
+  const initial = displayName.charAt(0).toUpperCase() || '?'
   const isUnconfiguredTaskUsage = isUnconfiguredTaskUsageModel(props.model)
   const billingTime = useBillingTime(props.model.billing_expr)
   const currency = useSystemConfigStore((state) => state.config.currency)
@@ -267,9 +269,13 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
         <div className='min-w-0 flex-1'>
           <h3
             className='line-clamp-2 font-mono text-sm leading-snug font-semibold [overflow-wrap:anywhere]'
-            title={props.model.model_name}
+            title={
+              displayName !== props.model.model_name
+                ? `${displayName} (${props.model.model_name})`
+                : props.model.model_name
+            }
           >
-            {props.model.model_name}
+            {displayName}
           </h3>
           {props.model.vendor_name && (
             <p

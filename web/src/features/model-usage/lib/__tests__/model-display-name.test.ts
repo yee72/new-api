@@ -7,9 +7,9 @@ published by the Free Software Foundation, either version 3 of the
 License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-GNU Affero General Public License for more details.
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+    GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>.
@@ -18,19 +18,31 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { describe, expect, it } from 'vitest'
 
-import { formatModelUsageShortName } from '../model-display-name'
+import { formatModelUsageDisplayName } from '../model-display-name'
 
-describe('formatModelUsageShortName', () => {
-  it('strips the first dash prefix', () => {
-    expect(formatModelUsageShortName('claude-fable-5-1')).toBe('fable-5-1')
-    expect(formatModelUsageShortName('gpt-4o-mini')).toBe('4o-mini')
+describe('formatModelUsageDisplayName', () => {
+  it('keeps the full pricing model name without stripping prefixes', () => {
+    expect(
+      formatModelUsageDisplayName({ model_name: 'claude-fable-5-1' })
+    ).toBe('claude-fable-5-1')
+    expect(formatModelUsageDisplayName({ model_name: 'gpt-4o-mini' })).toBe(
+      'gpt-4o-mini'
+    )
+    expect(formatModelUsageDisplayName({ model_name: 'gpt-4' })).toBe('gpt-4')
   })
 
-  it('keeps names without a dash', () => {
-    expect(formatModelUsageShortName('flux')).toBe('flux')
+  it('prefers a non-empty display name over the pricing name', () => {
+    expect(
+      formatModelUsageDisplayName({
+        model_name: 'gpt-4',
+        display_name: 'gpt-4（修改名称）',
+      })
+    ).toBe('gpt-4（修改名称）')
   })
 
-  it('keeps a trailing-only dash as the original trimmed name', () => {
-    expect(formatModelUsageShortName('claude-')).toBe('claude-')
+  it('falls back when display name is blank', () => {
+    expect(
+      formatModelUsageDisplayName({ model_name: 'gpt-4', display_name: '  ' })
+    ).toBe('gpt-4')
   })
 })

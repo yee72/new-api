@@ -31,6 +31,7 @@ const (
 type ModelUsageItem struct {
 	ID                     int                     `json:"id"`
 	ModelName              string                  `json:"model_name"`
+	DisplayName            string                  `json:"display_name,omitempty"`
 	Description            string                  `json:"description,omitempty"`
 	Icon                   string                  `json:"icon,omitempty"`
 	ModelType              string                  `json:"model_type"`
@@ -136,7 +137,10 @@ func GetModelUsageCatalog(userId int, typeFilter, keyword, rawVendorIDs string) 
 			continue
 		}
 		if useSearch {
-			if !strings.Contains(strings.ToLower(item.ModelName), keyword) {
+			nameHit := strings.Contains(strings.ToLower(item.ModelName), keyword)
+			displayHit := item.DisplayName != "" &&
+				strings.Contains(strings.ToLower(item.DisplayName), keyword)
+			if !nameHit && !displayHit {
 				continue
 			}
 		} else if len(vendorSet) > 0 {
@@ -210,6 +214,7 @@ func loadModelUsageCatalog() ([]ModelUsageItem, []model.PricingVendor, error) {
 		meta := metaByName[p.ModelName]
 		item := ModelUsageItem{
 			ModelName:              p.ModelName,
+			DisplayName:            strings.TrimSpace(p.DisplayName),
 			Description:            p.Description,
 			Icon:                   p.Icon,
 			ModelType:              model.ModelTypeChat,
@@ -232,6 +237,9 @@ func loadModelUsageCatalog() ([]ModelUsageItem, []model.PricingVendor, error) {
 			item.CreatedTime = meta.CreatedTime
 			item.GenerationCapabilities = meta.GenerationCapabilities
 			item.Status = meta.Status
+			if display := strings.TrimSpace(meta.DisplayName); display != "" {
+				item.DisplayName = display
+			}
 			if item.Description == "" {
 				item.Description = meta.Description
 			}

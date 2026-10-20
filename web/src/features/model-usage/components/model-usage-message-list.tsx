@@ -65,7 +65,7 @@ type ModelUsageMessageListProps = {
   /** 无消息时展示模型介绍 */
   model?: Pick<
     ModelUsageItem,
-    'model_name' | 'description' | 'icon' | 'vendor_icon'
+    'model_name' | 'display_name' | 'description' | 'icon' | 'vendor_icon'
   >
   busy: boolean
   /** 已引用的消息 id，用于按钮高亮 */

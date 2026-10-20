@@ -28,7 +28,7 @@ import {
 import { getLobeIcon } from '@/lib/lobe-icon'
 import { cn } from '@/lib/utils'
 
-import { formatModelUsageShortName } from '../lib/model-display-name'
+import { formatModelUsageDisplayName } from '../lib/model-display-name'
 import type { ModelUsageItem } from '../types'
 import { ModelUsageTypeBadge } from './model-usage-type-badge'
 
@@ -46,10 +46,12 @@ export function ModelUsageCard(props: ModelUsageCardProps) {
   const iconKey = props.model.icon || props.model.vendor_icon
   const icon = iconKey ? getLobeIcon(iconKey, 28) : null
   const fullName = props.model.model_name
-  const shortName = formatModelUsageShortName(fullName)
+  const displayName = formatModelUsageDisplayName(props.model)
   const description = props.model.description?.trim() || ''
-  const initial = fullName?.charAt(0).toUpperCase() || '?'
+  const initial = displayName?.charAt(0).toUpperCase() || '?'
   const pinLabel = props.pinned ? t('Unpin model') : t('Pin model')
+  const tooltipLabel =
+    displayName !== fullName ? `${displayName} (${fullName})` : fullName
 
   return (
     <div
@@ -63,7 +65,7 @@ export function ModelUsageCard(props: ModelUsageCardProps) {
         }
       }}
       aria-pressed={props.selected}
-      aria-label={fullName}
+      aria-label={displayName}
       className={cn(
         'relative w-full cursor-pointer rounded-lg border bg-card p-3 text-left transition-colors',
         'hover:bg-accent/40 focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none',
@@ -115,7 +117,9 @@ export function ModelUsageCard(props: ModelUsageCardProps) {
               render={<div className='min-w-0 flex-1' />}
             >
               <div className='flex items-center gap-2'>
-                <span className='truncate text-sm font-medium'>{shortName}</span>
+                <span className='truncate text-sm font-medium'>
+                  {displayName}
+                </span>
                 {props.sending && (
                   <Loader2
                     className='text-muted-foreground size-3.5 shrink-0 animate-spin'
@@ -129,7 +133,7 @@ export function ModelUsageCard(props: ModelUsageCardProps) {
                 </p>
               ) : null}
             </TooltipTrigger>
-            <TooltipContent side='right'>{fullName}</TooltipContent>
+            <TooltipContent side='right'>{tooltipLabel}</TooltipContent>
           </Tooltip>
         </TooltipProvider>
         <ModelUsageTypeBadge

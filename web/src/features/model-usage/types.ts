@@ -37,6 +37,8 @@ export type ModelUsageVendor = {
 export type ModelUsageItem = {
   id: number
   model_name: string
+  /** 元数据展示名；空则 UI 回退到 model_name */
+  display_name?: string
   description?: string
   icon?: string
   model_type: ModelUsageType

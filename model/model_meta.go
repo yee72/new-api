@@ -40,8 +40,10 @@ const (
 )
 
 type Model struct {
-	Id                 int      `json:"id"`
-	ModelName          string   `json:"model_name" gorm:"size:128;not null;uniqueIndex:uk_model_name_delete_at,priority:1"`
+	Id        int    `json:"id"`
+	ModelName string `json:"model_name" gorm:"size:128;not null;uniqueIndex:uk_model_name_delete_at,priority:1"`
+	// DisplayName 面向用户的展示名；空则前端回退到 model_name。匹配渠道/定价仍用 ModelName。
+	DisplayName        string   `json:"display_name,omitempty" gorm:"type:varchar(128)"`
 	Description        string   `json:"description,omitempty" gorm:"type:text"`
 	Icon               string   `json:"icon,omitempty" gorm:"type:varchar(128)"`
 	Tags               string   `json:"tags,omitempty" gorm:"type:varchar(255)"`
@@ -307,7 +309,7 @@ func (mi *Model) Update() error {
 			mi.ManualUsage = 0
 		}
 		return tx.Model(&Model{}).Where("id = ?", mi.Id).
-			Select("model_name", "description", "icon", "tags", "vendor_id", "endpoints", "model_type", "manual_usage", "generation_capabilities", "status", "sync_official", "name_rule", "updated_time").Updates(mi).Error
+			Select("model_name", "display_name", "description", "icon", "tags", "vendor_id", "endpoints", "model_type", "manual_usage", "generation_capabilities", "status", "sync_official", "name_rule", "updated_time").Updates(mi).Error
 	})
 }
 
@@ -525,7 +527,7 @@ func SearchModels(keyword string, vendor string, status string, syncOfficial str
 	db := DB.Model(&Model{})
 	if keyword != "" {
 		like := "%" + keyword + "%"
-		db = db.Where("model_name LIKE ? OR description LIKE ? OR tags LIKE ?", like, like, like)
+		db = db.Where("model_name LIKE ? OR display_name LIKE ? OR description LIKE ? OR tags LIKE ?", like, like, like, like)
 	}
 	if vendor != "" {
 		if vid, err := strconv.Atoi(vendor); err == nil {

@@ -350,6 +350,30 @@ export function ModelMutateDrawer(props: {
 
                       <FormField
                         control={form.control}
+                        name='display_name'
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t('Display Name')}</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder={t(
+                                  'Optional label shown in model usage'
+                                )}
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              {t(
+                                'Shown in model usage instead of the pricing name. Leave empty to use the model name.'
+                              )}
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
                         name='description'
                         render={({ field }) => (
                           <FormItem>

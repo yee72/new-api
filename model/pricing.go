@@ -28,6 +28,7 @@ type PricingPluginVariant struct {
 type Pricing struct {
 	BillingPluginVariants  []PricingPluginVariant               `json:"billing_plugin_variants,omitempty"`
 	ModelName              string                               `json:"model_name"`
+	DisplayName            string                               `json:"display_name,omitempty"`
 	Description            string                               `json:"description,omitempty"`
 	Icon                   string                               `json:"icon,omitempty"`
 	Tags                   string                               `json:"tags,omitempty"`
@@ -339,6 +340,7 @@ func updatePricing() {
 			if meta.Status != 1 {
 				continue
 			}
+			pricing.DisplayName = strings.TrimSpace(meta.DisplayName)
 			pricing.Description = meta.Description
 			pricing.Icon = meta.Icon
 			pricing.Tags = meta.Tags

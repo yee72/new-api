@@ -19,13 +19,13 @@ For commercial licensing, please contact support@quantumnous.com
 import { getLobeIcon } from '@/lib/lobe-icon'
 import { cn } from '@/lib/utils'
 
-import { formatModelUsageShortName } from '../lib/model-display-name'
+import { formatModelUsageDisplayName } from '../lib/model-display-name'
 import type { ModelUsageItem } from '../types'
 
 type ModelUsageEmptyIntroProps = {
   model: Pick<
     ModelUsageItem,
-    'model_name' | 'description' | 'icon' | 'vendor_icon'
+    'model_name' | 'display_name' | 'description' | 'icon' | 'vendor_icon'
   >
   /** 无介绍文案时的兜底提示 */
   fallbackHint: string
@@ -36,9 +36,9 @@ type ModelUsageEmptyIntroProps = {
 export function ModelUsageEmptyIntro(props: ModelUsageEmptyIntroProps) {
   const iconKey = props.model.icon || props.model.vendor_icon
   const icon = iconKey ? getLobeIcon(iconKey, 88) : null
-  const shortName = formatModelUsageShortName(props.model.model_name)
+  const displayName = formatModelUsageDisplayName(props.model)
   const description = props.model.description?.trim() || ''
-  const initial = shortName.charAt(0).toUpperCase() || '?'
+  const initial = displayName.charAt(0).toUpperCase() || '?'
 
   return (
     <div
@@ -63,7 +63,9 @@ export function ModelUsageEmptyIntro(props: ModelUsageEmptyIntroProps) {
 
       {description ? (
         <div className='border-cyan-500/40 bg-card/70 w-full max-w-xl rounded-xl border px-5 py-4 shadow-[0_0_24px_rgba(34,211,238,0.1)]'>
-          <p className='text-foreground mb-2 text-sm font-medium'>{shortName}</p>
+          <p className='text-foreground mb-2 text-sm font-medium'>
+            {displayName}
+          </p>
           <p className='text-foreground/85 text-sm leading-relaxed whitespace-pre-wrap'>
             {description}
           </p>
