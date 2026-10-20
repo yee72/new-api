@@ -93,8 +93,8 @@ type User struct {
 	WeChatId             string                     `json:"wechat_id" gorm:"column:wechat_id;index"`
 	TelegramId           string                     `json:"telegram_id" gorm:"column:telegram_id;index"`
 	VerificationCode     string                     `json:"verification_code" gorm:"-:all"`                         // this field is only for Email verification, don't save it to database!
-	CaptchaId            string                     `json:"captcha_id" gorm:"-:all"`                               // 图形验证码 ID，不入库
-	CaptchaCode          string                     `json:"captcha_code" gorm:"-:all"`                             // 图形验证码答案，不入库
+	CaptchaId            string                     `json:"captcha_id" gorm:"-:all"`                                // 图形验证码 ID，不入库
+	CaptchaCode          string                     `json:"captcha_code" gorm:"-:all"`                              // 图形验证码答案，不入库
 	AccessToken          *string                    `json:"-" gorm:"type:char(32);column:access_token;uniqueIndex"` // this token is for system management
 	AccessTokenCreatedAt *int64                     `json:"-" gorm:"type:bigint;column:access_token_created_at"`
 	Quota                int                        `json:"quota" gorm:"type:int;default:0"`
@@ -772,6 +772,8 @@ func (user *User) finishInsert(inviterId int) {
 			_ = inviteUser(inviterId)
 		}
 	}
+	// 注册完成后自动创建默认 API Key（受 GENERATE_DEFAULT_TOKEN 控制）
+	MaybeCreateDefaultTokenForUser(user.Id, user.Username)
 }
 
 func (user *User) FinishInsert(inviterId int) {
@@ -828,6 +830,8 @@ func (user *User) FinalizeOAuthUserCreation(inviterId int) {
 			_ = inviteUser(inviterId)
 		}
 	}
+	// OAuth/第三方注册同样自动创建默认 API Key
+	MaybeCreateDefaultTokenForUser(user.Id, user.Username)
 }
 
 func (user *User) Update(updatePassword bool) error {

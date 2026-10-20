@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/model"
 
@@ -28,10 +29,11 @@ func setupRegisterResetTest(t *testing.T) {
 	previousEmailVerification := common.EmailVerificationEnabled
 	previousQuota := common.QuotaForNewUser
 	previousTurnstile := common.TurnstileCheckEnabled
+	previousGenerateDefaultToken := constant.GenerateDefaultToken
 
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&model.User{}, &model.UserSession{}, &model.Log{}))
+	require.NoError(t, db.AutoMigrate(&model.User{}, &model.UserSession{}, &model.Log{}, &model.Token{}))
 	model.DB, model.LOG_DB = db, db
 	common.RedisEnabled = false
 	common.RegisterEnabled = true
@@ -39,6 +41,8 @@ func setupRegisterResetTest(t *testing.T) {
 	common.QuotaForNewUser = 0
 	common.TurnstileCheckEnabled = false
 	common.EmailVerificationEnabled = false
+	// 默认关闭，避免干扰既有用例；创建密钥由专项测试开启
+	constant.GenerateDefaultToken = false
 
 	t.Cleanup(func() {
 		model.DB, model.LOG_DB = previousDB, previousLogDB
@@ -48,6 +52,7 @@ func setupRegisterResetTest(t *testing.T) {
 		common.EmailVerificationEnabled = previousEmailVerification
 		common.QuotaForNewUser = previousQuota
 		common.TurnstileCheckEnabled = previousTurnstile
+		constant.GenerateDefaultToken = previousGenerateDefaultToken
 	})
 	gin.SetMode(gin.TestMode)
 }
@@ -135,6 +140,39 @@ func TestRegisterRejectsInvalidPhone(t *testing.T) {
 	}
 	require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &response))
 	assert.False(t, response.Success)
+}
+
+func TestRegisterCreatesDefaultAPIKey(t *testing.T) {
+	setupRegisterResetTest(t)
+	constant.GenerateDefaultToken = true
+	common.SeedCaptchaForTest("cap-reg-token", "XY89")
+
+	recorder := postJSON(t, Register, "/api/user/register", `{
+		"username":"tokenuser",
+		"password":"Password123",
+		"captcha_id":"cap-reg-token",
+		"captcha_code":"XY89"
+	}`)
+	require.Equal(t, http.StatusOK, recorder.Code)
+	var response struct {
+		Success bool `json:"success"`
+	}
+	require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &response))
+	require.True(t, response.Success)
+
+	var user model.User
+	require.NoError(t, model.DB.Where("username = ?", "tokenuser").First(&user).Error)
+	require.Greater(t, user.Id, 0)
+
+	var tokens []model.Token
+	require.NoError(t, model.DB.Where("user_id = ?", user.Id).Find(&tokens).Error)
+	require.Len(t, tokens, 1)
+	assert.Equal(t, "tokenuser的初始令牌", tokens[0].Name)
+	assert.NotEmpty(t, tokens[0].Key)
+	assert.True(t, tokens[0].UnlimitedQuota)
+	assert.Equal(t, int64(-1), tokens[0].ExpiredTime)
+	// 注册响应不得回传可用 API Key
+	assert.NotContains(t, recorder.Body.String(), tokens[0].Key)
 }
 
 func TestSendEmailVerificationRequiresCaptcha(t *testing.T) {

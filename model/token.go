@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
+	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/bytedance/gopkg/util/gopool"
 	"gorm.io/gorm"
@@ -304,6 +306,47 @@ func (token *Token) Insert() error {
 	var err error
 	err = DB.Create(token).Error
 	return err
+}
+
+// CreateDefaultTokenForUser 为新用户创建默认 API Key。
+// 不返回明文密钥；调用方不得写入响应或审计正文。
+func CreateDefaultTokenForUser(userId int, username string) error {
+	if userId <= 0 {
+		return errors.New("invalid user id")
+	}
+	key, err := common.GenerateKey()
+	if err != nil {
+		return err
+	}
+	name := strings.TrimSpace(username)
+	if name == "" {
+		name = "user"
+	}
+	token := Token{
+		UserId:             userId,
+		Name:               name + "的初始令牌",
+		Key:                key,
+		CreatedTime:        common.GetTimestamp(),
+		AccessedTime:       common.GetTimestamp(),
+		ExpiredTime:        -1,
+		RemainQuota:        500000,
+		UnlimitedQuota:     true,
+		ModelLimitsEnabled: false,
+	}
+	if setting.DefaultUseAutoGroup {
+		token.Group = "auto"
+	}
+	return token.Insert()
+}
+
+// MaybeCreateDefaultTokenForUser 在 GENERATE_DEFAULT_TOKEN 开启时创建默认 API Key；失败只记日志。
+func MaybeCreateDefaultTokenForUser(userId int, username string) {
+	if !constant.GenerateDefaultToken {
+		return
+	}
+	if err := CreateDefaultTokenForUser(userId, username); err != nil {
+		common.SysLog(fmt.Sprintf("failed to create default token for user %d: %v", userId, err))
+	}
 }
 
 // Update Make sure your token's fields is completed, because this will update non-zero values
