@@ -177,12 +177,6 @@ function SettingPill(props: {
   )
 }
 
-function formatAttachmentSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
-
 /** 堆叠收起时的错位/旋转（像一叠纸牌） */
 const STACK_COLLAPSE_OFFSETS = [
   { x: 0, y: 0, rotate: 0 },
@@ -325,8 +319,7 @@ function ComposerAttachmentRail(props: {
             <ModelUsageAttachmentTooltip
               key={file.id}
               name={file.name}
-              type={displayType}
-              hint={formatAttachmentSize(file.size)}
+              nameOnly
             >
               <div
                 className={cn(
@@ -421,9 +414,15 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
     [quotes]
   )
 
-  // 切换模型时清空引用，避免带到另一会话
+  // 切换模型时清空引用与附件（附件仅属于当前模型）
   useEffect(() => {
     setQuotes([])
+    setAttachments((current) => {
+      for (const item of current) {
+        if (item.previewUrl) URL.revokeObjectURL(item.previewUrl)
+      }
+      return current.length === 0 ? current : []
+    })
   }, [model?.model_name])
 
   // 被删除的轮次同步从引用芯片中移除
@@ -822,7 +821,8 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
 
           <div className='flex items-stretch gap-3'>
             <div className='flex min-w-0 flex-1 flex-col gap-2.5'>
-              <div className='flex min-h-[72px] items-start gap-3'>
+              {/* 输入区整体加高约 2 个字符高度 */}
+              <div className='flex min-h-[calc(72px+2em)] items-start gap-3'>
                 <ComposerAttachmentRail
                   attachments={attachments}
                   maxAttachments={MODEL_USAGE_MAX_ATTACHMENTS}
@@ -837,9 +837,9 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
                   onChange={(event) => setPrompt(event.target.value)}
                   onPaste={handlePaste}
                   placeholder={promptPlaceholder}
-                  rows={3}
+                  rows={5}
                   className={cn(
-                    'min-h-[72px] w-full min-w-0 flex-1 resize-none rounded-none border-0 px-0 py-1 shadow-none',
+                    'min-h-[calc(72px+2em)] w-full min-w-0 flex-1 resize-none rounded-none border-0 px-0 py-1 shadow-none',
                     'bg-transparent dark:bg-transparent',
                     'focus-visible:border-0 focus-visible:ring-0',
                     'disabled:bg-transparent dark:disabled:bg-transparent'

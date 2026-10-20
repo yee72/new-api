@@ -33,17 +33,21 @@ import {
 
 type ModelUsageAttachmentTooltipProps = {
   name: string
-  type: ModelUsageAttachmentDisplayType
+  type?: ModelUsageAttachmentDisplayType
   children: ReactNode
   /** 过期等额外说明 */
   hint?: string
+  /** 仅展示文件名（含后缀），不展示类型/大小 */
+  nameOnly?: boolean
 }
 
 export function ModelUsageAttachmentTooltip(
   props: ModelUsageAttachmentTooltipProps
 ) {
   const { t } = useTranslation()
-  const typeLabel = t(attachmentTypeLabelKey(props.type))
+  const typeLabel = props.type
+    ? t(attachmentTypeLabelKey(props.type))
+    : ''
   return (
     <TooltipProvider delay={200}>
       <Tooltip>
@@ -54,9 +58,11 @@ export function ModelUsageAttachmentTooltip(
         </TooltipTrigger>
         <TooltipContent side='top' className='max-w-xs'>
           <p className='truncate font-medium'>{props.name}</p>
-          <p className='text-background/80 text-[11px]'>
-            {props.hint ? `${typeLabel} · ${props.hint}` : typeLabel}
-          </p>
+          {!props.nameOnly && typeLabel ? (
+            <p className='text-background/80 text-[11px]'>
+              {props.hint ? `${typeLabel} · ${props.hint}` : typeLabel}
+            </p>
+          ) : null}
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
