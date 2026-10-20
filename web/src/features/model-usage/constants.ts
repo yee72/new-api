@@ -38,6 +38,8 @@ export const MODEL_USAGE_TABS: Array<{ value: ModelUsageTab; labelKey: string }>
 export const IMAGE_COUNT_OPTIONS = [1, 2, 4, 6, 10] as const
 /** 视频强制单条生成 */
 export const VIDEO_COUNT_OPTIONS = [1] as const
+/** 模型使用输入区附件上限 */
+export const MODEL_USAGE_MAX_ATTACHMENTS = 8
 export const ASPECT_RATIO_OPTIONS = [
   'auto',
   '1:1',

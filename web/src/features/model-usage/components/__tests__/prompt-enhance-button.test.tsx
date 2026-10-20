@@ -54,6 +54,7 @@ async function renderWorkspace() {
         translation: {
           'AI help write prompt': 'AI help write prompt',
           Send: 'Send',
+          Attachment: 'Attachment',
           'Upload image or file attachment': 'Upload image or file attachment',
           'Enter your question or generation prompt': 'Enter prompt',
           'Ask anything about this model': 'Ask anything',
@@ -81,28 +82,29 @@ async function renderWorkspace() {
 }
 
 describe('prompt enhance button', () => {
-  it('places a square blue AI label under the attachment upload button', async () => {
+  it('places a circular bold AI label above the circular send button', async () => {
     await renderWorkspace()
 
-    const upload = screen.getByRole('button', {
-      name: 'Upload image or file attachment',
-    })
     const enhance = screen.getByRole('button', {
       name: 'AI help write prompt',
     })
+    const send = screen.getByTitle('Send')
+    const upload = screen.getByRole('button', {
+      name: 'Upload image or file attachment',
+    })
 
-    expect(enhance.className).toContain('size-9')
-    expect(enhance.className).toContain('rounded-md')
-    expect(enhance.className).toContain('bg-white')
+    expect(enhance.className).toContain('rounded-full')
     expect(enhance.className).toContain('text-blue-600')
     expect(enhance).toHaveTextContent('AI')
-    expect(enhance.querySelector('svg')).not.toBeInTheDocument()
+    expect(enhance.querySelector('span')?.className).toContain('font-bold')
+    expect(send.className).toContain('rounded-full')
 
-    // 附件按钮与 AI 按钮同列，且 AI 在附件下方
-    const column = upload.closest('.flex-col')
+    // 附件在输入区左侧；AI 与发送同列且 AI 在上
+    expect(upload).toHaveTextContent('Attachment')
+    const column = send.closest('.flex-col')
     expect(column).toContainElement(enhance)
     expect(
-      upload.compareDocumentPosition(enhance) & Node.DOCUMENT_POSITION_FOLLOWING
+      enhance.compareDocumentPosition(send) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy()
   })
 })
