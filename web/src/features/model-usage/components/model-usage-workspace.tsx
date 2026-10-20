@@ -177,24 +177,30 @@ function SettingPill(props: {
   )
 }
 
-/** 堆叠收起时的错位/旋转（像一叠纸牌） */
+/**
+ * 多附件收起堆叠：仅向左侧错位/旋转；
+ * 单附件时用第一项（无位移无旋转）。
+ */
 const STACK_COLLAPSE_OFFSETS = [
   { x: 0, y: 0, rotate: 0 },
-  { x: 5, y: 3, rotate: 10 },
-  { x: -3, y: 5, rotate: -12 },
-  { x: 7, y: 1, rotate: 16 },
-  { x: -5, y: 4, rotate: -8 },
-  { x: 4, y: 6, rotate: 14 },
-  { x: -6, y: 2, rotate: -15 },
-  { x: 6, y: 5, rotate: 9 },
+  { x: -3, y: 2, rotate: -6 },
+  { x: -5, y: 3, rotate: -10 },
+  { x: -6, y: 4, rotate: -13 },
+  { x: -7, y: 3, rotate: -8 },
+  { x: -4, y: 5, rotate: -15 },
+  { x: -8, y: 2, rotate: -11 },
+  { x: -5, y: 4, rotate: -7 },
 ] as const
 
-const ATTACH_CARD_SIZE = 56
+const ATTACH_CARD_WIDTH = 56
+/** 原正方形高度上增加 50% */
+const ATTACH_CARD_HEIGHT = Math.round(ATTACH_CARD_WIDTH * 1.5)
 /** 展开时相邻卡片水平间距（中心距） */
 const ATTACH_EXPAND_STEP = 52
 
 /**
- * 左侧附件：多文件默认纸牌堆叠；悬停后横向扇形展开，并露出「附件」添加卡。
+ * 左侧附件：高度为原正方形 1.5 倍；多文件向左堆叠，右上角高亮圆圈显示总数；
+ * 悬停后横向展开并露出「附件」添加卡。
  */
 function ComposerAttachmentRail(props: {
   attachments: LocalAttachment[]
@@ -206,6 +212,7 @@ function ComposerAttachmentRail(props: {
   const { t } = useTranslation()
   const count = props.attachments.length
   const atLimit = count >= props.maxAttachments
+  const showCountBadge = count > 1
 
   const addCard = (
     <button
@@ -215,10 +222,11 @@ function ComposerAttachmentRail(props: {
       aria-label={t('Upload image or file attachment')}
       className={cn(
         'bg-muted/80 hover:bg-muted text-muted-foreground hover:text-foreground',
-        'inline-flex size-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-dashed transition-colors',
+        'inline-flex w-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-dashed transition-colors',
         'focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none',
         'disabled:pointer-events-none disabled:opacity-50'
       )}
+      style={{ height: ATTACH_CARD_HEIGHT }}
     >
       <Plus className='size-4' aria-hidden />
       <span className='text-[10px] leading-none font-medium'>
@@ -236,21 +244,25 @@ function ComposerAttachmentRail(props: {
 
   // 展开宽度 = 全部附件卡 + 末尾添加卡
   const expandedWidth =
-    ATTACH_EXPAND_STEP * count + ATTACH_CARD_SIZE + (atLimit ? 0 : 8)
+    ATTACH_EXPAND_STEP * count + ATTACH_CARD_WIDTH + (atLimit ? 0 : 8)
 
   return (
     <div
-      className='group/attach relative shrink-0 self-start pt-0.5'
-      style={{ width: ATTACH_CARD_SIZE, height: ATTACH_CARD_SIZE + 8 }}
+      className='group/attach relative shrink-0 self-start overflow-visible pt-0.5'
+      style={{
+        width: ATTACH_CARD_WIDTH,
+        height: ATTACH_CARD_HEIGHT + 8,
+      }}
     >
       {/* 悬停时撑开占位，避免挡住输入区布局突变过大可用 absolute 浮层 */}
       <div
         className={cn(
-          'absolute top-0 left-0 z-10 h-16 transition-[width] duration-200 ease-out',
-          'w-14 group-hover/attach:w-[var(--attach-expand-w)] group-focus-within/attach:w-[var(--attach-expand-w)]'
+          'absolute top-0 left-0 z-10 w-14 transition-[width] duration-200 ease-out',
+          'group-hover/attach:w-[var(--attach-expand-w)] group-focus-within/attach:w-[var(--attach-expand-w)]'
         )}
         style={
           {
+            height: ATTACH_CARD_HEIGHT,
             '--attach-expand-w': `${expandedWidth}px`,
           } as CSSProperties
         }
@@ -260,8 +272,11 @@ function ComposerAttachmentRail(props: {
             file.kind === 'image' || file.kind === 'video'
               ? file.kind
               : displayTypeFromExt(file.ext)
+          // 单附件不旋转；多附件仅向左错位
           const collapse =
-            STACK_COLLAPSE_OFFSETS[index % STACK_COLLAPSE_OFFSETS.length]
+            count <= 1
+              ? STACK_COLLAPSE_OFFSETS[0]
+              : STACK_COLLAPSE_OFFSETS[index % STACK_COLLAPSE_OFFSETS.length]
           const expandX = index * ATTACH_EXPAND_STEP
           // 展开时轻微扇形角度
           const expandRotate =
@@ -323,7 +338,7 @@ function ComposerAttachmentRail(props: {
             >
               <div
                 className={cn(
-                  'bg-card absolute top-0 left-0 size-14 overflow-hidden rounded-xl border shadow-md',
+                  'bg-card absolute top-0 left-0 w-14 overflow-hidden rounded-xl border shadow-md',
                   'origin-bottom transition-transform duration-200 ease-out',
                   // 收起用堆叠变量，悬停/聚焦切到展开变量（勿写 inline transform，否则盖住 hover）
                   '[transform:var(--attach-collapse)]',
@@ -332,6 +347,7 @@ function ComposerAttachmentRail(props: {
                 )}
                 style={
                   {
+                    height: ATTACH_CARD_HEIGHT,
                     zIndex: count - index,
                     '--attach-collapse': `translate(${collapse.x}px, ${collapse.y}px) rotate(${collapse.rotate}deg)`,
                     '--attach-expand': `translate(${expandX}px, 0px) rotate(${expandRotate}deg)`,
@@ -355,6 +371,21 @@ function ComposerAttachmentRail(props: {
           )
         })}
 
+        {/* 多附件时右上角高亮圆圈展示总数；单附件不展示；展开时隐藏 */}
+        {showCountBadge ? (
+          <span
+            className={cn(
+              'bg-primary text-primary-foreground absolute -top-1.5 z-40 flex h-5 min-w-5 items-center justify-center rounded-full px-1',
+              'text-[10px] leading-none font-semibold tabular-nums shadow-sm ring-2 ring-background',
+              'transition-opacity group-hover/attach:opacity-0 group-focus-within/attach:opacity-0'
+            )}
+            style={{ left: ATTACH_CARD_WIDTH - 10 }}
+            aria-hidden
+          >
+            {count}
+          </span>
+        ) : null}
+
         {/* 展开后末尾「附件」添加卡 */}
         {!atLimit && (
           <div
@@ -372,18 +403,22 @@ function ComposerAttachmentRail(props: {
           </div>
         )}
 
-        {/* 收起态右下角快捷 + */}
+        {/* 收起态贴在附件卡右下角的快捷 +（避开右侧数量） */}
         {!atLimit && (
           <button
             type='button'
             onClick={props.onAdd}
             aria-label={t('Upload image or file attachment')}
             className={cn(
-              'bg-background text-foreground absolute -right-1.5 -bottom-1.5 z-30 inline-flex size-6 items-center justify-center rounded-full border shadow-md',
+              'bg-background text-foreground absolute z-30 inline-flex size-6 items-center justify-center rounded-full border shadow-md',
               'transition-opacity group-hover/attach:pointer-events-none group-hover/attach:opacity-0',
               'group-focus-within/attach:pointer-events-none group-focus-within/attach:opacity-0',
               'focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none'
             )}
+            style={{
+              left: ATTACH_CARD_WIDTH - 10,
+              bottom: -6,
+            }}
           >
             <Plus className='size-3.5' aria-hidden />
           </button>
