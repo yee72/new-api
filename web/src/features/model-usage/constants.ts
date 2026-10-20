@@ -77,3 +77,10 @@ export const MODEL_TYPE_LABEL_KEY: Record<string, string> = {
   image: 'Image',
   video: 'Video',
 }
+
+/** 列表卡片右侧类型文字（对话 / 图片 / 视频） */
+export const MODEL_TYPE_BADGE_LABEL_KEY: Record<string, string> = {
+  chat: 'Conversation',
+  image: 'Image',
+  video: 'Video',
+}

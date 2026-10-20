@@ -101,6 +101,10 @@ export type ModelUsageAttachment = {
   kind: 'image' | 'pdf' | 'sheet' | 'ppt' | 'doc' | 'file'
   url?: string
   expires_at: number
+  /** 发送瞬间本地预览（blob:），仅内存；落库前换成服务端 url */
+  local_preview_url?: string
+  /** 仍在上传中的乐观附件 */
+  pending?: boolean
 }
 
 /** 单轮对话气泡（chat / image / video 共用） */

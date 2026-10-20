@@ -192,15 +192,10 @@ export function ModelUsagePage() {
             onTabChange={setTab}
             vendors={vendors}
             selectedVendorIds={selectedVendorIds}
-            onToggleVendor={(vendorId) => {
+            onVendorFilterChange={(vendorIds) => {
               setSearchInput('')
-              setSelectedVendorIds((current) => {
-                const next = current.includes(vendorId)
-                  ? current.filter((id) => id !== vendorId)
-                  : [...current, vendorId]
-                setActiveQuery({ mode: 'filter', q: '', vendorIds: next })
-                return next
-              })
+              setSelectedVendorIds(vendorIds)
+              setActiveQuery({ mode: 'filter', q: '', vendorIds })
             }}
             searchInput={searchInput}
             onSearchInputChange={setSearchInput}
@@ -224,9 +219,15 @@ export function ModelUsagePage() {
             isAuthenticated={Boolean(user)}
             promptEnhance={listQuery.data?.prompt_enhance}
             onRequireLogin={() => setLoginOpen(true)}
-            onSend={async (text, attachments, quoteTurnIds) => {
+            onSend={async (text, attachments, quoteTurnIds, localAttachments) => {
               if (!selectedModel) return
-              await send(selectedModel, text, attachments, quoteTurnIds)
+              await send(
+                selectedModel,
+                text,
+                attachments,
+                quoteTurnIds,
+                localAttachments
+              )
             }}
             onDeleteTurn={(turnId) => {
               if (!selectedModel) return

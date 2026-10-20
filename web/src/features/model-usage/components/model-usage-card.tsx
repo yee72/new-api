@@ -30,7 +30,7 @@ import { cn } from '@/lib/utils'
 
 import { formatModelUsageShortName } from '../lib/model-display-name'
 import type { ModelUsageItem } from '../types'
-import { ModelUsageTypeIcon } from './model-usage-type-icon'
+import { ModelUsageTypeBadge } from './model-usage-type-badge'
 
 type ModelUsageCardProps = {
   model: ModelUsageItem
@@ -47,9 +47,9 @@ export function ModelUsageCard(props: ModelUsageCardProps) {
   const icon = iconKey ? getLobeIcon(iconKey, 28) : null
   const fullName = props.model.model_name
   const shortName = formatModelUsageShortName(fullName)
+  const description = props.model.description?.trim() || ''
   const initial = fullName?.charAt(0).toUpperCase() || '?'
   const pinLabel = props.pinned ? t('Unpin model') : t('Pin model')
-  const vendorName = props.model.vendor_name?.trim() || '—'
 
   return (
     <div
@@ -112,14 +112,9 @@ export function ModelUsageCard(props: ModelUsageCardProps) {
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger
-              render={
-                <div className='min-w-0 flex-1' />
-              }
+              render={<div className='min-w-0 flex-1' />}
             >
-              <p className='text-muted-foreground truncate text-xs'>
-                {vendorName}
-              </p>
-              <div className='mt-0.5 flex items-center gap-2'>
+              <div className='flex items-center gap-2'>
                 <span className='truncate text-sm font-medium'>{shortName}</span>
                 {props.sending && (
                   <Loader2
@@ -128,11 +123,16 @@ export function ModelUsageCard(props: ModelUsageCardProps) {
                   />
                 )}
               </div>
+              {description ? (
+                <p className='text-muted-foreground mt-0.5 line-clamp-2 text-xs'>
+                  {description}
+                </p>
+              ) : null}
             </TooltipTrigger>
             <TooltipContent side='right'>{fullName}</TooltipContent>
           </Tooltip>
         </TooltipProvider>
-        <ModelUsageTypeIcon
+        <ModelUsageTypeBadge
           type={props.model.model_type}
           className='mt-0.5'
         />

@@ -58,7 +58,6 @@ import { sendChatCompletion } from '@/features/playground/api'
 import { handleServerError } from '@/lib/handle-server-error'
 import { cn } from '@/lib/utils'
 
-import { uploadModelUsageAttachment } from '../api'
 import {
   ATTACHMENT_EXTRACT_FAILED,
   extractAttachmentText,
@@ -108,7 +107,8 @@ type ModelUsageWorkspaceProps = {
   onSend: (
     text: string,
     attachments?: ModelUsageAttachment[],
-    quoteTurnIds?: string[]
+    quoteTurnIds?: string[],
+    localAttachments?: LocalAttachment[]
   ) => Promise<void>
   onDeleteTurn: (turnId: string) => void
   onRegenerate: (message: ModelUsageMessage) => Promise<void>
@@ -495,7 +495,7 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
     })
   }
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     const text = prompt.trim()
     if ((!text && !hasAttachments) || busy) return
     if (!props.isAuthenticated) {
@@ -504,28 +504,20 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
     }
     const pending = [...attachments]
     const quoteTurnIds = quotes.map((item) => item.turnId)
+    // 立刻清空输入区；附件预览交给会话气泡占位，上传在 onSend 内完成
     setPrompt('')
     setAttachments([])
     setQuotes([])
-    for (const item of pending) {
-      if (item.previewUrl) URL.revokeObjectURL(item.previewUrl)
-    }
-    try {
-      let uploaded: ModelUsageAttachment[] | undefined
-      if (pending.length > 0) {
-        uploaded = []
-        for (const item of pending) {
-          uploaded.push(await uploadModelUsageAttachment(item.file))
-        }
-      }
-      await props.onSend(
+    void props
+      .onSend(
         text,
-        uploaded,
-        quoteTurnIds.length > 0 ? quoteTurnIds : undefined
+        undefined,
+        quoteTurnIds.length > 0 ? quoteTurnIds : undefined,
+        pending.length > 0 ? pending : undefined
       )
-    } catch (error) {
-      handleServerError(error, t('Failed to upload attachment'))
-    }
+      .catch((error) => {
+        handleServerError(error, t('Failed to upload attachment'))
+      })
   }
 
   let emptyHint = t('Generated videos will appear here')
@@ -537,10 +529,14 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
 
   return (
     <div className='flex min-h-0 min-w-0 flex-1 flex-col'>
-      <div ref={listRef} className='min-h-0 flex-1 overflow-y-auto px-4 py-4'>
+      <div
+        ref={listRef}
+        className='flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-4'
+      >
         <ModelUsageMessageList
           messages={props.session.messages}
           emptyHint={emptyHint}
+          model={model}
           busy={busy}
           quotedMessageIds={quotedMessageIds}
           onQuote={toggleQuote}

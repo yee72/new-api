@@ -36,8 +36,13 @@ import {
   refreshModelUsageVideoTurn,
   replaceModelUsageSession,
   sendAnthropicMessages,
+  uploadModelUsageAttachment,
 } from '../api'
 import { ATTACHMENT_EXTRACT_FAILED } from '../lib/attachment-text-extract'
+import {
+  messagesForPersist,
+  optimisticAttachmentFromLocal,
+} from '../lib/attachments'
 import {
   resolveGenerationCapabilities,
   validateImageConfig,
@@ -75,6 +80,7 @@ import {
 } from '../stores/sessions-store'
 import type {
   GenerationFormConfig,
+  LocalAttachment,
   ModelUsageAttachment,
   ModelUsageItem,
   ModelUsageMessage,
@@ -254,6 +260,8 @@ export function useModelSessions() {
         imageConfig?: GenerationFormConfig
         videoConfig?: GenerationFormConfig
         attachments?: ModelUsageAttachment[]
+        /** 本地待上传附件：先占位展示，再上传 */
+        localAttachments?: LocalAttachment[]
         /** 有值时只把这些轮次拼进上游历史（引用模式） */
         quoteTurnIds?: string[]
       }
@@ -268,6 +276,8 @@ export function useModelSessions() {
       const turnId = options?.turnId ?? newId('turn')
       const isRegenerate = Boolean(options?.turnId)
       const mediaType = mediaTypeOf(model)
+      const localAttachments = options?.localAttachments
+      const userMessageId = newId('u')
 
       const invokeProtocolEarly = resolveInvokeProtocol(model)
       // 模型类型为图片即按能力矩阵校验（含 chat 协议生图）
@@ -292,19 +302,22 @@ export function useModelSessions() {
         }
       }
 
-      const attachments =
-        options?.attachments && options.attachments.length > 0
-          ? options.attachments
-          : undefined
-      const userMessage: ModelUsageMessage = {
-        id: newId('u'),
+      // 优先用本地文件做乐观占位，已上传附件（重生成）原样带上
+      const initialAttachments =
+        localAttachments && localAttachments.length > 0
+          ? localAttachments.map(optimisticAttachmentFromLocal)
+          : options?.attachments && options.attachments.length > 0
+            ? options.attachments
+            : undefined
+      let userMessage: ModelUsageMessage = {
+        id: userMessageId,
         turnId,
         role: 'user',
         content: prompt,
         status: 'done',
         mediaType,
         prompt,
-        attachments,
+        attachments: initialAttachments,
         imageConfig: model.model_type === 'image' ? imageConfig : undefined,
         videoConfig: model.model_type === 'video' ? videoConfig : undefined,
       }
@@ -332,6 +345,7 @@ export function useModelSessions() {
           quoteTurnIds && quoteTurnIds.length > 0 ? quoteTurnIds : undefined,
       })
 
+      // 先写入气泡占位，再做上传/抽附件等耗时操作
       patchSession(
         modelName,
         (current) => {
@@ -375,7 +389,7 @@ export function useModelSessions() {
         try {
           await replaceModelUsageSession(modelName, {
             model_name: modelName,
-            messages: snapshot.messages,
+            messages: messagesForPersist(snapshot.messages),
             image_config: generationFormToRecord(snapshot.imageConfig),
             video_config: generationFormToRecord(snapshot.videoConfig),
           })
@@ -393,12 +407,49 @@ export function useModelSessions() {
         try {
           await replaceModelUsageSession(modelName, {
             model_name: modelName,
-            messages: snapshot.messages,
+            messages: messagesForPersist(snapshot.messages),
             image_config: generationFormToRecord(snapshot.imageConfig),
             video_config: generationFormToRecord(snapshot.videoConfig),
           })
         } catch (error) {
           handleServerError(error, t('Failed to save conversation'))
+        }
+      }
+
+      let attachments =
+        options?.attachments && options.attachments.length > 0
+          ? options.attachments
+          : undefined
+
+      // 占位展示后再上传，避免附件耗时挡住发送反馈
+      if (localAttachments && localAttachments.length > 0) {
+        try {
+          const uploaded: ModelUsageAttachment[] = []
+          for (const item of localAttachments) {
+            uploaded.push(await uploadModelUsageAttachment(item.file))
+          }
+          attachments = uploaded
+          userMessage = { ...userMessage, attachments: uploaded }
+          patchSession(
+            modelName,
+            (current) => ({
+              ...current,
+              messages: current.messages.map((message) =>
+                message.id === userMessageId
+                  ? { ...message, attachments: uploaded }
+                  : message
+              ),
+            }),
+            model
+          )
+        } catch (error) {
+          handleServerError(error, t('Failed to upload attachment'))
+          await failAssistant(t('Failed to upload attachment'))
+          return
+        } finally {
+          for (const item of localAttachments) {
+            if (item.previewUrl) URL.revokeObjectURL(item.previewUrl)
+          }
         }
       }
 
@@ -663,13 +714,22 @@ export function useModelSessions() {
       model: ModelUsageItem,
       prompt: string,
       attachments?: ModelUsageAttachment[],
-      quoteTurnIds?: string[]
+      quoteTurnIds?: string[],
+      localAttachments?: LocalAttachment[]
     ) => {
       const text = prompt.trim()
-      if (!text && (!attachments || attachments.length === 0)) return
+      const hasLocal = Boolean(localAttachments && localAttachments.length > 0)
+      if (
+        !text &&
+        (!attachments || attachments.length === 0) &&
+        !hasLocal
+      ) {
+        return
+      }
       setLastModelName(model.model_name)
       await runGeneration(model, text || t('Attachment'), {
         attachments,
+        localAttachments,
         quoteTurnIds,
       })
     },
@@ -728,7 +788,7 @@ export function useModelSessions() {
       try {
         const dto = await replaceModelUsageSession(model.model_name, {
           model_name: model.model_name,
-          messages: session.messages,
+          messages: messagesForPersist(session.messages),
           image_config: generationFormToRecord(session.imageConfig),
           video_config: generationFormToRecord(session.videoConfig),
         })

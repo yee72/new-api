@@ -41,12 +41,13 @@ import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
 
 import {
+  attachmentDisplayUrl,
   canPreviewModelUsageAttachment,
   displayTypeFromAttachment,
   isModelUsageAttachmentExpired,
 } from '../lib/attachments'
 import { downloadModelUsageMedia } from '../lib/media-download'
-import type { ModelUsageMessage } from '../types'
+import type { ModelUsageItem, ModelUsageMessage } from '../types'
 import { ModelUsageAttachmentIcon } from './model-usage-attachment-icon'
 import { ModelUsageAttachmentTooltip } from './model-usage-attachment-tooltip'
 import {
@@ -54,12 +55,18 @@ import {
   ModelUsageAuthVideo,
 } from './model-usage-auth-media'
 import { ModelUsageChatFailureCard } from './model-usage-chat-failure-card'
+import { ModelUsageEmptyIntro } from './model-usage-empty-intro'
 import { ModelUsageMediaPlaceholder } from './model-usage-media-placeholder'
 import { ModelUsageMediaPreview } from './model-usage-media-preview'
 
 type ModelUsageMessageListProps = {
   messages: ModelUsageMessage[]
   emptyHint: string
+  /** 无消息时展示模型介绍 */
+  model?: Pick<
+    ModelUsageItem,
+    'model_name' | 'description' | 'icon' | 'vendor_icon'
+  >
   busy: boolean
   /** 已引用的消息 id，用于按钮高亮 */
   quotedMessageIds?: ReadonlySet<string>
@@ -83,6 +90,14 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
   const [editDraft, setEditDraft] = useState('')
 
   if (props.messages.length === 0) {
+    if (props.model) {
+      return (
+        <ModelUsageEmptyIntro
+          model={props.model}
+          fallbackHint={props.emptyHint}
+        />
+      )
+    }
     return (
       <p className='text-muted-foreground py-8 text-center text-sm'>
         {props.emptyHint}
@@ -355,7 +370,7 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
                     const canPreview =
                       canPreviewModelUsageAttachment(attachment)
                     const displayType = displayTypeFromAttachment(attachment)
-                    const attachmentUrl = attachment.url
+                    const attachmentUrl = attachmentDisplayUrl(attachment)
                     // 过期：文件名标识；未过期：类型图标/缩略图，悬停看名称与类型
                     if (expired) {
                       return (

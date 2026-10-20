@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import type { ModelUsageAttachment } from '../types'
+import type { LocalAttachment, ModelUsageAttachment } from '../types'
 
 /** 展示用附件类型（图标与悬停文案） */
 export type ModelUsageAttachmentDisplayType =
@@ -28,9 +28,22 @@ export type ModelUsageAttachmentDisplayType =
   | 'doc'
   | 'file'
 
+export function attachmentDisplayUrl(
+  attachment: Pick<ModelUsageAttachment, 'url' | 'local_preview_url'>
+): string | undefined {
+  return attachment.local_preview_url || attachment.url || undefined
+}
+
 export function isModelUsageAttachmentExpired(
-  attachment: Pick<ModelUsageAttachment, 'expires_at' | 'url'>
+  attachment: Pick<
+    ModelUsageAttachment,
+    'expires_at' | 'url' | 'local_preview_url' | 'pending'
+  >
 ): boolean {
+  // 上传中的乐观附件始终可展示
+  if (attachment.pending || attachment.local_preview_url) {
+    return false
+  }
   if (attachment.expires_at > 0 && Date.now() / 1000 > attachment.expires_at) {
     return true
   }
@@ -49,9 +62,69 @@ export function canPreviewModelUsageAttachment(
 ): boolean {
   return (
     attachment.kind === 'image' &&
-    Boolean(attachment.url) &&
+    Boolean(attachmentDisplayUrl(attachment)) &&
     !isModelUsageAttachmentExpired(attachment)
   )
+}
+
+/** 发送瞬间用本地文件生成气泡占位附件 */
+export function optimisticAttachmentFromLocal(
+  local: LocalAttachment
+): ModelUsageAttachment {
+  const display =
+    local.kind === 'image' ? 'image' : displayTypeFromExt(local.ext)
+  const kind: ModelUsageAttachment['kind'] =
+    display === 'image' ||
+    display === 'pdf' ||
+    display === 'sheet' ||
+    display === 'ppt' ||
+    display === 'doc'
+      ? display
+      : 'file'
+  return {
+    id: local.id,
+    name: local.name,
+    mime: local.type || undefined,
+    size: local.size,
+    kind,
+    local_preview_url: local.previewUrl,
+    pending: true,
+    // 占位用远未到期时间，避免无 url 时被当成过期
+    expires_at: Math.floor(Date.now() / 1000) + 24 * 60 * 60,
+  }
+}
+
+/** 落库前去掉仅前端字段与 blob 预览 */
+export function persistableAttachments(
+  attachments: ModelUsageAttachment[] | undefined
+): ModelUsageAttachment[] | undefined {
+  if (!attachments?.length) return undefined
+  const out: ModelUsageAttachment[] = []
+  for (const item of attachments) {
+    if (item.pending || item.local_preview_url) continue
+    const url = item.url?.trim()
+    if (!url || url.startsWith('blob:')) continue
+    out.push({
+      id: item.id,
+      name: item.name,
+      mime: item.mime,
+      size: item.size,
+      kind: item.kind,
+      url,
+      expires_at: item.expires_at,
+    })
+  }
+  return out.length > 0 ? out : undefined
+}
+
+/** 会话落库前清洗消息中的乐观附件字段 */
+export function messagesForPersist<T extends { attachments?: ModelUsageAttachment[] }>(
+  messages: T[]
+): T[] {
+  return messages.map((message) => ({
+    ...message,
+    attachments: persistableAttachments(message.attachments),
+  }))
 }
 
 export function displayTypeFromExt(ext: string): ModelUsageAttachmentDisplayType {

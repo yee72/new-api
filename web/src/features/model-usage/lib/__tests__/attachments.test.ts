@@ -21,7 +21,11 @@ import { describe, expect, it } from 'vitest'
 import {
   canPreviewModelUsageAttachment,
   isModelUsageAttachmentExpired,
+  messagesForPersist,
+  optimisticAttachmentFromLocal,
+  persistableAttachments,
 } from '../attachments'
+import type { LocalAttachment } from '../../types'
 
 describe('model usage attachment expiry', () => {
   it('marks attachments past expires_at as expired', () => {
@@ -29,6 +33,25 @@ describe('model usage attachment expiry', () => {
       isModelUsageAttachmentExpired({
         expires_at: Math.floor(Date.now() / 1000) - 10,
         url: '/api/model-usage/media/model-usage/attachments/1/a/x.png',
+      })
+    ).toBe(true)
+  })
+
+  it('keeps optimistic local attachments visible while uploading', () => {
+    expect(
+      isModelUsageAttachmentExpired({
+        expires_at: Math.floor(Date.now() / 1000) + 3600,
+        pending: true,
+      })
+    ).toBe(false)
+    expect(
+      canPreviewModelUsageAttachment({
+        id: 'local-1',
+        name: 'shot.png',
+        kind: 'image',
+        local_preview_url: 'blob:http://localhost/preview',
+        pending: true,
+        expires_at: Math.floor(Date.now() / 1000) + 3600,
       })
     ).toBe(true)
   })
@@ -53,5 +76,40 @@ describe('model usage attachment expiry', () => {
         expires_at: future,
       })
     ).toBe(false)
+  })
+
+  it('strips optimistic fields before persist', () => {
+    const local: LocalAttachment = {
+      id: 'l1',
+      name: 'a.png',
+      ext: 'png',
+      size: 12,
+      type: 'image/png',
+      kind: 'image',
+      file: new File(['x'], 'a.png', { type: 'image/png' }),
+      previewUrl: 'blob:http://localhost/a',
+    }
+    const optimistic = optimisticAttachmentFromLocal(local)
+    expect(optimistic.pending).toBe(true)
+    expect(persistableAttachments([optimistic])).toBeUndefined()
+
+    const future = Math.floor(Date.now() / 1000) + 3600
+    const persisted = messagesForPersist([
+      {
+        id: 'm1',
+        attachments: [
+          optimistic,
+          {
+            id: 's1',
+            name: 'a.png',
+            kind: 'image' as const,
+            url: `/api/model-usage/media/x.png?expires=${future}`,
+            expires_at: future,
+          },
+        ],
+      },
+    ])
+    expect(persisted[0]?.attachments).toHaveLength(1)
+    expect(persisted[0]?.attachments?.[0]?.id).toBe('s1')
   })
 })
