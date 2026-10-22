@@ -48,7 +48,7 @@ export function ModelUsageAuthImage(props: ModelUsageAuthImageProps) {
   if (failed) {
     let failedSize = 'aspect-video min-h-36 w-full'
     if (props.compact) failedSize = 'size-full'
-    else if (props.fitContent) failedSize = 'min-h-36 min-w-36'
+    else if (props.fitContent) failedSize = 'min-h-24 min-w-24'
     return (
       <div
         className={cn(
@@ -95,7 +95,7 @@ export function ModelUsageAuthImage(props: ModelUsageAuthImageProps) {
         'relative overflow-hidden rounded-xl',
         fitContent ? 'inline-block max-w-full' : 'w-full',
         showPlaceholder &&
-          (fitContent ? 'min-h-36 min-w-36' : 'aspect-video min-h-36')
+          (fitContent ? 'min-h-24 min-w-24' : 'aspect-video min-h-24')
       )}
     >
       {showPlaceholder && (
@@ -112,9 +112,10 @@ export function ModelUsageAuthImage(props: ModelUsageAuthImageProps) {
           src={src}
           alt={props.alt}
           className={cn(
+            // 对话列表等比例缩略展示；点开预览仍看原图
             fitContent
-              ? 'block h-auto max-h-[min(70vh,36rem)] w-auto max-w-full'
-              : 'max-h-80 w-full bg-black/20 object-contain',
+              ? 'block h-auto max-h-72 w-auto max-w-full'
+              : 'max-h-64 w-full bg-black/20 object-contain',
             props.className,
             !mediaReady && 'invisible absolute inset-0'
           )}
@@ -153,8 +154,8 @@ export function ModelUsageAuthVideo(props: ModelUsageAuthVideoProps) {
         className={cn(
           'bg-muted text-muted-foreground flex items-center justify-center rounded-xl px-3 text-center text-xs',
           fitContent
-            ? 'min-h-36 min-w-48'
-            : 'aspect-video min-h-36 w-full',
+            ? 'min-h-24 min-w-40'
+            : 'aspect-video min-h-24 w-full',
           props.className
         )}
       >
@@ -171,7 +172,7 @@ export function ModelUsageAuthVideo(props: ModelUsageAuthVideoProps) {
         'relative overflow-hidden rounded-xl',
         fitContent ? 'inline-block max-w-full' : 'w-full',
         showPlaceholder &&
-          (fitContent ? 'aspect-video min-h-36 w-64' : 'aspect-video min-h-36')
+          (fitContent ? 'aspect-video min-h-24 w-56' : 'aspect-video min-h-24')
       )}
     >
       {showPlaceholder && (
@@ -190,8 +191,8 @@ export function ModelUsageAuthVideo(props: ModelUsageAuthVideoProps) {
           muted={props.muted}
           className={cn(
             fitContent
-              ? 'block h-auto max-h-[min(70vh,36rem)] w-auto max-w-full'
-              : 'max-h-80 w-full bg-black/20 object-contain',
+              ? 'block h-auto max-h-72 w-auto max-w-full'
+              : 'max-h-64 w-full bg-black/20 object-contain',
             props.className,
             !mediaReady && 'invisible absolute inset-0'
           )}

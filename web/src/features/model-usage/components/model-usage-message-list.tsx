@@ -270,15 +270,16 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
               )}
 
               {showWorkPrompt && (
-                <p className='text-muted-foreground max-w-[min(100%,36rem)] text-sm leading-relaxed whitespace-pre-wrap'>
+                <p className='text-muted-foreground max-w-[min(100%,24rem)] text-sm leading-relaxed whitespace-pre-wrap'>
                   {workPrompt}
                 </p>
               )}
 
               {showGeneratingMedia && (
-                <div className='bg-muted w-full max-w-[min(100%,36rem)] overflow-hidden rounded-2xl p-2'>
+                <div className='bg-muted w-full max-w-[min(100%,24rem)] overflow-hidden rounded-2xl p-2'>
                   <ModelUsageMediaPlaceholder
                     label={t('Waiting to generate...')}
+                    className='min-h-40'
                   />
                 </div>
               )}
@@ -286,7 +287,7 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
               {hasImages && (
                 <div
                   className={cn(
-                    'bg-muted max-w-[min(100%,36rem)] overflow-hidden rounded-2xl p-2',
+                    'bg-muted max-w-[min(100%,24rem)] overflow-hidden rounded-2xl p-2',
                     // 单图气泡随作品尺寸收缩，避免右侧大块空白
                     images.length === 1
                       ? 'w-fit'
@@ -326,7 +327,7 @@ export function ModelUsageMessageList(props: ModelUsageMessageListProps) {
               {hasVideos && (
                 <div
                   className={cn(
-                    'bg-muted max-w-[min(100%,36rem)] overflow-hidden rounded-2xl p-2',
+                    'bg-muted max-w-[min(100%,24rem)] overflow-hidden rounded-2xl p-2',
                     videos.length === 1
                       ? 'w-fit'
                       : 'grid w-full grid-cols-2 gap-2'

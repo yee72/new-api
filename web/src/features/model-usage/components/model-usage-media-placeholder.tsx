@@ -35,7 +35,7 @@ export function ModelUsageMediaPlaceholder(
       aria-live='polite'
       aria-label={props.label}
       className={cn(
-        'bg-muted/70 text-muted-foreground flex aspect-video w-full min-h-36 flex-col items-center justify-center gap-2 rounded-xl border border-dashed',
+        'bg-muted/70 text-muted-foreground flex aspect-video w-full min-h-24 flex-col items-center justify-center gap-2 rounded-xl border border-dashed',
         props.className
       )}
     >

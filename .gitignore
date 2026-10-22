@@ -49,3 +49,6 @@ go.work.sum
 .env.local
 .env.neon.jdcloud.staging
 .jdcloud-deploy/
+new-api-20261022-2300.tar.gz
+*.tar.gz
+.jd_ssh_pass
