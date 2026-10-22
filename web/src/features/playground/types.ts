@@ -81,6 +81,8 @@ export interface ChatCompletionRequest {
   frequency_penalty?: number
   presence_penalty?: number
   seed?: number
+  /** 意图分类等短调用可降推理；不改写 API Key 默认行为 */
+  reasoning_effort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh'
   /** Gemini 等 chat 生图需声明输出模态，否则上游可能只回文本 */
   modalities?: Array<'text' | 'image'>
 }

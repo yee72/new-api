@@ -54,7 +54,6 @@ export function ModelUsagePage() {
     setVideoConfig,
     send,
     deleteTurn,
-    resendEdited,
     regenerate,
     isModelSending,
     lastModelName,
@@ -226,7 +225,8 @@ export function ModelUsagePage() {
                 text,
                 attachments,
                 quoteTurnIds,
-                localAttachments
+                localAttachments,
+                listQuery.data?.prompt_enhance
               )
             }}
             onDeleteTurn={(turnId) => {
@@ -236,10 +236,6 @@ export function ModelUsagePage() {
             onRegenerate={async (message) => {
               if (!selectedModel) return
               await regenerate(selectedModel, message)
-            }}
-            onEditUserMessage={async (message, text) => {
-              if (!selectedModel) return
-              await resendEdited(selectedModel, message, text)
             }}
             onImageConfigChange={(config) => {
               if (!selectedModel) return

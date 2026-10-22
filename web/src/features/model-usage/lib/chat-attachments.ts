@@ -81,6 +81,32 @@ export function usableChatAttachments(
   )
 }
 
+/** 挑选未过期的图片附件（任务协议参考图） */
+export function usableImageAttachments(
+  attachments: ModelUsageAttachment[] | undefined
+): ModelUsageAttachment[] {
+  return usableChatAttachments(attachments).filter(
+    (item) => item.kind === 'image'
+  )
+}
+
+/** 图片附件 → data URL，供 images / videos 任务协议作参考图 */
+export async function resolveAttachmentImageDataUrls(
+  attachments: ModelUsageAttachment[] | undefined,
+  options?: { userId?: number | null }
+): Promise<string[]> {
+  const imageRefs = usableImageAttachments(attachments)
+  if (imageRefs.length === 0) return []
+  const dataUrls: string[] = []
+  for (const item of imageRefs) {
+    const blob = await fetchModelUsageMediaBlobCached(item.url!, {
+      userId: options?.userId,
+    })
+    dataUrls.push(ensureDataUrlMime(await blobToDataURL(blob), item.mime))
+  }
+  return dataUrls
+}
+
 function isExtractFailure(error: unknown): boolean {
   return (
     error instanceof Error && error.message === ATTACHMENT_EXTRACT_FAILED

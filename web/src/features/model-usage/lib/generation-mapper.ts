@@ -34,6 +34,8 @@ export type ImagesGenerationsPayload = {
   n: number
   size?: string
   quality?: string
+  /** 参考图（HTTP/data URL）；有值时上游按图生图处理 */
+  images?: string[]
 }
 
 export type VideosCreatePayload = {
@@ -41,6 +43,8 @@ export type VideosCreatePayload = {
   prompt: string
   seconds?: number
   size?: string
+  /** 参考图（HTTP/data URL）；有值时上游按图生视频处理 */
+  images?: string[]
 }
 
 export function validateGenerationForm(
@@ -76,10 +80,16 @@ function resolveVideoSize(
   )
 }
 
+function trimReferenceImages(images?: string[]): string[] | undefined {
+  const next = images?.map((item) => item.trim()).filter(Boolean)
+  return next && next.length > 0 ? next : undefined
+}
+
 /** 通用配置 → POST /pg/images/generations */
 export function mapToImagesGenerations(
   req: GenerationRequestV1,
-  caps: GenerationCapabilityMatrix
+  caps: GenerationCapabilityMatrix,
+  options?: { images?: string[] }
 ): ImagesGenerationsPayload {
   const payload: ImagesGenerationsPayload = {
     model: req.model,
@@ -91,22 +101,28 @@ export function mapToImagesGenerations(
   if (quality && quality !== 'auto') {
     payload.quality = quality
   }
+  const images = trimReferenceImages(options?.images)
+  if (images) payload.images = images
   return payload
 }
 
 /** 通用配置 → POST /pg/videos（视频强制 n=1，由调用方循环外控制） */
 export function mapToVideosCreate(
   req: GenerationRequestV1,
-  caps: GenerationCapabilityMatrix
+  caps: GenerationCapabilityMatrix,
+  options?: { images?: string[] }
 ): VideosCreatePayload {
   const seconds =
     req.duration_sec === -1
       ? undefined
       : (req.duration_sec ?? caps.duration_sec.default)
-  return {
+  const payload: VideosCreatePayload = {
     model: req.model,
     prompt: req.prompt,
     seconds,
     size: resolveVideoSize(req, caps),
   }
+  const images = trimReferenceImages(options?.images)
+  if (images) payload.images = images
+  return payload
 }

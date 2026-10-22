@@ -91,7 +91,7 @@ async function renderActions() {
         busy={false}
         onDelete={vi.fn()}
         onRegenerate={vi.fn()}
-        onEditUserMessage={vi.fn()}
+        
       />
     </I18nextProvider>
   )
@@ -100,6 +100,12 @@ async function renderActions() {
 describe('ModelUsageMessageList action buttons', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+  })
+
+  it('shows the generation prompt above image works', async () => {
+    await renderActions()
+    // 助手出图气泡：prompt 展示在图片上方（用户气泡不重复此布局）
+    expect(screen.getByText('draw a cat')).toBeInTheDocument()
   })
 
   it.each(actionLabels)(

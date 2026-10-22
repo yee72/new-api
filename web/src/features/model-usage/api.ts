@@ -137,6 +137,8 @@ export async function generateImages(payload: {
   size?: string
   quality?: string
   group?: string
+  /** 参考图 data URL / HTTP URL，供图生图 */
+  images?: string[]
 }): Promise<unknown> {
   // 与 Playground 一致：走 UserAuth 的 /pg 入口，避免 /v1 TokenAuth 401 被踢到登录页
   const res = await api.post('/pg/images/generations', payload, {
@@ -151,6 +153,8 @@ export async function generateVideo(payload: {
   prompt: string
   seconds?: number
   size?: string
+  /** 参考图 data URL / HTTP URL，供图生视频 */
+  images?: string[]
 }): Promise<unknown> {
   const res = await api.post('/pg/videos', payload, {
     skipErrorHandler: true,

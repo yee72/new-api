@@ -73,7 +73,7 @@ async function renderWorkspace() {
         onSend={vi.fn()}
         onDeleteTurn={vi.fn()}
         onRegenerate={vi.fn()}
-        onEditUserMessage={vi.fn()}
+        
         onImageConfigChange={vi.fn()}
         onVideoConfigChange={vi.fn()}
       />

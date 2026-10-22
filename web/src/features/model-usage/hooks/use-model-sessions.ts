@@ -30,6 +30,7 @@ import { useAuthStore } from '@/stores/auth-store'
 
 import {
   commitModelUsageTurn,
+  fetchModelUsageModels,
   fetchModelUsageSession,
   generateImages,
   generateVideo,
@@ -50,10 +51,23 @@ import {
 } from '../lib/capabilities'
 import {
   buildChatUserContent,
+  resolveAttachmentImageDataUrls,
   usableChatAttachments,
+  usableImageAttachments,
 } from '../lib/chat-attachments'
 import { resolveChatFailurePresentation } from '../lib/chat-failure'
+import { streamModelUsageChatCompletion } from '../lib/chat-stream'
 import { selectChatHistoryMessages } from '../lib/chat-history'
+import { stageAttachmentsFromWorks } from '../lib/composer-stage'
+import {
+  buildImageIntentMessages,
+  findLatestCompletedImageMessage,
+  imageWorkNoteFallbackKey,
+  parseImagePromptIntentResponse,
+  resolveIntentWorkNote,
+  shouldAutoAttachLatestImageForEdit,
+  shouldClassifyImagePromptIntent,
+} from '../lib/image-intent'
 import {
   textFromAnthropicResponse,
   toAnthropicMessages,
@@ -84,6 +98,7 @@ import type {
   ModelUsageAttachment,
   ModelUsageItem,
   ModelUsageMessage,
+  ModelUsagePromptEnhance,
   ModelUsageSession,
 } from '../types'
 
@@ -264,11 +279,15 @@ export function useModelSessions() {
         localAttachments?: LocalAttachment[]
         /** 有值时只把这些轮次拼进上游历史（引用模式） */
         quoteTurnIds?: string[]
+        /** 提示增强模型配置；用于图片意图分类 */
+        promptEnhance?: ModelUsagePromptEnhance | null
       }
     ) => {
       const modelName = model.model_name
       const store = useModelUsageSessionsStore.getState()
       const latest = store.sessions[modelName] ?? createEmptySession(model)
+      const priorMessages = latest.messages
+      const promptEnhance = options?.promptEnhance
       if (latest.sending) return
 
       const imageConfig = options?.imageConfig ?? latest.imageConfig
@@ -302,13 +321,20 @@ export function useModelSessions() {
         }
       }
 
-      // 优先用本地文件做乐观占位，已上传附件（重生成）原样带上
-      const initialAttachments =
+      // 已有短链附件（编辑/引用/重生成）+ 本地待上传：乐观占位一并展示
+      const carriedAttachments =
+        options?.attachments && options.attachments.length > 0
+          ? options.attachments
+          : []
+      const optimisticLocals =
         localAttachments && localAttachments.length > 0
           ? localAttachments.map(optimisticAttachmentFromLocal)
-          : options?.attachments && options.attachments.length > 0
-            ? options.attachments
-            : undefined
+          : []
+      const initialAttachments =
+        carriedAttachments.length > 0 || optimisticLocals.length > 0
+          ? [...carriedAttachments, ...optimisticLocals]
+          : undefined
+      const createdAt = Math.floor(Date.now() / 1000)
       let userMessage: ModelUsageMessage = {
         id: userMessageId,
         turnId,
@@ -320,9 +346,10 @@ export function useModelSessions() {
         attachments: initialAttachments,
         imageConfig: model.model_type === 'image' ? imageConfig : undefined,
         videoConfig: model.model_type === 'video' ? videoConfig : undefined,
+        created_at: createdAt,
       }
       const assistantId = newId('a')
-      const pendingAssistant: ModelUsageMessage = {
+      let pendingAssistant: ModelUsageMessage = {
         id: assistantId,
         turnId,
         role: 'assistant',
@@ -335,6 +362,25 @@ export function useModelSessions() {
         prompt,
         imageConfig: model.model_type === 'image' ? imageConfig : undefined,
         videoConfig: model.model_type === 'video' ? videoConfig : undefined,
+        created_at: createdAt,
+      }
+
+      const applyAssistantWorkNote = (workNote: string) => {
+        const note = workNote.trim()
+        if (!note) return
+        pendingAssistant = { ...pendingAssistant, workNote: note }
+        patchSession(
+          modelName,
+          (current) => ({
+            ...current,
+            messages: current.messages.map((message) =>
+              message.id === assistantId
+                ? { ...message, workNote: note }
+                : message
+            ),
+          }),
+          model
+        )
       }
 
       // 失败轮次用户附件不拼进历史；有引用时只带选中轮次，避免全量历史
@@ -416,10 +462,9 @@ export function useModelSessions() {
         }
       }
 
-      let attachments =
-        options?.attachments && options.attachments.length > 0
-          ? options.attachments
-          : undefined
+      // 先保留编辑/引用短链；本地文件上传后与之合并
+      let attachments: ModelUsageAttachment[] | undefined =
+        carriedAttachments.length > 0 ? [...carriedAttachments] : undefined
 
       // 占位展示后再上传，避免附件耗时挡住发送反馈
       if (localAttachments && localAttachments.length > 0) {
@@ -428,15 +473,15 @@ export function useModelSessions() {
           for (const item of localAttachments) {
             uploaded.push(await uploadModelUsageAttachment(item.file))
           }
-          attachments = uploaded
-          userMessage = { ...userMessage, attachments: uploaded }
+          attachments = [...carriedAttachments, ...uploaded]
+          userMessage = { ...userMessage, attachments }
           patchSession(
             modelName,
             (current) => ({
               ...current,
               messages: current.messages.map((message) =>
                 message.id === userMessageId
-                  ? { ...message, attachments: uploaded }
+                  ? { ...message, attachments }
                   : message
               ),
             }),
@@ -454,6 +499,112 @@ export function useModelSessions() {
       }
 
       const invokeProtocol = invokeProtocolEarly
+
+      // 图片流：无参考图但有历史完成图时，用增强模型判「改图 / 新图」
+      // 发送前刷新 prompt_enhance，避免列表缓存仍是未配置状态而跳过分类
+      const latestWorkForIntent = findLatestCompletedImageMessage(priorMessages)
+      const intentPathCandidate =
+        (model.model_type === 'image' || invokeProtocol === 'images') &&
+        usableImageAttachments(attachments).length === 0 &&
+        Boolean(latestWorkForIntent)
+
+      let resolvedEnhance = promptEnhance ?? null
+      if (intentPathCandidate) {
+        try {
+          const freshList = await fetchModelUsageModels({
+            type: model.model_type === 'image' ? 'image' : 'all',
+          })
+          if (freshList.prompt_enhance) {
+            resolvedEnhance = freshList.prompt_enhance
+          }
+        } catch {
+          // 刷新失败则沿用传入配置
+        }
+      }
+
+      let intentAttachedEdit = false
+      let intentWorkNote: string | undefined
+      if (
+        shouldClassifyImagePromptIntent({
+          model,
+          attachments,
+          priorMessages,
+          promptEnhance: resolvedEnhance,
+        })
+      ) {
+        const enhanceModel = resolvedEnhance?.model?.trim()
+        if (latestWorkForIntent && enhanceModel) {
+          try {
+            const intentResponse = await sendChatCompletion({
+              model: enhanceModel,
+              messages: buildImageIntentMessages(prompt),
+              stream: false,
+              max_tokens: 200,
+              temperature: 0,
+              // 短分类调用降推理，避免答案只落在 reasoning_content
+              reasoning_effort: 'low',
+            })
+            const intentMessage = intentResponse.choices?.[0]?.message
+            const contentText =
+              typeof intentMessage?.content === 'string'
+                ? intentMessage.content.trim()
+                : ''
+            const reasoningText =
+              typeof intentMessage?.reasoning_content === 'string'
+                ? intentMessage.reasoning_content.trim()
+                : ''
+            const intentResult = parseImagePromptIntentResponse(
+              contentText || reasoningText
+            )
+            intentWorkNote = resolveIntentWorkNote(intentResult)
+            if (shouldAutoAttachLatestImageForEdit(intentResult)) {
+              const staged = stageAttachmentsFromWorks(latestWorkForIntent)
+              if (staged.attachments.length > 0) {
+                attachments = [...(attachments ?? []), ...staged.attachments]
+                userMessage = { ...userMessage, attachments }
+                intentAttachedEdit = true
+                patchSession(
+                  modelName,
+                  (current) => ({
+                    ...current,
+                    messages: current.messages.map((message) =>
+                      message.id === userMessageId
+                        ? { ...message, attachments }
+                        : message
+                    ),
+                  }),
+                  model
+                )
+                toast.info(t('Editing based on your previous image'))
+              }
+            }
+          } catch {
+            // 意图失败降级为文生新图，不阻断发送
+            toast.info(t('Image edit intent unavailable, generating a new image'))
+          }
+        }
+      } else if (intentPathCandidate && !resolvedEnhance?.model?.trim()) {
+        toast.info(t('Prompt enhance model is not configured'))
+      }
+
+      // 生图/生视频：作品上方展示自然语言说明（意图 summary，否则模板）
+      if (model.model_type === 'image' || model.model_type === 'video') {
+        const refCount = usableImageAttachments(attachments).length
+        let workNote = intentWorkNote
+        if (!workNote) {
+          if (intentAttachedEdit) {
+            workNote = t(imageWorkNoteFallbackKey('edit'), { prompt })
+          } else if (refCount > 0) {
+            workNote = t(imageWorkNoteFallbackKey('refs'), {
+              count: refCount,
+              prompt,
+            })
+          } else {
+            workNote = t(imageWorkNoteFallbackKey('text'), { prompt })
+          }
+        }
+        applyAssistantWorkNote(workNote)
+      }
 
       try {
         if (invokeProtocol === 'chat' || invokeProtocol === 'messages') {
@@ -508,50 +659,112 @@ export function useModelSessions() {
             return
           }
 
-          await savePendingTurn()
-
           const chatImages: string[] = []
           let contentText = ''
           const openAIMessages = [
             ...chatHistory,
             { role: 'user' as const, content: userContent },
           ]
-          for (let i = 0; i < requestCount; i += 1) {
-            let messageImages:
-              | Array<{ type?: string; image_url?: { url?: string } }>
-              | undefined
-            if (useAnthropicMessages) {
-              const response = (await sendAnthropicMessages({
-                model: modelName,
-                max_tokens: 4096,
-                messages: toAnthropicMessages(openAIMessages),
-                stream: false,
-              })) as AnthropicMessagesResponse
-              contentText = textFromAnthropicResponse(response)
-            } else {
-              const response = await sendChatCompletion({
-                model: modelName,
-                messages: openAIMessages,
-                stream: false,
-                ...(chatImage ? { modalities: ['text', 'image'] as const } : {}),
-              })
-              const assistantMessage = response.choices?.[0]?.message
-              const rawContent = assistantMessage?.content
-              if (typeof rawContent === 'string') {
-                contentText = rawContent
-              } else if (rawContent == null) {
-                contentText = ''
-              } else {
-                contentText = String(rawContent)
-              }
-              messageImages = assistantMessage?.images
+
+          // 纯文本对话走 SSE，边收边展示；生图 / Anthropic Messages 仍非流式
+          const useTextStream = !chatImage && !useAnthropicMessages
+          if (useTextStream) {
+            // 落库不挡首包；失败仅打日志由后续 commit 兜底
+            void savePendingTurn()
+            let rafId = 0
+            const flushStreamingContent = () => {
+              rafId = 0
+              const snapshot = contentText
+              patchSession(
+                modelName,
+                (current) => ({
+                  ...current,
+                  messages: current.messages.map((message) =>
+                    message.id === assistantId
+                      ? {
+                          ...message,
+                          // 空内容保持空串，气泡继续显示 spinner
+                          content: snapshot,
+                          status: 'pending',
+                        }
+                      : message
+                  ),
+                }),
+                model
+              )
             }
-            if (chatImage) {
-              for (const src of extractImagesFromChatMessage({
-                content: contentText,
-                images: messageImages,
-              })) {
-                if (!chatImages.includes(src)) chatImages.push(src)
+            try {
+              const streamed = await streamModelUsageChatCompletion(
+                {
+                  model: modelName,
+                  messages: openAIMessages,
+                  stream: true,
+                },
+                {
+                  onUpdate: (type, chunk) => {
+                    if (type !== 'content') return
+                    contentText += chunk
+                    if (!rafId) {
+                      rafId = requestAnimationFrame(flushStreamingContent)
+                    }
+                  },
+                }
+              )
+              if (rafId) cancelAnimationFrame(rafId)
+              contentText = streamed.content
+              // 收尾再刷一次，避免末包落在上一帧之后未进 UI
+              flushStreamingContent()
+            } catch (streamError) {
+              if (rafId) cancelAnimationFrame(rafId)
+              markServerErrorHandled(streamError)
+              const presentation = resolveChatFailurePresentation(
+                streamError,
+                t
+              )
+              await failAssistant(presentation.title, presentation.detail)
+              return
+            }
+          } else {
+            await savePendingTurn()
+            for (let i = 0; i < requestCount; i += 1) {
+              let messageImages:
+                | Array<{ type?: string; image_url?: { url?: string } }>
+                | undefined
+              if (useAnthropicMessages) {
+                const response = (await sendAnthropicMessages({
+                  model: modelName,
+                  max_tokens: 4096,
+                  messages: toAnthropicMessages(openAIMessages),
+                  stream: false,
+                })) as AnthropicMessagesResponse
+                contentText = textFromAnthropicResponse(response)
+              } else {
+                const response = await sendChatCompletion({
+                  model: modelName,
+                  messages: openAIMessages,
+                  stream: false,
+                  ...(chatImage
+                    ? { modalities: ['text', 'image'] as const }
+                    : {}),
+                })
+                const assistantMessage = response.choices?.[0]?.message
+                const rawContent = assistantMessage?.content
+                if (typeof rawContent === 'string') {
+                  contentText = rawContent
+                } else if (rawContent == null) {
+                  contentText = ''
+                } else {
+                  contentText = String(rawContent)
+                }
+                messageImages = assistantMessage?.images
+              }
+              if (chatImage) {
+                for (const src of extractImagesFromChatMessage({
+                  content: contentText,
+                  images: messageImages,
+                })) {
+                  if (!chatImages.includes(src)) chatImages.push(src)
+                }
               }
             }
           }
@@ -612,6 +825,34 @@ export function useModelSessions() {
           return
         }
 
+        // 图片/视频任务协议：用户图片附件转 data URL 写入 images 字段
+        let taskReferenceImages: string[] | undefined
+        if (invokeProtocol === 'images' || invokeProtocol === 'videos') {
+          const imageAttachmentCount =
+            attachments?.filter(
+              (item) => item.kind === 'image' && Boolean(item.url?.trim())
+            ).length ?? 0
+          if (
+            imageAttachmentCount > 0 &&
+            usableImageAttachments(attachments).length !== imageAttachmentCount
+          ) {
+            await failAssistant(t('Attachment expired'))
+            toast.error(t('Attachment expired'))
+            return
+          }
+          try {
+            const dataUrls = await resolveAttachmentImageDataUrls(
+              attachments,
+              { userId }
+            )
+            if (dataUrls.length > 0) taskReferenceImages = dataUrls
+          } catch {
+            await failAssistant(t('Failed to load attachment'))
+            toast.error(t('Failed to load attachment'))
+            return
+          }
+        }
+
         if (invokeProtocol === 'images') {
           const imageCaps = resolveGenerationCapabilities(
             model.generation_capabilities,
@@ -626,7 +867,10 @@ export function useModelSessions() {
                 model: modelName,
                 prompt,
               },
-              imageCaps
+              imageCaps,
+              taskReferenceImages
+                ? { images: taskReferenceImages }
+                : undefined
             )
           )
           const sources = extractImageUrls(data)
@@ -661,7 +905,8 @@ export function useModelSessions() {
             model: modelName,
             prompt,
           },
-          videoCaps
+          videoCaps,
+          taskReferenceImages ? { images: taskReferenceImages } : undefined
         )
         // 视频强制单任务；n 预留能力表但 MVP mapper 固定 1
         await savePendingTurn()
@@ -715,7 +960,8 @@ export function useModelSessions() {
       prompt: string,
       attachments?: ModelUsageAttachment[],
       quoteTurnIds?: string[],
-      localAttachments?: LocalAttachment[]
+      localAttachments?: LocalAttachment[],
+      promptEnhance?: ModelUsagePromptEnhance | null
     ) => {
       const text = prompt.trim()
       const hasLocal = Boolean(localAttachments && localAttachments.length > 0)
@@ -731,6 +977,7 @@ export function useModelSessions() {
         attachments,
         localAttachments,
         quoteTurnIds,
+        promptEnhance,
       })
     },
     [runGeneration, setLastModelName, t]

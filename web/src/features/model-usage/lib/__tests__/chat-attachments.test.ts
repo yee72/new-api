@@ -23,6 +23,8 @@ import {
   buildChatUserContent,
   contentPartFromAttachmentData,
   ensureDataUrlMime,
+  resolveAttachmentImageDataUrls,
+  usableImageAttachments,
 } from '../chat-attachments'
 import type { ModelUsageAttachment } from '../../types'
 
@@ -141,5 +143,31 @@ describe('chat attachment content parts', () => {
       type: 'image_url',
       image_url: { url: expect.stringContaining('data:image/png') },
     })
+  })
+
+  it('resolves only non-expired image attachments to data URLs', async () => {
+    fetchBlob.mockResolvedValue(
+      new Blob([new Uint8Array([9, 8, 7])], { type: 'image/png' })
+    )
+    const expired = Math.floor(Date.now() / 1000) - 10
+    expect(
+      usableImageAttachments([
+        attachment({ kind: 'image', name: 'ok.png', mime: 'image/png' }),
+        attachment({
+          kind: 'image',
+          name: 'old.png',
+          mime: 'image/png',
+          expires_at: expired,
+        }),
+        attachment({ kind: 'pdf', name: 'a.pdf', mime: 'application/pdf' }),
+      ])
+    ).toHaveLength(1)
+
+    const urls = await resolveAttachmentImageDataUrls([
+      attachment({ kind: 'image', name: 'ok.png', mime: 'image/png' }),
+      attachment({ kind: 'pdf', name: 'a.pdf', mime: 'application/pdf' }),
+    ])
+    expect(urls).toHaveLength(1)
+    expect(urls[0]).toContain('data:image/png')
   })
 })

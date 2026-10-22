@@ -39,10 +39,14 @@ type ModelUsageMessage struct {
 	Videos      []ModelUsageVideo      `json:"videos,omitempty"`
 	Attachments []ModelUsageAttachment `json:"attachments,omitempty"`
 	Prompt      string                 `json:"prompt,omitempty"`
+	// WorkNote 生图/生视频作品上方的自然语言说明（意图摘要）；重生成仍用 Prompt。
+	WorkNote string `json:"workNote,omitempty"`
 	// ErrorDetail 对话失败时接口原文，前端折叠展示；余额不足等友好文案可不带。
 	ErrorDetail string         `json:"errorDetail,omitempty"`
 	ImageConfig map[string]any `json:"imageConfig,omitempty"`
 	VideoConfig map[string]any `json:"videoConfig,omitempty"`
+	// CreatedAt 本轮对话发起时间（unix 秒），用户/助手气泡共用同一值。
+	CreatedAt int64 `json:"created_at,omitempty"`
 }
 
 type ModelUsageVideo struct {

@@ -130,11 +130,8 @@ func normalizePersistedAttachments(userId int, attachments []model.ModelUsageAtt
 			return nil, ErrModelUsageInvalidRequest
 		}
 		relative, ok := modelUsageMediaRelativeKey(item.URL)
-		if !ok || !strings.HasPrefix(relative, "model-usage/attachments/") {
-			return nil, ErrModelUsageInvalidRequest
-		}
-		owner, ownerOK := modelUsageOwnerID(relative)
-		if !ownerOK || owner != userId {
+		// 允许本用户上传附件与生成作品短链（引用作品再发送）
+		if !ok || !isOwnedModelUsageReusableMedia(userId, relative) {
 			return nil, ErrModelUsageInvalidRequest
 		}
 		if item.ExpiresAt <= 0 {

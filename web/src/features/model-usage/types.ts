@@ -122,10 +122,14 @@ export type ModelUsageMessage = {
   attachments?: ModelUsageAttachment[]
   /** 用户输入，供删除后重生成 */
   prompt?: string
+  /** 生图/生视频作品上方说明（意图自然语言摘要）；重生成仍用 prompt */
+  workNote?: string
   /** 失败时接口原文（折叠展开）；余额不足等友好文案可不带 */
   errorDetail?: string
   imageConfig?: ImageGenerationConfig
   videoConfig?: VideoGenerationConfig
+  /** 本轮对话发起时间（unix 秒） */
+  created_at?: number
 }
 
 export type ModelUsageSessionDTO = {

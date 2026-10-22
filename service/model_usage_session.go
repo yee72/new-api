@@ -691,12 +691,38 @@ func validatePersistedMessage(message model.ModelUsageMessage) error {
 				return ErrModelUsageInvalidRequest
 			}
 			relative, ok := modelUsageMediaRelativeKey(attachment.URL)
-			if !ok || !strings.HasPrefix(relative, "model-usage/attachments/") {
+			if !ok {
+				return ErrModelUsageInvalidRequest
+			}
+			// 路径归属在 normalize 阶段按 userId 校验；此处只挡非 model-usage 前缀
+			if !strings.HasPrefix(relative, "model-usage/") {
 				return ErrModelUsageInvalidRequest
 			}
 		}
 	}
 	return nil
+}
+
+// isOwnedModelUsageReusableMedia 本用户可复用的短链：上传附件或生成作品。
+func isOwnedModelUsageReusableMedia(userId int, relativeKey string) bool {
+	if userId <= 0 || relativeKey == "" {
+		return false
+	}
+	owner, ok := modelUsageOwnerID(relativeKey)
+	if !ok || owner != userId {
+		return false
+	}
+	parts := strings.Split(relativeKey, "/")
+	if len(parts) < 3 || parts[0] != "model-usage" {
+		return false
+	}
+	switch parts[1] {
+	case "attachments", "outputs":
+		return len(parts) >= 4
+	default:
+		// 旧路径 model-usage/{userId}/...
+		return true
+	}
 }
 
 func containsDataURL(value string) bool {

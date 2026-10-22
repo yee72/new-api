@@ -100,4 +100,40 @@ describe('generation mapper', () => {
       ).n
     ).toBe(10)
   })
+
+  it('forwards reference images for image and video tasks', () => {
+    const imageCaps = resolveGenerationCapabilities(undefined, 'image')
+    const videoCaps = resolveGenerationCapabilities(undefined, 'video')
+    expect(
+      mapToImagesGenerations(
+        {
+          ...DEFAULT_IMAGE_FORM,
+          model: 'qwen-image',
+          prompt: 'add wings',
+        },
+        imageCaps,
+        {
+          images: [
+            'data:image/png;base64,abc',
+            '  ',
+            'https://cdn.example/ref.png',
+          ],
+        }
+      ).images
+    ).toEqual(['data:image/png;base64,abc', 'https://cdn.example/ref.png'])
+    expect(
+      mapToVideosCreate(
+        {
+          ...DEFAULT_VIDEO_FORM,
+          model: 'wan',
+          prompt: 'animate',
+          aspect_ratio: '16:9',
+          resolution: '720p',
+          duration_sec: 5,
+        },
+        videoCaps,
+        { images: ['data:image/png;base64,frame'] }
+      ).images
+    ).toEqual(['data:image/png;base64,frame'])
+  })
 })

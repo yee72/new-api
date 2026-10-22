@@ -49,11 +49,7 @@ function message(overrides: Partial<ModelUsageMessage>): ModelUsageMessage {
 
 async function renderList(
   messages: ModelUsageMessage[],
-  onEditUserMessage: (
-    message: ModelUsageMessage,
-    text: string
-  ) => Promise<void>,
-  busy = false
+  onEditToComposer: (message: ModelUsageMessage) => void
 ) {
   const i18n = createInstance()
   await i18n.init({
@@ -63,11 +59,14 @@ async function renderList(
       en: {
         translation: {
           Edit: 'Edit',
-          Cancel: 'Cancel',
-          Submit: 'Submit',
           Copy: 'Copy',
           Delete: 'Delete',
           Regenerate: 'Regenerate',
+          Quote: 'Quote',
+          'Delete this turn?': 'Delete this turn?',
+          'This will delete the question and its reply. This action cannot be undone.':
+            'This will delete the question and its reply. This action cannot be undone.',
+          Cancel: 'Cancel',
           'Copied!': 'Copied!',
         },
       },
@@ -78,23 +77,23 @@ async function renderList(
       <ModelUsageMessageList
         messages={messages}
         emptyHint='empty'
-        busy={busy}
+        busy={false}
         onDelete={vi.fn()}
         onRegenerate={vi.fn()}
-        onEditUserMessage={onEditUserMessage}
+        onEditToComposer={onEditToComposer}
       />
     </I18nextProvider>
   )
 }
 
-describe('ModelUsageMessageList edit sent text', () => {
+describe('ModelUsageMessageList edit to composer', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it('submits edited user text while the original turn stays visible', async () => {
+  it('loads user bubble into composer without inline editor', async () => {
     const user = userEvent.setup()
-    const onEdit = vi.fn().mockResolvedValue(undefined)
+    const onEdit = vi.fn()
     await renderList(
       [
         message({ id: 'u1', content: 'draw a cat' }),
@@ -107,59 +106,10 @@ describe('ModelUsageMessageList edit sent text', () => {
       onEdit
     )
 
-    expect(screen.getAllByRole('button', { name: 'Edit' })).toHaveLength(1)
     await user.click(screen.getByRole('button', { name: 'Edit' }))
-    const editor = screen.getByRole('textbox', { name: 'Edit' })
-    expect(editor).toHaveValue('draw a cat')
-
-    await user.clear(editor)
-    await user.type(editor, 'draw a dog')
-    await user.click(screen.getByRole('button', { name: 'Submit' }))
-
     expect(onEdit).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'u1', content: 'draw a cat' }),
-      'draw a dog'
+      expect.objectContaining({ id: 'u1', content: 'draw a cat' })
     )
-    expect(screen.getByText('draw a cat')).toBeInTheDocument()
-    expect(screen.getByText('Here is a cat')).toBeInTheDocument()
-    expect(
-      screen.queryByRole('textbox', { name: 'Edit' })
-    ).not.toBeInTheDocument()
-  })
-
-  it('keeps the original text when the edit is cancelled', async () => {
-    const user = userEvent.setup()
-    const onEdit = vi.fn().mockResolvedValue(undefined)
-    await renderList([message({ id: 'u1' })], onEdit)
-
-    await user.click(screen.getByRole('button', { name: 'Edit' }))
-    const editor = screen.getByRole('textbox', { name: 'Edit' })
-    await user.type(editor, ' extra')
-    await user.click(screen.getByRole('button', { name: 'Cancel' }))
-
-    expect(onEdit).not.toHaveBeenCalled()
-    expect(screen.getByText('draw a cat')).toBeInTheDocument()
-    expect(
-      screen.queryByRole('textbox', { name: 'Edit' })
-    ).not.toBeInTheDocument()
-  })
-
-  it('does not submit a blank edit', async () => {
-    const user = userEvent.setup()
-    const onEdit = vi.fn().mockResolvedValue(undefined)
-    await renderList([message({ id: 'u1' })], onEdit)
-
-    await user.click(screen.getByRole('button', { name: 'Edit' }))
-    await user.clear(screen.getByRole('textbox', { name: 'Edit' }))
-
-    expect(screen.getByRole('button', { name: 'Submit' })).toBeDisabled()
-    expect(onEdit).not.toHaveBeenCalled()
-  })
-
-  it('disables edit while a request is in progress', async () => {
-    const onEdit = vi.fn().mockResolvedValue(undefined)
-    await renderList([message({ id: 'u1' })], onEdit, true)
-
-    expect(screen.getByRole('button', { name: 'Edit' })).toBeDisabled()
+    expect(screen.queryByRole('textbox', { name: 'Edit' })).toBeNull()
   })
 })

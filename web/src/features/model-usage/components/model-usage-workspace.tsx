@@ -71,6 +71,11 @@ import {
   nValues,
   resolveGenerationCapabilities,
 } from '../lib/capabilities'
+import {
+  stageAttachmentsForEdit,
+  stageAttachmentsFromWorks,
+  takeAttachmentsUpToMax,
+} from '../lib/composer-stage'
 import { generationOptionLabelKey } from '../lib/generation-option-labels'
 import {
   classifyPromptEnhanceAttachments,
@@ -94,6 +99,7 @@ import type {
 } from '../types'
 import { ModelUsageAttachmentIcon } from './model-usage-attachment-icon'
 import { ModelUsageAttachmentTooltip } from './model-usage-attachment-tooltip'
+import { ModelUsageAuthImage } from './model-usage-auth-media'
 import {
   ModelUsageMediaPreview,
   type ModelUsagePreviewItem,
@@ -114,7 +120,6 @@ type ModelUsageWorkspaceProps = {
   ) => Promise<void>
   onDeleteTurn: (turnId: string) => void
   onRegenerate: (message: ModelUsageMessage) => Promise<void>
-  onEditUserMessage: (message: ModelUsageMessage, text: string) => Promise<void>
   onImageConfigChange: (config: ImageGenerationConfig) => void
   onVideoConfigChange: (config: VideoGenerationConfig) => void
 }
@@ -198,19 +203,30 @@ const ATTACH_CARD_HEIGHT = Math.round(ATTACH_CARD_WIDTH * 1.5)
 /** 展开时相邻卡片水平间距（中心距） */
 const ATTACH_EXPAND_STEP = 52
 
+/** 输入区附件轨展示项（本地上传或编辑/引用短链） */
+type ComposerRailItem = {
+  id: string
+  name: string
+  kind: 'image' | 'video' | 'file'
+  ext: string
+  /** blob: 本地预览；http(s) 远程图用 AuthImage */
+  previewUrl?: string
+  remote?: boolean
+}
+
 /**
  * 左侧附件：高度为原正方形 1.5 倍；多文件向左堆叠，右上角高亮圆圈显示总数；
  * 悬停后横向展开并露出「附件」添加卡。
  */
 function ComposerAttachmentRail(props: {
-  attachments: LocalAttachment[]
+  items: ComposerRailItem[]
   maxAttachments: number
   onAdd: () => void
   onRemove: (id: string) => void
-  onPreview: (attachment: LocalAttachment) => void
+  onPreview: (item: ComposerRailItem) => void
 }) {
   const { t } = useTranslation()
-  const count = props.attachments.length
+  const count = props.items.length
   const atLimit = count >= props.maxAttachments
   const showCountBadge = count > 1
 
@@ -267,7 +283,7 @@ function ComposerAttachmentRail(props: {
           } as CSSProperties
         }
       >
-        {props.attachments.map((file, index) => {
+        {props.items.map((file, index) => {
           const displayType =
             file.kind === 'image' || file.kind === 'video'
               ? file.kind
@@ -297,7 +313,21 @@ function ComposerAttachmentRail(props: {
             </div>
           )
           if (file.kind === 'image' && file.previewUrl) {
-            attachmentPreview = (
+            attachmentPreview = file.remote ? (
+              <button
+                type='button'
+                className='size-full'
+                onClick={() => props.onPreview(file)}
+                aria-label={t('Image Preview')}
+              >
+                <ModelUsageAuthImage
+                  url={file.previewUrl}
+                  alt=''
+                  compact
+                  className='size-full object-cover'
+                />
+              </button>
+            ) : (
               <button
                 type='button'
                 className='size-full'
@@ -432,6 +462,13 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
   const { t } = useTranslation()
   const [prompt, setPrompt] = useState('')
   const [attachments, setAttachments] = useState<LocalAttachment[]>([])
+  /** 编辑/引用填入的短链附件（发送时不再上传） */
+  const [stagedAttachments, setStagedAttachments] = useState<
+    ModelUsageAttachment[]
+  >([])
+  const [quotedWorkMessageId, setQuotedWorkMessageId] = useState<string | null>(
+    null
+  )
   const [quotes, setQuotes] = useState<QuoteChip[]>([])
   const [enhancing, setEnhancing] = useState(false)
   const [preview, setPreview] = useState<{
@@ -448,10 +485,46 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
     () => new Set(quotes.map((item) => item.messageId)),
     [quotes]
   )
+  const quotedWorkMessageIds = useMemo(
+    () =>
+      quotedWorkMessageId ? new Set([quotedWorkMessageId]) : new Set<string>(),
+    [quotedWorkMessageId]
+  )
+
+  const clearLocalAttachments = () => {
+    setAttachments((current) => {
+      for (const item of current) {
+        if (item.previewUrl) URL.revokeObjectURL(item.previewUrl)
+      }
+      return []
+    })
+  }
+
+  /** 清空附件区后填入短链附件（编辑/引用） */
+  const replaceComposerAttachments = (
+    next: ModelUsageAttachment[],
+    options?: { toastExpired?: boolean; toastTruncated?: boolean }
+  ) => {
+    clearLocalAttachments()
+    const { items, truncated } = takeAttachmentsUpToMax(next)
+    setStagedAttachments(items)
+    if (options?.toastExpired) {
+      toast.info(t('Attachment expired'))
+    }
+    if (options?.toastTruncated || truncated) {
+      toast.info(
+        t('You can upload up to {{count}} attachments', {
+          count: MODEL_USAGE_MAX_ATTACHMENTS,
+        })
+      )
+    }
+  }
 
   // 切换模型时清空引用与附件（附件仅属于当前模型）
   useEffect(() => {
     setQuotes([])
+    setQuotedWorkMessageId(null)
+    setStagedAttachments([])
     setAttachments((current) => {
       for (const item of current) {
         if (item.previewUrl) URL.revokeObjectURL(item.previewUrl)
@@ -514,7 +587,43 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
     )
   }
 
-  const hasAttachments = attachments.length > 0
+  const composerAttachmentCount =
+    attachments.length + stagedAttachments.length
+  const hasAttachments = composerAttachmentCount > 0
+  const railItems: ComposerRailItem[] = [
+    ...stagedAttachments.map((item) => {
+      const display = displayTypeFromExt(
+        item.name.includes('.')
+          ? item.name.slice(item.name.lastIndexOf('.') + 1)
+          : ''
+      )
+      const kind: ComposerRailItem['kind'] =
+        item.kind === 'image'
+          ? 'image'
+          : display === 'video'
+            ? 'video'
+            : 'file'
+      return {
+        id: item.id,
+        name: item.name,
+        kind,
+        ext:
+          item.name.includes('.')
+            ? item.name.slice(item.name.lastIndexOf('.') + 1)
+            : '',
+        previewUrl: item.url,
+        remote: true,
+      }
+    }),
+    ...attachments.map((item) => ({
+      id: item.id,
+      name: item.name,
+      kind: item.kind,
+      ext: item.ext,
+      previewUrl: item.previewUrl,
+      remote: false,
+    })),
+  ]
   // 仅当前模型发送中时禁用输入，其他模型进行中的请求互不影响
   const busy = props.session.sending
   const hasPromptText = Boolean(prompt.trim())
@@ -533,7 +642,7 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
     if (list.length === 0) return
 
     const maxAttachments = MODEL_USAGE_MAX_ATTACHMENTS
-    const remaining = maxAttachments - attachments.length
+    const remaining = maxAttachments - composerAttachmentCount
     if (remaining <= 0) {
       toast.info(
         t('You can upload up to {{count}} attachments', {
@@ -568,35 +677,73 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
         previewUrl,
       })
     }
-    setAttachments((current) => [...current, ...next].slice(0, maxAttachments))
+    setAttachments((current) =>
+      [...current, ...next].slice(0, maxAttachments - stagedAttachments.length)
+    )
   }
 
   const removeAttachment = (id: string) => {
+    setStagedAttachments((current) => {
+      if (!current.some((item) => item.id === id)) return current
+      setQuotedWorkMessageId(null)
+      return current.filter((item) => item.id !== id)
+    })
     setAttachments((current) => {
       const target = current.find((item) => item.id === id)
-      if (target?.previewUrl) URL.revokeObjectURL(target.previewUrl)
+      if (!target) return current
+      if (target.previewUrl) URL.revokeObjectURL(target.previewUrl)
       return current.filter((item) => item.id !== id)
     })
   }
 
-  const openAttachmentPreview = (attachment: LocalAttachment) => {
-    if (attachment.kind === 'file' || !attachment.previewUrl) return
-    const media = attachments.filter(
+  const openAttachmentPreview = (item: ComposerRailItem) => {
+    if (item.kind === 'file' || !item.previewUrl) return
+    const media = railItems.filter(
       (
-        item
-      ): item is LocalAttachment & {
+        entry
+      ): entry is ComposerRailItem & {
         kind: 'image' | 'video'
         previewUrl: string
       } =>
-        (item.kind === 'image' || item.kind === 'video') &&
-        Boolean(item.previewUrl)
+        (entry.kind === 'image' || entry.kind === 'video') &&
+        Boolean(entry.previewUrl)
     )
-    const items: ModelUsagePreviewItem[] = media.map((item) => ({
-      url: item.previewUrl,
-      kind: item.kind,
+    const items: ModelUsagePreviewItem[] = media.map((entry) => ({
+      url: entry.previewUrl,
+      kind: entry.kind,
     }))
-    const index = media.findIndex((item) => item.id === attachment.id)
+    const index = media.findIndex((entry) => entry.id === item.id)
     setPreview({ items, index: Math.max(0, index) })
+  }
+
+  const handleEditToComposer = (message: ModelUsageMessage) => {
+    const assistantMessage = props.session.messages.find(
+      (item) => item.turnId === message.turnId && item.role === 'assistant'
+    )
+    const staged = stageAttachmentsForEdit({
+      userMessage: message,
+      assistantMessage,
+    })
+    setPrompt(message.content)
+    setQuotes([])
+    setQuotedWorkMessageId(null)
+    if (staged.skipAttachments) {
+      clearLocalAttachments()
+      setStagedAttachments([])
+      return
+    }
+    replaceComposerAttachments(staged.attachments, {
+      toastExpired: staged.hadExpired,
+    })
+  }
+
+  const handleQuoteWork = (message: ModelUsageMessage) => {
+    const staged = stageAttachmentsFromWorks(message)
+    setQuotes([])
+    setQuotedWorkMessageId(message.id)
+    replaceComposerAttachments(staged.attachments, {
+      toastExpired: staged.hadExpired,
+    })
   }
 
   const handlePaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
@@ -761,18 +908,21 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
       props.onRequireLogin()
       return
     }
-    const pending = [...attachments]
+    const pendingLocal = [...attachments]
+    const pendingStaged = [...stagedAttachments]
     const quoteTurnIds = quotes.map((item) => item.turnId)
-    // 立刻清空输入区；附件预览交给会话气泡占位，上传在 onSend 内完成
+    // 立刻清空输入区；短链与本地附件一并交给 onSend
     setPrompt('')
     setAttachments([])
+    setStagedAttachments([])
+    setQuotedWorkMessageId(null)
     setQuotes([])
     void props
       .onSend(
         text,
-        undefined,
+        pendingStaged.length > 0 ? pendingStaged : undefined,
         quoteTurnIds.length > 0 ? quoteTurnIds : undefined,
-        pending.length > 0 ? pending : undefined
+        pendingLocal.length > 0 ? pendingLocal : undefined
       )
       .catch((error) => {
         handleServerError(error, t('Failed to upload attachment'))
@@ -798,12 +948,12 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
           model={model}
           busy={busy}
           quotedMessageIds={quotedMessageIds}
+          quotedWorkMessageIds={quotedWorkMessageIds}
           onQuote={toggleQuote}
+          onQuoteWork={handleQuoteWork}
+          onEditToComposer={handleEditToComposer}
           onDelete={props.onDeleteTurn}
           onRegenerate={(message) => void props.onRegenerate(message)}
-          onEditUserMessage={(message, text) =>
-            props.onEditUserMessage(message, text)
-          }
         />
       </div>
 
@@ -859,7 +1009,7 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
               {/* 输入区整体加高约 2 个字符高度 */}
               <div className='flex min-h-[calc(72px+2em)] items-start gap-3'>
                 <ComposerAttachmentRail
-                  attachments={attachments}
+                  items={railItems}
                   maxAttachments={MODEL_USAGE_MAX_ATTACHMENTS}
                   onAdd={() => fileInputRef.current?.click()}
                   onRemove={removeAttachment}

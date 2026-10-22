@@ -194,6 +194,34 @@ func TestReplaceModelUsageSessionRejectsDataURLs(t *testing.T) {
 	require.ErrorIs(t, err, ErrModelUsageInvalidRequest)
 }
 
+func TestCommitModelUsageTurnAllowsQuotedOutputAsAttachment(t *testing.T) {
+	common.CryptoSecret = "test-secret-for-model-usage"
+	setupModelUsageSessionTestDB(t)
+	_ = withMemoryBlobStore(t)
+
+	workURL := BuildModelUsageMediaURL(
+		7,
+		"model-usage/outputs/7/flux/a0/0.png",
+		time.Now().Add(24*time.Hour).Unix(),
+	)
+	dto, err := CommitModelUsageTurn(context.Background(), 7, "flux", ModelUsageTurnRequest{
+		UserMessage: model.ModelUsageMessage{
+			ID: "u2", TurnID: "t2", Role: "user", Content: "add wings", Status: "done", MediaType: "image",
+			Attachments: []model.ModelUsageAttachment{{
+				ID: "ref-1", Name: "work-1.png", Kind: "image", URL: workURL,
+				ExpiresAt: time.Now().Add(24 * time.Hour).Unix(),
+			}},
+		},
+		AssistantMessage: model.ModelUsageMessage{
+			ID: "a2", TurnID: "t2", Role: "assistant", Content: "", Status: "done", MediaType: "image",
+		},
+		ImageSources: []string{"data:image/png;base64,iVBORw0KGgo="},
+	})
+	require.NoError(t, err)
+	require.Len(t, dto.Messages[0].Attachments, 1)
+	assert.Contains(t, dto.Messages[0].Attachments[0].URL, "model-usage/outputs/7/")
+}
+
 func TestUploadModelUsageAttachmentPersistsMetadataOnly(t *testing.T) {
 	common.CryptoSecret = "test-secret-for-model-usage"
 	setupModelUsageSessionTestDB(t)
