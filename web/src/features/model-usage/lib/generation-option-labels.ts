@@ -66,6 +66,12 @@ export function splitLegacyQualityList(values: string[]): {
   return { quality, resolution }
 }
 
+/** 图片比例选项文案；auto 用「自适应」与质量档位的 Auto 区分 */
+export function aspectRatioOptionLabelKey(value: string): string {
+  if (value.trim().toLowerCase() === 'auto') return 'Adaptive'
+  return value
+}
+
 /** i18n key（英文源文案）；未知值原样返回供 t 回退 */
 export function generationOptionLabelKey(value: string): string {
   switch (value.trim().toLowerCase()) {

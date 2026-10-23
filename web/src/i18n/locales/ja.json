@@ -247,6 +247,7 @@
     "Ad image": "Ad image",
     "Ad image workflow is coming soon. Please use Main or Detail for now.": "Ad image workflow is coming soon. Please use Main or Detail for now.",
     "Adapt `-thinking` suffix requests to Anthropic native thinking behavior while keeping billing predictable.": "`-thinking` サフィックス付きリクエストを Anthropic ネイティブの思考動作に適配し、課金を予測可能に保ちます。",
+    "Adaptive": "Adaptive",
     "Add": "追加",
     "Add \"{{value}}\"": "\"{{value}}\" を追加",
     "Add {{added}} models and remove {{removed}} models": "{{added}} 個のモデルを追加、{{removed}} 個を削除",

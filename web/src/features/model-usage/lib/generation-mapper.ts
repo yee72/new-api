@@ -60,8 +60,12 @@ export function validateGenerationForm(
 function resolveImageSize(
   config: GenerationFormConfig,
   caps: GenerationCapabilityMatrix
-): string {
+): string | undefined {
   if (config.size && config.size !== 'auto') return config.size
+  // 自适应：不传 size，让上游按模型默认比例出图
+  if (!config.aspect_ratio || config.aspect_ratio === 'auto') {
+    return undefined
+  }
   const mapped = caps.size_map[config.aspect_ratio]
   if (mapped) return mapped
   return aspectRatioToSize(config.aspect_ratio)
@@ -95,8 +99,9 @@ export function mapToImagesGenerations(
     model: req.model,
     prompt: req.prompt,
     n: Math.min(Math.max(req.n || 1, 1), 10),
-    size: resolveImageSize(req, caps),
   }
+  const size = resolveImageSize(req, caps)
+  if (size) payload.size = size
   const quality = req.quality
   if (quality && quality !== 'auto') {
     payload.quality = quality

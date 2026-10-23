@@ -113,7 +113,7 @@ function withAutoPrefixed(list: string[]): string[] {
 const DEFAULT_IMAGE_CAPS: GenerationCapabilityMatrix = {
   modes: ['image_generate'],
   n: rangeFromCounts([...IMAGE_COUNT_OPTIONS], DEFAULT_IMAGE_FORM.n),
-  aspect_ratio: ['1:1', '3:4', '16:9', '9:16'],
+  aspect_ratio: ['auto', '1:1', '3:4', '16:9', '9:16'],
   quality: [...IMAGE_QUALITY_OPTIONS],
   resolution: [...IMAGE_RESOLUTION_OPTIONS],
   duration_sec: durationRange(1, 1, 1),
@@ -385,6 +385,13 @@ export function resolveGenerationCapabilities(
   const legacy = fromLegacySource(nested ?? (parsed as Record<string, unknown>), kind)
 
   let matrix = mergeMatrix(base, { ...legacy, ...v1 })
+  // 图片比例始终提供自适应选项（能力表未声明时补上）
+  if (kind === 'image') {
+    matrix = {
+      ...matrix,
+      aspect_ratio: withAutoPrefixed(matrix.aspect_ratio),
+    }
+  }
   // 视频强制 n=1
   if (kind === 'video') {
     matrix = {
@@ -592,9 +599,11 @@ export function aspectRatioToSize(ratio: string): string {
     case '4:3':
     case '16:9':
     case '21:9':
+      return '1792x1024'
     case 'auto':
     default:
-      return '1792x1024'
+      // auto 由调用方省略 size；此处仅作兜底
+      return '1024x1024'
   }
 }
 

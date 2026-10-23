@@ -41,6 +41,7 @@ describe('generation mapper', () => {
           ...DEFAULT_IMAGE_FORM,
           model: 'flux',
           prompt: 'a cat',
+          aspect_ratio: '1:1',
           quality: 'auto',
         },
         caps
@@ -57,11 +58,32 @@ describe('generation mapper', () => {
           ...DEFAULT_IMAGE_FORM,
           model: 'flux',
           prompt: 'a cat',
+          aspect_ratio: '1:1',
           quality: 'medium',
         },
         caps
       ).quality
     ).toBe('medium')
+  })
+
+  it('omits size when image aspect_ratio is auto', () => {
+    const caps = resolveGenerationCapabilities(undefined, 'image')
+    expect(
+      mapToImagesGenerations(
+        {
+          ...DEFAULT_IMAGE_FORM,
+          model: 'flux',
+          prompt: 'a cat',
+          aspect_ratio: 'auto',
+          quality: 'auto',
+        },
+        caps
+      )
+    ).toEqual({
+      model: 'flux',
+      prompt: 'a cat',
+      n: 1,
+    })
   })
 
   it('maps video generate using resolution and duration_sec', () => {
@@ -94,6 +116,7 @@ describe('generation mapper', () => {
           ...DEFAULT_IMAGE_FORM,
           model: 'x',
           prompt: 'y',
+          aspect_ratio: '1:1',
           n: 99,
         },
         caps
@@ -110,6 +133,7 @@ describe('generation mapper', () => {
           ...DEFAULT_IMAGE_FORM,
           model: 'qwen-image',
           prompt: 'add wings',
+          aspect_ratio: '1:1',
         },
         imageCaps,
         {

@@ -76,7 +76,10 @@ import {
   stageAttachmentsFromWorks,
   takeAttachmentsUpToMax,
 } from '../lib/composer-stage'
-import { generationOptionLabelKey } from '../lib/generation-option-labels'
+import {
+  aspectRatioOptionLabelKey,
+  generationOptionLabelKey,
+} from '../lib/generation-option-labels'
 import {
   classifyPromptEnhanceAttachments,
   DEFAULT_PROMPT_ENHANCE_MAX_TOKENS,
@@ -1075,7 +1078,7 @@ export function ModelUsageWorkspace(props: ModelUsageWorkspaceProps) {
                       >
                         {imageCaps.aspect_ratio.map((ratio) => (
                           <SelectItem key={ratio} value={ratio}>
-                            {ratio}
+                            {t(aspectRatioOptionLabelKey(ratio))}
                           </SelectItem>
                         ))}
                       </SettingPill>

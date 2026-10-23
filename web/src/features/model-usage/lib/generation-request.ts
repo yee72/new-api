@@ -72,7 +72,8 @@ export const DEFAULT_IMAGE_FORM: GenerationFormConfig = {
   schema_version: GENERATION_SCHEMA_VERSION,
   mode: 'image_generate',
   n: 1,
-  aspect_ratio: '1:1',
+  // 自适应：不强制上游 size / 不在 chat 提示中写死比例
+  aspect_ratio: 'auto',
   quality: 'medium',
   resolution: 'auto',
   output_format: 'png',

@@ -247,6 +247,7 @@
     "Ad image": "Ad image",
     "Ad image workflow is coming soon. Please use Main or Detail for now.": "Ad image workflow is coming soon. Please use Main or Detail for now.",
     "Adapt `-thinking` suffix requests to Anthropic native thinking behavior while keeping billing predictable.": "Điều chỉnh các yêu cầu có hậu tố `-thinking` sang hành vi suy luận gốc của Anthropic trong khi vẫn giữ tính phí dễ dự đoán.",
+    "Adaptive": "Adaptive",
     "Add": "Add",
     "Add \"{{value}}\"": "Thêm \"{{value}}\"",
     "Add {{added}} models and remove {{removed}} models": "Thêm {{added}} mô hình và xóa {{removed}} mô hình",

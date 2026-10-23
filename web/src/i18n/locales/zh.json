@@ -247,6 +247,7 @@
     "Ad image": "广告图",
     "Ad image workflow is coming soon. Please use Main or Detail for now.": "广告图流程即将上线，请先使用主图或详情图。",
     "Adapt `-thinking` suffix requests to Anthropic native thinking behavior while keeping billing predictable.": "将带 `-thinking` 后缀的请求适配为 Anthropic 原生思考请求，并保持计费可预测。",
+    "Adaptive": "自适应",
     "Add": "添加",
     "Add \"{{value}}\"": "添加 \"{{value}}\"",
     "Add {{added}} models and remove {{removed}} models": "新增 {{added}} 个模型，移除 {{removed}} 个模型",

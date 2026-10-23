@@ -123,7 +123,7 @@ describe('generation capability validation', () => {
       })
     )
     expect(matrix.counts).toEqual([1, 2])
-    expect(matrix.aspectRatios).toEqual(['1:1'])
+    expect(matrix.aspectRatios).toEqual(['auto', '1:1'])
     expect(matrix.qualities).toEqual(['medium'])
   })
 })

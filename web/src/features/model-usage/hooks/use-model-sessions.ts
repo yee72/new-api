@@ -611,8 +611,21 @@ export function useModelSessions() {
           // chat 协议生图：按配置张数多次请求；比例/质量写入当次调用提示（不改用户气泡原文）
           const chatImage = model.model_type === 'image'
           const requestCount = chatImage ? Math.max(1, imageConfig.n || 1) : 1
+          // 自适应比例不写入提示，避免强制模型改默认构图
           const requestPrompt = chatImage
-            ? `${prompt}\n\n[image settings: aspect_ratio=${imageConfig.aspect_ratio}, quality=${imageConfig.quality}, resolution=${imageConfig.resolution ?? 'auto'}]`
+            ? (() => {
+                const settings: string[] = [
+                  `quality=${imageConfig.quality}`,
+                  `resolution=${imageConfig.resolution ?? 'auto'}`,
+                ]
+                if (
+                  imageConfig.aspect_ratio &&
+                  imageConfig.aspect_ratio !== 'auto'
+                ) {
+                  settings.unshift(`aspect_ratio=${imageConfig.aspect_ratio}`)
+                }
+                return `${prompt}\n\n[image settings: ${settings.join(', ')}]`
+              })()
             : prompt
           const useAnthropicMessages = invokeProtocol === 'messages'
 
