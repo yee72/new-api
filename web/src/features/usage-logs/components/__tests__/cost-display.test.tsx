@@ -88,7 +88,7 @@ describe('log cost display', () => {
       showBillingSource: true,
     })
 
-    expect(screen.getByText('$0.01')).toBeVisible()
+    expect(screen.getByText('0.01 points')).toBeVisible()
     expect(screen.getByRole('img', { name: 'Wallet' })).toBeVisible()
     expect(screen.queryByText('Wallet')).not.toBeInTheDocument()
     expect(screen.queryByText('Subscription')).not.toBeInTheDocument()
@@ -101,7 +101,7 @@ describe('log cost display', () => {
       showBillingSource: false,
     })
 
-    expect(screen.getByText('$0.01')).toBeVisible()
+    expect(screen.getByText('0.01 points')).toBeVisible()
     expect(screen.queryByText('Wallet')).not.toBeInTheDocument()
     expect(screen.queryByRole('img')).not.toBeInTheDocument()
   })
@@ -113,7 +113,7 @@ describe('log cost display', () => {
       showBillingSource: false,
     })
 
-    expect(screen.getByText('$0.025')).toBeVisible()
+    expect(screen.getByText('0.025 points')).toBeVisible()
     expect(screen.getByRole('img', { name: 'Subscription' })).toBeVisible()
     expect(screen.queryByRole('img', { name: 'Wallet' })).not.toBeInTheDocument()
   })
@@ -121,7 +121,7 @@ describe('log cost display', () => {
   test('keeps legacy cost visible without inventing a funding source', () => {
     renderCost({ quota: 5000, other: null })
 
-    expect(screen.getByText('$0.01')).toBeVisible()
+    expect(screen.getByText('0.01 points')).toBeVisible()
     expect(screen.queryByText('Wallet')).not.toBeInTheDocument()
     expect(screen.queryByText('Subscription')).not.toBeInTheDocument()
     expect(screen.queryByRole('img')).not.toBeInTheDocument()
@@ -183,7 +183,7 @@ describe('log cost display', () => {
       },
     })
 
-    expect(screen.getByText('$0.025')).toBeVisible()
+    expect(screen.getByText('0.025 points')).toBeVisible()
     const marker = screen.getByRole('img', {
       name: 'Includes tool-call surcharge',
     })
@@ -203,7 +203,7 @@ describe('log cost display', () => {
       showBillingSource: true,
     })
 
-    expect(screen.getByText('$0.01')).toBeVisible()
+    expect(screen.getByText('0.01 points')).toBeVisible()
     expect(screen.getByRole('img', { name: 'Subscription' })).toBeVisible()
     expect(
       screen.getByRole('img', { name: 'Includes tool-call surcharge' })

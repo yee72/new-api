@@ -53,7 +53,7 @@ describe('selectChatHistoryMessages', () => {
         id: 'a1',
         turnId: 't1',
         role: 'assistant',
-        content: 'Chat request failed',
+        content: "This request didn't go through. Please try again later.",
         status: 'error',
       }),
       msg({

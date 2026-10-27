@@ -195,7 +195,7 @@ export function TierPriceFields(props: TierPriceFieldsProps) {
           label={t('Price per request')}
           value={props.fixedPrice ?? ''}
           onChange={(value) => props.onFixedPriceChange?.(value)}
-          hint={`${props.currency.symbol}/${t('request')}`}
+          hint={`${t('Points')}/${t('request')}`}
           invalid={props.invalidVariables?.includes('fixed')}
         />
       </>
@@ -208,7 +208,7 @@ export function TierPriceFields(props: TierPriceFieldsProps) {
         <div className='flex items-center justify-between gap-3'>
           <Label className='text-sm font-semibold'>{t('Token prices')}</Label>
           <span className='bg-muted text-muted-foreground rounded-md px-2 py-1 text-xs'>
-            {props.currency.symbol}/{t('1M token')}
+            {t('Points')}/{t('1M token')}
           </span>
         </div>
 

@@ -107,9 +107,9 @@ describe('pricing synchronization', () => {
   it('shows every dollar price inline, including explicit zero cache and audio prices', () => {
     render(<TableFixture prices={prices} />)
     expect(screen.queryAllByText('Model ratio')).toHaveLength(0)
-    expect(screen.getAllByText('$2')).toHaveLength(2)
-    expect(screen.getByText('$8')).toBeVisible()
-    expect(screen.getByText('$0')).toBeVisible()
+    expect(screen.getAllByText('2 points')).toHaveLength(2)
+    expect(screen.getByText('8 points')).toBeVisible()
+    expect(screen.getByText('0 points')).toBeVisible()
     expect(screen.getByText('Cache Read')).toBeVisible()
     expect(
       screen.queryByRole('button', { name: /details/i })
@@ -125,10 +125,10 @@ describe('pricing synchronization', () => {
         (key) => key
       )
     ).toEqual([
-      { label: 'Input', value: '$4' },
-      { label: 'Image input', value: '$0' },
-      { label: 'Audio input', value: '$12' },
-      { label: 'Audio output', value: '$48' },
+      { label: 'Input', value: '4 points' },
+      { label: 'Image input', value: '0 points' },
+      { label: 'Audio input', value: '12 points' },
+      { label: 'Audio output', value: '48 points' },
     ])
   })
 
@@ -149,9 +149,9 @@ describe('pricing synchronization', () => {
       />
     )
     expect(screen.queryByText(expression)).not.toBeInTheDocument()
-    expect(screen.getByText('$2')).toBeVisible()
-    expect(screen.getByText('$8')).toBeVisible()
-    expect(screen.getByText('$0')).toBeVisible()
+    expect(screen.getByText('2 points')).toBeVisible()
+    expect(screen.getByText('8 points')).toBeVisible()
+    expect(screen.getByText('0 points')).toBeVisible()
     expect(
       screen.getByRole('button', { name: 'Copy billing expression' })
     ).toBeVisible()
@@ -173,8 +173,8 @@ describe('pricing synchronization', () => {
     }} />)
     expect(screen.queryByText(tiered)).not.toBeInTheDocument()
     expect(screen.getByText(/128,000/)).toBeVisible()
-    expect(screen.getByText('$0.2')).toBeVisible()
-    expect(screen.getByText('$0.4')).toBeVisible()
+    expect(screen.getByText('0.2 points')).toBeVisible()
+    expect(screen.getByText('0.4 points')).toBeVisible()
     expect(screen.getByText(custom)).toBeVisible()
   })
 
@@ -411,8 +411,12 @@ describe('pricing synchronization', () => {
     const preview = screen.getByRole('alertdialog', {
       name: 'Preview price changes',
     })
-    expect(within(preview).getByText(/Expression pricing/)).toHaveTextContent('Input: $2')
-    expect(within(preview).getByText(/Expression pricing/)).toHaveTextContent('Output: $8')
+    expect(within(preview).getByText(/Expression pricing/)).toHaveTextContent(
+      'Input: 2 points'
+    )
+    expect(within(preview).getByText(/Expression pricing/)).toHaveTextContent(
+      'Output: 8 points'
+    )
     expect(within(preview).queryByText(expression)).not.toBeInTheDocument()
     expect(patch).not.toHaveBeenCalled()
     await user.click(

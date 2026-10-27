@@ -208,7 +208,7 @@ function formatBreakdownPrice(
     field.unit === 'request' ||
     field.unit === 'image'
       ? formatTaskUsageUnitPrice(value, { tokenUnit: 'M', ...taskPriceOptions })
-      : `${symbol}${(value * rate).toFixed(4)}`
+      : t('{{amount}} points', { amount: (value * rate).toFixed(4) })
   if (field.unit === 'second') return `${amount}/${t('s')}`
   if (field.unit === 'count') {
     return `${amount}/${taskUsageUnitLabel(field, language, t('unit'))}`
@@ -297,15 +297,15 @@ export function DynamicPricingBreakdown({
 
   const { symbol, rate } = useMemo(() => {
     if (currency.quotaDisplayType === 'CNY') {
-      return { symbol: '¥', rate: currency.usdExchangeRate || 7 }
+      return { symbol: '', rate: currency.usdExchangeRate || 7 }
     }
     if (currency.quotaDisplayType === 'CUSTOM') {
       return {
-        symbol: currency.customCurrencySymbol || '¤',
+        symbol: '',
         rate: currency.customCurrencyExchangeRate || 1,
       }
     }
-    return { symbol: '$', rate: 1 }
+    return { symbol: '', rate: 1 }
   }, [currency])
 
   const { tiers, ruleGroups } = useMemo(() => {

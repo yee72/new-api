@@ -21,9 +21,18 @@ import { useTranslation } from 'react-i18next'
 
 import { IconBadge, type IconBadgeTone } from '@/components/ui/icon-badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { formatQuota } from '@/lib/format'
+import { formatQuotaWithCurrency } from '@/lib/currency'
 
 import type { UserWalletData } from '../types'
+
+function formatWalletPoints(quota: number): string {
+  return formatQuotaWithCurrency(quota, {
+    digitsLarge: 2,
+    digitsSmall: 4,
+    abbreviate: true,
+    showSymbol: false,
+  })
+}
 
 interface WalletStatsCardProps {
   user: UserWalletData | null
@@ -55,14 +64,18 @@ export function WalletStatsCard(props: WalletStatsCardProps) {
   }[] = [
     {
       label: t('Current Balance'),
-      value: formatQuota(props.user?.quota ?? 0),
+      value: t('{{amount}} points', {
+        amount: formatWalletPoints(props.user?.quota ?? 0),
+      }),
       description: t('Remaining quota'),
       icon: WalletCards,
       tone: 'success',
     },
     {
       label: t('Total Usage'),
-      value: formatQuota(props.user?.used_quota ?? 0),
+      value: t('{{amount}} points', {
+        amount: formatWalletPoints(props.user?.used_quota ?? 0),
+      }),
       description: t('Total consumed quota'),
       icon: BarChart3,
       tone: 'info',

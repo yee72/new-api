@@ -81,7 +81,9 @@ export function resolveChatFailurePresentation(
       ),
     }
   }
-  const title = t('Chat request failed')
+  const title = t(
+    "This request didn't go through. Please try again later."
+  )
   if (!detail || detail === title) {
     return { title }
   }

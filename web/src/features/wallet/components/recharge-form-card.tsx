@@ -37,11 +37,14 @@ import {
 import { formatNumber } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
+import { PAYMENT_POINTS_MAX, PAYMENT_POINTS_MIN } from '../constants'
 import {
   formatCurrency,
   getDiscountLabel,
   getPaymentIcon,
   getMinTopupAmount,
+  getMaxTopupAmount,
+  isTopupAmountInBounds,
   calculatePresetPricing,
 } from '../lib'
 import type {
@@ -124,8 +127,12 @@ export function RechargeFormCard({
 
   const handleAmountChange = (value: string) => {
     setLocalAmount(value)
-    const numValue = Number.parseInt(value) || 0
-    if (numValue >= 0) {
+    if (value.trim() === '' || value === '.') {
+      onTopupAmountChange(0)
+      return
+    }
+    const numValue = Number.parseFloat(value)
+    if (Number.isFinite(numValue) && numValue >= 0) {
       onTopupAmountChange(numValue)
     }
   }
@@ -141,6 +148,25 @@ export function RechargeFormCard({
   const hasWaffoPaymentMethods =
     Array.isArray(waffoPayMethods) && waffoPayMethods.length > 0
   const minTopup = getMinTopupAmount(topupInfo)
+  const maxTopup = getMaxTopupAmount()
+  const amountInBounds = isTopupAmountInBounds(topupAmount, minTopup, maxTopup)
+  const trimmedLocalAmount = localAmount.trim()
+  const parsedLocalAmount = Number.parseFloat(trimmedLocalAmount)
+  const customAmountError = (() => {
+    if (trimmedLocalAmount === '' || trimmedLocalAmount === '.') {
+      return t('Please enter topup points')
+    }
+    if (!Number.isFinite(parsedLocalAmount)) {
+      return t('Please enter a valid number')
+    }
+    if (parsedLocalAmount < minTopup || parsedLocalAmount > maxTopup) {
+      return t('Payment points must be between {{min}} and {{max}}', {
+        min: minTopup,
+        max: maxTopup,
+      })
+    }
+    return null
+  })()
   const redemptionEnabled = topupInfo?.enable_redemption !== false
 
   if (loading) {
@@ -197,7 +223,7 @@ export function RechargeFormCard({
   return (
     <TitledCard
       title={t('Add Funds')}
-      description={t('Choose an amount and payment method')}
+      description={t('Choose points and a payment method')}
       icon={<WalletCards className='h-4 w-4' />}
       iconTone='success'
       disableHoverEffect
@@ -224,7 +250,7 @@ export function RechargeFormCard({
               {presetAmounts.length > 0 && (
                 <div className='space-y-2.5 sm:space-y-3'>
                   <Label className='text-muted-foreground text-xs font-medium tracking-wider uppercase'>
-                    {t('Amount')}
+                    {t('Points')}
                   </Label>
                   <div className='grid grid-cols-2 gap-1.5 sm:gap-3 md:grid-cols-4'>
                     {presetAmounts.map((preset) => {
@@ -257,7 +283,9 @@ export function RechargeFormCard({
                         >
                           <div className='flex w-full items-center justify-between'>
                             <div className='text-base font-semibold sm:text-lg'>
-                              {formatNumber(displayValue)}
+                              {t('{{amount}} points', {
+                                amount: formatNumber(displayValue),
+                              })}
                             </div>
                             {hasDiscount && (
                               <div className='text-xs font-medium text-green-600'>
@@ -266,11 +294,16 @@ export function RechargeFormCard({
                             )}
                           </div>
                           <div className='text-muted-foreground mt-1.5 w-full text-xs sm:mt-2'>
-                            Pay {formatCurrency(actualPrice)}
+                            {t('Pay {{amount}} points', {
+                              amount: formatCurrency(actualPrice),
+                            })}
                             {hasDiscount && savedAmount > 0 && (
                               <span className='text-green-600'>
                                 {' '}
-                                • Save {formatCurrency(savedAmount)}
+                                •{' '}
+                                {t('Save {{amount}} points', {
+                                  amount: formatCurrency(savedAmount),
+                                })}
                               </span>
                             )}
                           </div>
@@ -286,7 +319,7 @@ export function RechargeFormCard({
                   htmlFor='topup-amount'
                   className='text-muted-foreground text-xs font-medium tracking-wider uppercase'
                 >
-                  {t('Custom Amount')}
+                  {t('Custom Points')}
                 </Label>
                 <div className='grid grid-cols-[minmax(0,1fr)_minmax(110px,0.55fr)] gap-2 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center'>
                   <Input
@@ -294,23 +327,38 @@ export function RechargeFormCard({
                     type='number'
                     value={localAmount}
                     onChange={(e) => handleAmountChange(e.target.value)}
-                    min={minTopup}
-                    placeholder={`Minimum ${minTopup}`}
+                    min={PAYMENT_POINTS_MIN}
+                    max={PAYMENT_POINTS_MAX}
+                    step={0.1}
+                    placeholder={`${PAYMENT_POINTS_MIN} – ${PAYMENT_POINTS_MAX}`}
+                    aria-invalid={!!customAmountError}
                     className='h-9 text-base sm:h-10 sm:text-lg'
                   />
                   <div className='bg-muted/30 flex min-h-9 items-center justify-between gap-2 rounded-md border px-3 lg:min-w-52'>
                     <span className='text-muted-foreground truncate text-xs'>
-                      {t('Amount to pay:')}
+                      {t('Points to pay:')}
                     </span>
                     {calculating ? (
                       <Skeleton className='h-5 w-16' />
                     ) : (
                       <span className='text-sm font-semibold'>
-                        {formatCurrency(paymentAmount)}
+                        {t('{{amount}} points', {
+                          amount: formatCurrency(paymentAmount),
+                        })}
                       </span>
                     )}
                   </div>
                 </div>
+                <p className='text-muted-foreground text-xs'>
+                  {t(
+                    'Payment points support a minimum of 0.1 and a maximum of 10000'
+                  )}
+                </p>
+                {customAmountError ? (
+                  <p className='text-destructive text-xs' role='alert'>
+                    {customAmountError}
+                  </p>
+                ) : null}
               </div>
 
               <div className='space-y-2.5 sm:space-y-3'>
@@ -320,19 +368,39 @@ export function RechargeFormCard({
                 {hasStandardPaymentMethods ? (
                   <div className='grid grid-cols-2 gap-1.5 sm:gap-3 lg:grid-cols-3'>
                     {topupInfo?.pay_methods?.map((method) => {
-                      const minTopup = Math.max(
-                        method.min_topup || 0,
-                        getMinTopupAmount(topupInfo)
+                      // 产品边界覆盖服务端全局下限；支付方式若显式配置更高下限仍生效
+                      const methodMin = Math.max(
+                        PAYMENT_POINTS_MIN,
+                        method.min_topup || 0
                       )
-                      const disabled = minTopup > topupAmount
-                      const disabledReason = disabled
-                        ? t('Minimum topup amount: {{amount}}', {
-                            amount: minTopup,
-                          })
-                        : undefined
-                      const disabledLabel = disabled
-                        ? `${t('Minimum:')} ${minTopup}`
-                        : undefined
+                      const belowMin = topupAmount < methodMin
+                      const aboveMax = topupAmount > maxTopup
+                      const disabled =
+                        !amountInBounds || belowMin || aboveMax
+                      const disabledReason = !amountInBounds
+                        ? t(
+                            'Payment points must be between {{min}} and {{max}}',
+                            {
+                              min: minTopup,
+                              max: maxTopup,
+                            }
+                          )
+                        : belowMin
+                          ? t('Minimum topup points: {{amount}}', {
+                              amount: methodMin,
+                            })
+                          : aboveMax
+                            ? t('Maximum topup points: {{amount}}', {
+                                amount: maxTopup,
+                              })
+                            : undefined
+                      const disabledLabel = !amountInBounds
+                        ? `${minTopup} – ${maxTopup}`
+                        : belowMin
+                          ? `${t('Minimum:')} ${methodMin}`
+                          : aboveMax
+                            ? `${t('Maximum:')} ${maxTopup}`
+                            : undefined
 
                       const button = (
                         <Button
@@ -406,16 +474,36 @@ export function RechargeFormCard({
                       {waffoPayMethods?.map((method, index) => {
                         const loadingKey = `waffo-${index}`
                         const methodKey = `${method.payMethodType ?? 'unknown'}-${method.payMethodName ?? method.name}`
-                        const waffoMin = waffoMinTopup || 0
-                        const belowMin = waffoMin > topupAmount
-                        const disabledReason = belowMin
-                          ? t('Minimum topup amount: {{amount}}', {
-                              amount: waffoMin,
-                            })
-                          : undefined
-                        const disabledLabel = belowMin
-                          ? `${t('Minimum:')} ${waffoMin}`
-                          : undefined
+                        // Waffo 同样以产品下限为准，忽略服务端抬高的 min_topup
+                        const waffoMin = minTopup
+                        const belowMin = topupAmount < waffoMin
+                        const aboveMax = topupAmount > maxTopup
+                        const disabled =
+                          !amountInBounds || belowMin || aboveMax
+                        const disabledReason = !amountInBounds
+                          ? t(
+                              'Payment points must be between {{min}} and {{max}}',
+                              {
+                                min: minTopup,
+                                max: maxTopup,
+                              }
+                            )
+                          : belowMin
+                            ? t('Minimum topup points: {{amount}}', {
+                                amount: waffoMin,
+                              })
+                            : aboveMax
+                              ? t('Maximum topup points: {{amount}}', {
+                                  amount: maxTopup,
+                                })
+                              : undefined
+                        const disabledLabel = !amountInBounds
+                          ? `${minTopup} – ${maxTopup}`
+                          : belowMin
+                            ? `${t('Minimum:')} ${waffoMin}`
+                            : aboveMax
+                              ? `${t('Maximum:')} ${maxTopup}`
+                              : undefined
 
                         let methodIcon = getPaymentIcon('waffo')
                         if (paymentLoading === loadingKey) {
@@ -437,7 +525,7 @@ export function RechargeFormCard({
                             key={methodKey}
                             variant='outline'
                             onClick={() => onWaffoMethodSelect(method, index)}
-                            disabled={belowMin || !!paymentLoading}
+                            disabled={disabled || !!paymentLoading}
                             title={disabledReason}
                             aria-label={
                               disabledReason
@@ -460,7 +548,7 @@ export function RechargeFormCard({
                           </Button>
                         )
 
-                        return belowMin ? (
+                        return disabled ? (
                           <TooltipProvider key={methodKey}>
                             <Tooltip>
                               <TooltipTrigger render={button} />

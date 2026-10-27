@@ -139,12 +139,12 @@ it.each(['none', 'standard', 'claude_ttl'] as const)(
           within(panel).getByText(
             mode === 'claude_ttl' ? 'Cache Creation (5m)' : 'Cache write price'
           ).nextElementSibling
-        ).toHaveTextContent('$5')
+        ).toHaveTextContent('5 points')
         if (mode === 'claude_ttl') {
           expect(
             within(panel).getByText('Cache create (1h) price')
               .nextElementSibling
-          ).toHaveTextContent('$8')
+          ).toHaveTextContent('8 points')
         } else {
           expect(
             within(panel).queryByText('Cache create (1h) price')

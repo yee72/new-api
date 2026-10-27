@@ -21,6 +21,8 @@ import {
   DEFAULT_PRESET_MULTIPLIERS,
   DEFAULT_PAYMENT_TYPE,
   DEFAULT_MIN_TOPUP,
+  PAYMENT_POINTS_MIN,
+  PAYMENT_POINTS_MAX,
 } from '../constants'
 import type { PaymentMethod, PresetAmount, TopupInfo } from '../types'
 
@@ -148,9 +150,9 @@ export function getDefaultPaymentType(topupInfo: TopupInfo | null): string {
 }
 
 /**
- * Get minimum topup amount from topup info
+ * Get server-configured minimum topup (未套用产品上下限)
  */
-export function getMinTopupAmount(topupInfo: TopupInfo | null): number {
+export function getServerMinTopupAmount(topupInfo: TopupInfo | null): number {
   if (!topupInfo) {
     return DEFAULT_MIN_TOPUP
   }
@@ -175,12 +177,56 @@ export function getMinTopupAmount(topupInfo: TopupInfo | null): number {
 }
 
 /**
+ * 有效最低充值积分：产品固定下限 0.1（覆盖服务端 MinTopUp）
+ */
+export function getMinTopupAmount(_topupInfo: TopupInfo | null): number {
+  return PAYMENT_POINTS_MIN
+}
+
+/**
+ * 有效最高充值积分（产品上限）
+ */
+export function getMaxTopupAmount(): number {
+  return PAYMENT_POINTS_MAX
+}
+
+/**
+ * 充值积分是否在有效边界内
+ */
+export function isTopupAmountInBounds(
+  amount: number,
+  minAmount: number,
+  maxAmount: number = PAYMENT_POINTS_MAX
+): boolean {
+  return Number.isFinite(amount) && amount >= minAmount && amount <= maxAmount
+}
+
+/**
+ * 按充值边界过滤预设积分档位
+ */
+export function filterPresetAmountsByBounds(
+  presets: PresetAmount[],
+  minAmount: number,
+  maxAmount: number = PAYMENT_POINTS_MAX
+): PresetAmount[] {
+  return presets.filter(
+    (preset) =>
+      Number.isFinite(preset.value) &&
+      preset.value >= minAmount &&
+      preset.value <= maxAmount
+  )
+}
+
+/**
  * Generate preset amounts based on minimum topup
  */
 export function generatePresetAmounts(minAmount: number): PresetAmount[] {
-  return DEFAULT_PRESET_MULTIPLIERS.map((multiplier) => ({
-    value: minAmount * multiplier,
-  }))
+  return filterPresetAmountsByBounds(
+    DEFAULT_PRESET_MULTIPLIERS.map((multiplier) => ({
+      value: minAmount * multiplier,
+    })),
+    minAmount
+  )
 }
 
 /**

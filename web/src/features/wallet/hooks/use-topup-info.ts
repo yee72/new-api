@@ -24,6 +24,7 @@ import { getTopupInfo } from '../api'
 import {
   generatePresetAmounts,
   mergePresetAmounts,
+  filterPresetAmountsByBounds,
   getMinTopupAmount,
 } from '../lib'
 import type {
@@ -197,16 +198,18 @@ export function useTopupInfo() {
 
       setTopupInfo(processedData)
 
+      const minTopup = getMinTopupAmount(processedData)
       if (processedData.amount_options.length > 0) {
-        const customPresets = mergePresetAmounts(
-          processedData.amount_options,
-          processedData.discount || {}
+        const customPresets = filterPresetAmountsByBounds(
+          mergePresetAmounts(
+            processedData.amount_options,
+            processedData.discount || {}
+          ),
+          minTopup
         )
         setPresetAmounts(customPresets)
       } else {
-        const minTopup = getMinTopupAmount(processedData)
-        const defaultPresets = generatePresetAmounts(minTopup)
-        setPresetAmounts(defaultPresets)
+        setPresetAmounts(generatePresetAmounts(minTopup))
       }
     } catch (err) {
       handleServerError(err)

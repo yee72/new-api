@@ -85,7 +85,9 @@ function sanitizeSessions(
           return {
             ...message,
             status: 'error' as const,
-            content: message.content || 'Generation failed',
+            content:
+              message.content ||
+              "Generation didn't complete. Please try again later.",
           }
         }),
     }

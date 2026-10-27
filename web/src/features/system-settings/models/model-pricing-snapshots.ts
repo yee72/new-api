@@ -116,13 +116,15 @@ export const getPriceSummary = (
     return getExpressionSummary(row, t)
   }
   if (row.billingMode === 'per-request') {
-    return row.price ? `$${row.price} / ${t('request')}` : t('Unset price')
+    return row.price
+      ? `${t('{{amount}} points', { amount: row.price })} / ${t('request')}`
+      : t('Unset price')
   }
 
   const inputPrice = ratioToPrice(row.ratio)
   if (!inputPrice) return t('Unset price')
 
-  return `${t('Input')} $${inputPrice}`
+  return `${t('Input')} ${t('{{amount}} points', { amount: inputPrice })}`
 }
 
 export const getPriceDetail = (
@@ -143,11 +145,17 @@ export const getPriceDetail = (
 
   const details = [
     row.completionRatio &&
-      `${t('Output')} $${ratioToPrice(row.completionRatio, inputPrice)}`,
+      `${t('Output')} ${t('{{amount}} points', {
+        amount: ratioToPrice(row.completionRatio, inputPrice),
+      })}`,
     row.cacheRatio &&
-      `${t('Cache')} $${ratioToPrice(row.cacheRatio, inputPrice)}`,
+      `${t('Cache')} ${t('{{amount}} points', {
+        amount: ratioToPrice(row.cacheRatio, inputPrice),
+      })}`,
     row.createCacheRatio &&
-      `${t('Cache write')} $${ratioToPrice(row.createCacheRatio, inputPrice)}`,
+      `${t('Cache write')} ${t('{{amount}} points', {
+        amount: ratioToPrice(row.createCacheRatio, inputPrice),
+      })}`,
   ]
     .filter(Boolean)
     .slice(0, 2)

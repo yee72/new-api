@@ -43,7 +43,8 @@ await i18n.use(initReactI18next).init({
         'Failed to load': 'Failed to load',
         'Loading...': 'Loading...',
         'Save changes': 'Save changes',
-        'Something went wrong!': 'Something went wrong!',
+        'Something went wrong. Please try again later.':
+          'Something went wrong. Please try again later.',
       },
     },
   },

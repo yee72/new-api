@@ -32,7 +32,8 @@ async function createT() {
     resources: {
       en: {
         translation: {
-          'Chat request failed': 'Chat request failed',
+          "This request didn't go through. Please try again later.":
+            "This request didn't go through. Please try again later.",
           'Your compute balance is not enough for this chat. Top up to continue chatting~':
             'Your compute balance is not enough for this chat. Top up to continue chatting~',
         },
@@ -86,7 +87,9 @@ describe('resolveChatFailurePresentation', () => {
     const detail =
       '当前无法提供该模型：模型名称不存在，或您所在分组下暂无可用渠道。'
     const result = resolveChatFailurePresentation({ message: detail }, t)
-    expect(result.title).toBe('Chat request failed')
+    expect(result.title).toBe(
+      "This request didn't go through. Please try again later."
+    )
     expect(result.detail).toBe(detail)
   })
 })

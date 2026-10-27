@@ -45,6 +45,8 @@ import {
 import {
   getDefaultPaymentType,
   getMinTopupAmount,
+  getMaxTopupAmount,
+  isTopupAmountInBounds,
   dispatchSelectedPayment,
 } from './lib'
 import type {
@@ -176,9 +178,9 @@ export function Wallet(props: WalletProps) {
     setPaymentLoading(method.type)
 
     try {
-      // Validate minimum topup
+      // 校验充值积分边界
       const minTopup = getMinTopupAmount(topupInfo)
-      if (topupAmount < minTopup) {
+      if (!isTopupAmountInBounds(topupAmount, minTopup, getMaxTopupAmount())) {
         return
       }
 
@@ -263,6 +265,10 @@ export function Wallet(props: WalletProps) {
     setPaymentLoading(loadingKey)
 
     try {
+      const minTopup = getMinTopupAmount(topupInfo)
+      if (!isTopupAmountInBounds(topupAmount, minTopup, getMaxTopupAmount())) {
+        return
+      }
       await calculatePaymentAmount(topupAmount, PAYMENT_TYPES.WAFFO)
       setConfirmDialogOpen(true)
     } finally {

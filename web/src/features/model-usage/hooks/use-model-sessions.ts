@@ -230,7 +230,7 @@ export function useModelSessions() {
         const dto = await fetchModelUsageSession(modelName)
         const messages = markUnresumedMessages(
           dto.messages ?? [],
-          t('Generation failed')
+          t("Generation didn't complete. Please try again later.")
         )
         const accepted = useModelUsageSessionsStore
           .getState()
@@ -792,7 +792,7 @@ export function useModelSessions() {
               return
             }
             if (chatImages.length === 0) {
-              await failAssistant(contentText.trim() || t('Generation failed'))
+              await failAssistant(contentText.trim() || t("Generation didn't complete. Please try again later."))
               return
             }
             // 优先提交短链/URL；若仍有 data: 则由后端落库
@@ -930,7 +930,7 @@ export function useModelSessions() {
           return
         }
         if (taskIds.length === 0) {
-          await failAssistant(t('Generation failed'))
+          await failAssistant(t("Generation didn't complete. Please try again later."))
           return
         }
         const dto = await commitModelUsageTurn(modelName, {
@@ -946,7 +946,7 @@ export function useModelSessions() {
         applyServerSession(modelName, dto, model)
         toast.success(t('Generation completed'))
         void pollVideoUntilSettled(modelName, turnId).catch((error) => {
-          handleServerError(error, t('Generation failed'))
+          handleServerError(error, t("Generation didn't complete. Please try again later."))
         })
       } catch (error) {
         const isTextChat =
@@ -959,7 +959,7 @@ export function useModelSessions() {
           await failAssistant(presentation.title, presentation.detail)
           return
         }
-        const fallback = t('Generation failed')
+        const fallback = t("Generation didn't complete. Please try again later.")
         handleServerError(error, fallback)
         await failAssistant(fallback)
       }

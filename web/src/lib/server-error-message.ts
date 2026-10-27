@@ -167,7 +167,7 @@ export function getServerErrorMessage(
       getServerErrorMessageKey(safe) ||
         messageText(safe.message) ||
         fallback ||
-        'Something went wrong!'
+        'Something went wrong. Please try again later.'
     )
   }
   const key = getServerErrorMessageKey(value)
@@ -194,7 +194,10 @@ export function getServerErrorMessage(
     const message = messageText(source.message)
     if (message) return message
   }
-  return messageText(value) || (fallback ?? i18next.t('Something went wrong!'))
+  return (
+    messageText(value) ||
+    (fallback ?? i18next.t('Something went wrong. Please try again later.'))
+  )
 }
 
 /** Preserve the payload/cause so every layer can recognize the same failure. */

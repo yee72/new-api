@@ -79,7 +79,7 @@ it('shows localized schema explanations in the price table and calculator', asyn
 
 it('uses count unit labels in the price matrix and calculator without changing the charge', async () => {
   renderPricing({ en: 'song', zh: '首' })
-  expect(within(screen.getByRole('table')).getByText('$/song')).toBeVisible()
+  expect(within(screen.getByRole('table')).getByText('Points/song')).toBeVisible()
   expect(
     screen.getByText(
       'Additional charge: $1 + Song generation unit price: 1 song × $11/song = $12'

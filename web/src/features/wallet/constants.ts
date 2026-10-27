@@ -61,6 +61,12 @@ export const PAYMENT_ICON_COLORS = {
 export const DEFAULT_DISCOUNT_RATE = 1.0
 
 /**
- * Default minimum topup amount
+ * Default minimum topup amount（与支付方积分下限对齐）
  */
-export const DEFAULT_MIN_TOPUP = 1
+export const DEFAULT_MIN_TOPUP = 0.1
+
+/**
+ * 支付方积分充值边界（产品固定）
+ */
+export const PAYMENT_POINTS_MIN = 0.1
+export const PAYMENT_POINTS_MAX = 10000

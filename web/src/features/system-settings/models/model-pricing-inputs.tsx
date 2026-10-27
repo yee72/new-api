@@ -42,11 +42,10 @@ export function PriceInput(props: {
   disabled?: boolean
   onChange: (value: string) => void
 }) {
+  const { t } = useTranslation()
   return (
     <InputGroup className='has-[[data-pricing-error]]:h-auto has-[[data-pricing-error]]:flex-wrap'>
-      <InputGroupAddon>
-        {(props.currency ?? USD_PRICING_CURRENCY).symbol}
-      </InputGroupAddon>
+      <InputGroupAddon>{t('Points')}</InputGroupAddon>
       <PricingAmountInput
         grouped
         currency={props.currency}
@@ -60,7 +59,7 @@ export function PriceInput(props: {
         onChange={props.onChange}
       />
       <InputGroupAddon align='inline-end'>
-        {(props.currency ?? USD_PRICING_CURRENCY).symbol}/1M
+        {t('Points')}/1M
       </InputGroupAddon>
     </InputGroup>
   )

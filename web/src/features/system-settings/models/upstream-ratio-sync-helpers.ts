@@ -20,6 +20,7 @@ import { createContext, useContext } from 'react'
 
 import { BILLING_PRICING_VARS, splitBillingExprAndRequestRules } from '@/features/pricing/lib/billing-expr'
 import { tryParseVisualConfig } from '@/features/pricing/lib/tier-expr'
+import { formatPricingAmount } from '@/features/model-pricing/currency'
 
 import type { PricingSyncValues } from '../types'
 import {
@@ -92,7 +93,7 @@ export function getSyncPriceLines(
     return [
       {
         label: t('Per-request'),
-        value: `$${formatPricingNumber(values.model_price)}`,
+        value: formatPricingAmount(values.model_price),
       },
     ]
   }
@@ -100,7 +101,10 @@ export function getSyncPriceLines(
   const input = Number(values.model_ratio) * 2
   const formattedInput = formatPricingNumber(input)
   const lines = [
-    { label: t('Input'), value: formattedInput ? `$${formattedInput}` : '—' },
+    {
+      label: t('Input'),
+      value: formattedInput ? formatPricingAmount(input) : '—',
+    },
   ]
   const multipliers = [
     ['completion_ratio', t('Output')],
@@ -122,7 +126,10 @@ export function getSyncPriceLines(
       price *= values.audio_ratio
     }
     const formatted = formatPricingNumber(price)
-    lines.push({ label, value: formatted ? `$${formatted}` : '—' })
+    lines.push({
+      label,
+      value: formatted ? formatPricingAmount(price) : '—',
+    })
   }
   return lines
 }
@@ -149,7 +156,7 @@ export function getSyncExpressionPricing(expression: string, t: (key: string) =>
       ).join(' ∧ '),
       lines: fields.map((field) => ({
         label: t(field.shortLabel),
-        value: `$${formatPricingNumber(Number(tier[field.tierField!]))}`,
+        value: formatPricingAmount(Number(tier[field.tierField!])),
       })),
     })),
   }

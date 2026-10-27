@@ -16,6 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import i18next from 'i18next'
+
 import { formatPricingNumber } from '@/features/system-settings/models/pricing-format'
 import type { CurrencyConfig } from '@/stores/system-config-store'
 
@@ -26,8 +28,8 @@ export type PricingCurrency = {
 }
 
 export const USD_PRICING_CURRENCY: PricingCurrency = {
-  label: 'USD',
-  symbol: '$',
+  label: 'Points',
+  symbol: '',
   exchangeRate: 1,
 }
 
@@ -35,13 +37,12 @@ export function getSitePricingCurrency(
   config: CurrencyConfig
 ): PricingCurrency | null {
   if (config.quotaDisplayType === 'CNY') {
-    return { label: 'CNY', symbol: '¥', exchangeRate: config.usdExchangeRate }
+    return { label: 'Points', symbol: '', exchangeRate: config.usdExchangeRate }
   }
   if (config.quotaDisplayType === 'CUSTOM') {
-    const symbol = config.customCurrencySymbol?.trim() || '¤'
     return {
-      label: symbol,
-      symbol,
+      label: 'Points',
+      symbol: '',
       exchangeRate: config.customCurrencyExchangeRate,
     }
   }
@@ -65,5 +66,6 @@ export function formatPricingAmount(
   if (value === '') return ''
   const amount = Number(value) * currency.exchangeRate
   if (!Number.isFinite(amount)) return '—'
-  return `${currency.symbol}${formatPricingNumber(amount)}`
+  const formatted = formatPricingNumber(amount)
+  return i18next.t('{{amount}} points', { amount: formatted })
 }

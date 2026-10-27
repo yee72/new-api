@@ -286,7 +286,9 @@ export function SubscriptionPurchaseDialog(props: Props) {
           <Separator />
           <div className='flex items-center justify-between'>
             <span className='text-sm font-medium'>{t('Amount Due')}</span>
-            <span className='text-primary text-lg font-bold'>${price}</span>
+            <span className='text-primary text-lg font-bold'>
+              {t('{{amount}} points', { amount: price })}
+            </span>
           </div>
         </div>
 

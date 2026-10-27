@@ -16,6 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import i18next from 'i18next'
+
 /**
  * ============================================================================
  * Currency Formatting Library
@@ -187,16 +189,16 @@ function getConfig(): CurrencyConfig {
 function getDisplayMeta(config: CurrencyConfig): DisplayMeta {
   switch (config.quotaDisplayType) {
     case 'CNY':
+      // 产品展示统一为积分；保留汇率用于数值换算
       return {
-        kind: 'currency',
-        symbol: '¥',
-        currencyCode: 'CNY',
+        kind: 'custom',
+        symbol: '',
         exchangeRate: config.usdExchangeRate,
       }
     case 'CUSTOM':
       return {
         kind: 'custom',
-        symbol: config.customCurrencySymbol,
+        symbol: '',
         exchangeRate: config.customCurrencyExchangeRate,
       }
     case 'TOKENS':
@@ -207,9 +209,8 @@ function getDisplayMeta(config: CurrencyConfig): DisplayMeta {
     case 'USD':
     default:
       return {
-        kind: 'currency',
-        symbol: '$',
-        currencyCode: 'USD',
+        kind: 'custom',
+        symbol: '',
         exchangeRate: 1,
       }
   }
@@ -219,9 +220,8 @@ function getBillingDisplayMeta(config: CurrencyConfig): DisplayMeta {
   const meta = getDisplayMeta(config)
   if (meta.kind === 'tokens') {
     return {
-      kind: 'currency',
-      symbol: '$',
-      currencyCode: 'USD',
+      kind: 'custom',
+      symbol: '',
       exchangeRate: 1,
     }
   }
@@ -324,33 +324,15 @@ function formatCurrencyValue(
   )
   const adjustedValue = adjustForMinimum(value, digits, options.minimumNonZero)
 
-  if (meta.kind === 'currency') {
-    if (!options.showSymbol) {
-      return new Intl.NumberFormat(options.locale, {
-        notation: options.compact ? 'compact' : 'standard',
-        minimumFractionDigits: 0,
-        maximumFractionDigits: options.compact ? 1 : digits,
-      }).format(adjustedValue)
-    }
-
-    const formatted = new Intl.NumberFormat(options.locale, {
-      style: 'currency',
-      currency: meta.currencyCode,
-      currencyDisplay: 'narrowSymbol',
-      notation: options.compact ? 'compact' : 'standard',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: options.compact ? 1 : digits,
-    }).format(adjustedValue)
-    return formatted
-  }
-
   const decimal = new Intl.NumberFormat(options.locale, {
     notation: options.compact ? 'compact' : 'standard',
     minimumFractionDigits: 0,
     maximumFractionDigits: options.compact ? 1 : digits,
   }).format(adjustedValue)
 
-  return options.showSymbol ? `${meta.symbol} ${decimal}` : decimal
+  // 产品统一展示为积分，不再使用 $/¥ 等货币符号
+  if (!options.showSymbol) return decimal
+  return i18next.t('{{amount}} points', { amount: decimal })
 }
 
 /**

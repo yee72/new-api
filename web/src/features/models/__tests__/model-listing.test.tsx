@@ -702,7 +702,7 @@ it('shows an unrecognized expression as special and retains its full source in p
     name: 'View pricing for channel-only',
   })
   expect(button).toHaveTextContent('Special billing expression')
-  expect(button).not.toHaveTextContent('$2')
+  expect(button).not.toHaveTextContent('2 points')
   expect(button).not.toHaveTextContent(expression)
   await userEvent.click(button)
   const preview = await screen.findByRole('region', { name: 'Current Billing' })

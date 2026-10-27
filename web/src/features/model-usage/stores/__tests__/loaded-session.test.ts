@@ -143,14 +143,14 @@ describe('markUnresumedMessages', () => {
   it('keeps the user turn and stops a chat request that cannot resume', () => {
     const settled = markUnresumedMessages(
       [userMessage, pendingAssistant],
-      'Generation failed'
+      "Generation didn't complete. Please try again later."
     )
 
     expect(settled[0]).toEqual(userMessage)
     expect(settled[1]).toMatchObject({
       id: 'a1',
       status: 'error',
-      content: 'Generation failed',
+      content: "Generation didn't complete. Please try again later.",
     })
   })
 
@@ -158,17 +158,17 @@ describe('markUnresumedMessages', () => {
     const failedAssistant: ModelUsageMessage = {
       ...pendingAssistant,
       status: 'error',
-      content: 'Chat request failed',
+      content: "This request didn't go through. Please try again later.",
       errorDetail: 'upstream refused the model',
     }
     const settled = markUnresumedMessages(
       [userMessage, failedAssistant],
-      'Generation failed'
+      "Generation didn't complete. Please try again later."
     )
 
     expect(settled[1]).toMatchObject({
       status: 'error',
-      content: 'Chat request failed',
+      content: "This request didn't go through. Please try again later.",
       errorDetail: 'upstream refused the model',
     })
   })
@@ -188,14 +188,14 @@ describe('markUnresumedMessages', () => {
 
     const settled = markUnresumedMessages(
       [videoPending, videoWithoutTask],
-      'Generation failed'
+      "Generation didn't complete. Please try again later."
     )
 
     expect(settled[0]).toMatchObject({ id: 'v1', status: 'pending' })
     expect(settled[1]).toMatchObject({
       id: 'v2',
       status: 'error',
-      content: 'Generation failed',
+      content: "Generation didn't complete. Please try again later.",
     })
   })
 })

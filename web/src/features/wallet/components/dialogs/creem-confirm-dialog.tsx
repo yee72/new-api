@@ -77,9 +77,11 @@ export function CreemConfirmDialog({
           <span className='font-medium'>{product.name}</span>
         </div>
         <div className='flex items-center justify-between'>
-          <span className='text-muted-foreground'>{t('Price')}</span>
+          <span className='text-muted-foreground'>{t('Points')}</span>
           <span className='text-primary font-medium'>
-            {formatCreemPrice(product.price, product.currency)}
+            {t('{{amount}} points', {
+              amount: formatCreemPrice(product.price, product.currency),
+            })}
           </span>
         </div>
         <div className='flex items-center justify-between'>

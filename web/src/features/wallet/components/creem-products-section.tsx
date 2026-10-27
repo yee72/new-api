@@ -67,7 +67,9 @@ export function CreemProductsSection({
               {t('Quota')}: {formatNumber(product.quota)}
             </div>
             <div className='text-primary text-lg font-semibold'>
-              {formatCreemPrice(product.price, product.currency)}
+              {t('{{amount}} points', {
+                amount: formatCreemPrice(product.price, product.currency),
+              })}
             </div>
           </CardContent>
         </Card>

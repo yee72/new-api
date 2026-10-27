@@ -18,10 +18,19 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { describe, expect, test } from 'vitest'
 
-import { PAYMENT_TYPES } from '../constants'
+import {
+  PAYMENT_POINTS_MAX,
+  PAYMENT_POINTS_MIN,
+  PAYMENT_TYPES,
+} from '../constants'
 import {
   dispatchSelectedPayment,
+  filterPresetAmountsByBounds,
+  generatePresetAmounts,
+  getMaxTopupAmount,
+  getMinTopupAmount,
   isStripePayment,
+  isTopupAmountInBounds,
   isWaffoPayment,
   isWaffoPancakePayment,
 } from './payment'
@@ -33,6 +42,44 @@ describe('payment type classification', () => {
     expect(isWaffoPancakePayment(PAYMENT_TYPES.WAFFO_PANCAKE)).toBe(true)
     expect(isWaffoPancakePayment(PAYMENT_TYPES.WAFFO)).toBe(false)
     expect(isStripePayment(PAYMENT_TYPES.STRIPE)).toBe(true)
+  })
+})
+
+describe('payment points bounds', () => {
+  test('enforces product min and max for topup points', () => {
+    expect(getMinTopupAmount(null)).toBe(PAYMENT_POINTS_MIN)
+    expect(
+      getMinTopupAmount({
+        enable_online_topup: true,
+        min_topup: 1,
+        enable_stripe_topup: false,
+        stripe_min_topup: 1,
+        enable_waffo_topup: false,
+        enable_waffo_pancake_topup: false,
+        enable_creem_topup: false,
+        enable_redemption: true,
+        pay_methods: [],
+        amount_options: [],
+        discount: {},
+      } as never)
+    ).toBe(PAYMENT_POINTS_MIN)
+    expect(getMaxTopupAmount()).toBe(PAYMENT_POINTS_MAX)
+    expect(isTopupAmountInBounds(0.1, PAYMENT_POINTS_MIN)).toBe(true)
+    expect(isTopupAmountInBounds(0.09, PAYMENT_POINTS_MIN)).toBe(false)
+    expect(isTopupAmountInBounds(10000, PAYMENT_POINTS_MIN)).toBe(true)
+    expect(isTopupAmountInBounds(10000.1, PAYMENT_POINTS_MIN)).toBe(false)
+  })
+
+  test('filters preset amounts outside the payment points bounds', () => {
+    expect(
+      filterPresetAmountsByBounds(
+        [{ value: 0.05 }, { value: 1 }, { value: 500 }, { value: 20000 }],
+        PAYMENT_POINTS_MIN
+      )
+    ).toEqual([{ value: 1 }, { value: 500 }])
+    expect(generatePresetAmounts(PAYMENT_POINTS_MIN).every((preset) =>
+      isTopupAmountInBounds(preset.value, PAYMENT_POINTS_MIN)
+    )).toBe(true)
   })
 })
 

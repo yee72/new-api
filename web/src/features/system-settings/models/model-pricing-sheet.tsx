@@ -1105,7 +1105,7 @@ export const ModelPricingEditorPanel = forwardRef<
                                 <FormLabel>{t('Fixed price')}</FormLabel>
                                 <InputGroup className='has-[[data-pricing-error]]:h-auto has-[[data-pricing-error]]:flex-wrap'>
                                   <InputGroupAddon>
-                                    {currency.symbol}
+                                    {t('Points')}
                                   </InputGroupAddon>
                                   <FormControl>
                                     <PricingAmountInput

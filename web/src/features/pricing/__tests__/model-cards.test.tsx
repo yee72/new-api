@@ -86,10 +86,10 @@ describe('model cards', () => {
       />
     )
     expect(screen.getByText('Cache Read').parentElement).toHaveTextContent(
-      '$1.25'
+      '1.25 points'
     )
     expect(screen.getByText('Image Cache').parentElement).toHaveTextContent(
-      '$0'
+      '0 points'
     )
   })
   it('shows fixed prices per request in both token display units', () => {
@@ -100,10 +100,10 @@ describe('model cards', () => {
     const { rerender } = render(
       <ModelCard model={model} onClick={vi.fn()} tokenUnit='K' />
     )
-    expect(screen.getByText('$0.01')).toBeVisible()
+    expect(screen.getByText('0.01 points')).toBeVisible()
     expect(screen.getByText('/ request')).toBeVisible()
     rerender(<ModelCard model={model} onClick={vi.fn()} tokenUnit='M' />)
-    expect(screen.getByText('$0.01')).toBeVisible()
+    expect(screen.getByText('0.01 points')).toBeVisible()
     expect(screen.queryByText('/ 1M')).not.toBeInTheDocument()
   })
   it('updates the current time tier at a minute boundary and after returning to the page', () => {
@@ -116,14 +116,14 @@ describe('model cards', () => {
     })
     render(<ModelCard model={model} onClick={vi.fn()} tokenUnit='M' />)
     expect(screen.getByText('Current period price')).toBeVisible()
-    expect(screen.getByText('$1.5')).toBeVisible()
+    expect(screen.getByText('1.5 points')).toBeVisible()
     act(() => vi.advanceTimersByTime(1000))
-    expect(screen.getByText('$3')).toBeVisible()
+    expect(screen.getByText('3 points')).toBeVisible()
     act(() => {
       vi.setSystemTime(new Date('2026-09-07T12:00:00+08:00'))
       fireEvent(document, new Event('visibilitychange'))
     })
-    expect(screen.getByText('$1.5')).toBeVisible()
+    expect(screen.getByText('1.5 points')).toBeVisible()
   })
 
   it('copies the complete long model name without opening details', async () => {
@@ -241,23 +241,23 @@ describe('model cards', () => {
     }
     const { rerender } = render(<ModelCard {...props} tokenUnit='M' />)
     expect(screen.getByText('Input').parentElement).toHaveTextContent(
-      /\$3\s*\/\s*1M/
+      /3 points\s*\/\s*1M/
     )
     expect(screen.getByText('Output').parentElement).toHaveTextContent(
-      /\$9\s*\/\s*1M/
+      /9 points\s*\/\s*1M/
     )
     expect(screen.getByText('Cached').parentElement).toHaveTextContent(
-      /\$0\s*\/\s*1M/
+      /0 points\s*\/\s*1M/
     )
     rerender(<ModelCard {...props} tokenUnit='K' />)
     expect(screen.getByText('Input').parentElement).toHaveTextContent(
-      /\$0.003\s*\/\s*1K/
+      /0.003 points\s*\/\s*1K/
     )
     expect(screen.getByText('Output').parentElement).toHaveTextContent(
-      /\$0.009\s*\/\s*1K/
+      /0.009 points\s*\/\s*1K/
     )
     expect(screen.getByText('Cached').parentElement).toHaveTextContent(
-      /\$0\s*\/\s*1K/
+      /0 points\s*\/\s*1K/
     )
   })
 
@@ -273,7 +273,9 @@ describe('model cards', () => {
         tokenUnit='K'
       />
     )
-    expect(screen.getByText(/\$0.6/)).toHaveTextContent(/\$0.6\s*\/\s*request/)
+    expect(screen.getByText(/0.6 points/)).toHaveTextContent(
+      /0.6 points\s*\/\s*request/
+    )
     expect(screen.queryByText(/1K|1M/)).not.toBeInTheDocument()
     expect(screen.getAllByText('Per Request')).toHaveLength(1)
     expect(screen.queryByText('Per-request')).not.toBeInTheDocument()
@@ -295,10 +297,10 @@ describe('model cards', () => {
       />
     )
     expect(screen.getByText('Input').parentElement).toHaveTextContent(
-      /\$0.0045\s*\/\s*1K/
+      /0.0045 points\s*\/\s*1K/
     )
     expect(screen.getByText('Output').parentElement).toHaveTextContent(
-      /\$0.0225\s*\/\s*1K/
+      /0.0225 points\s*\/\s*1K/
     )
   })
 
@@ -318,7 +320,9 @@ describe('model cards', () => {
         tokenUnit='K'
       />
     )
-    expect(screen.getByText(/0.4.*0.8/)).toHaveTextContent(/0.4 – \$0.8/)
+    expect(screen.getByText(/0.4.*0.8/)).toHaveTextContent(
+      /0.4 points – 0.8 points/
+    )
     expect(screen.getByText(/^\/\s*s$/)).toBeVisible()
     expect(screen.queryByText(/1K|1M/)).not.toBeInTheDocument()
   })
@@ -357,8 +361,8 @@ describe('model cards', () => {
         tokenUnit='K'
       />
     )
-    expect(screen.getByText('$42 – $70').parentElement).toHaveTextContent(
-      '$42 – $70 / 1M token'
+    expect(screen.getByText('42 points – 70 points').parentElement).toHaveTextContent(
+      '42 points – 70 points / 1M token'
     )
     expect(screen.getByText(/480p · 5s ≈/)).toBeVisible()
   })

@@ -19,7 +19,7 @@ import (
 )
 
 type WaffoPancakePayRequest struct {
-	Amount int64 `json:"amount"`
+	Amount float64 `json:"amount"`
 }
 
 func RequestWaffoPancakeAmount(c *gin.Context) {
@@ -29,8 +29,11 @@ func RequestWaffoPancakeAmount(c *gin.Context) {
 		return
 	}
 
-	if req.Amount < int64(setting.WaffoPancakeMinTopUp) {
-		c.JSON(http.StatusOK, gin.H{"message": "error", "data": fmt.Sprintf("充值数量不能小于 %d", setting.WaffoPancakeMinTopUp)})
+	if rejectOutOfPaymentPointsBounds(c, req.Amount) {
+		return
+	}
+	if req.Amount < paymentPointsMin {
+		c.JSON(http.StatusOK, gin.H{"message": "error", "data": fmt.Sprintf("充值数量不能小于 %g", paymentPointsMin)})
 		return
 	}
 	id := c.GetInt("id")
@@ -53,8 +56,8 @@ func RequestWaffoPancakeAmount(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "success", "data": fmt.Sprintf("%.2f", payMoney)})
 }
 
-func getWaffoPancakePayMoney(amount int64, group string) float64 {
-	dAmount := decimal.NewFromInt(amount)
+func getWaffoPancakePayMoney(amount float64, group string) float64 {
+	dAmount := decimal.NewFromFloat(amount)
 	if operation_setting.GetQuotaDisplayType() == operation_setting.QuotaDisplayTypeTokens {
 		dAmount = dAmount.Div(decimal.NewFromFloat(common.QuotaPerUnit))
 	}
@@ -77,16 +80,16 @@ func getWaffoPancakePayMoney(amount int64, group string) float64 {
 	return payMoney.InexactFloat64()
 }
 
-func normalizeWaffoPancakeTopUpAmount(amount int64) int64 {
+func normalizeWaffoPancakeTopUpAmount(amount float64) float64 {
 	if operation_setting.GetQuotaDisplayType() != operation_setting.QuotaDisplayTypeTokens {
 		return amount
 	}
 
-	normalized := decimal.NewFromInt(amount).
+	normalized := decimal.NewFromFloat(amount).
 		Div(decimal.NewFromFloat(common.QuotaPerUnit)).
-		IntPart()
-	if normalized < 1 {
-		return 1
+		InexactFloat64()
+	if normalized < paymentPointsMin {
+		return paymentPointsMin
 	}
 	return normalized
 }
@@ -350,8 +353,11 @@ func RequestWaffoPancakePay(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "参数错误"})
 		return
 	}
-	if req.Amount < int64(setting.WaffoPancakeMinTopUp) {
-		c.JSON(http.StatusOK, gin.H{"message": "error", "data": fmt.Sprintf("充值数量不能小于 %d", setting.WaffoPancakeMinTopUp)})
+	if rejectOutOfPaymentPointsBounds(c, req.Amount) {
+		return
+	}
+	if req.Amount < paymentPointsMin {
+		c.JSON(http.StatusOK, gin.H{"message": "error", "data": fmt.Sprintf("充值数量不能小于 %g", paymentPointsMin)})
 		return
 	}
 	id := c.GetInt("id")

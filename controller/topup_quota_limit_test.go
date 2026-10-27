@@ -88,39 +88,27 @@ func TestValidateTopUpQuotaReturnsMaximumAmount(t *testing.T) {
 		Div(decimal.NewFromFloat(common.QuotaPerUnit)).
 		Floor().IntPart()
 
-	_, err := validateTopUpQuota(maxAmount)
+	_, err := validateTopUpQuota(float64(maxAmount))
 	require.NoError(t, err)
-	_, err = validateTopUpQuota(maxAmount + 1)
+	_, err = validateTopUpQuota(float64(maxAmount + 1))
 	require.EqualError(t, err, fmt.Sprintf("单笔充值数量不能大于 %d", maxAmount))
 }
 
-func TestRequestAmountRejectsTopUpThatCannotBeSettled(t *testing.T) {
-	oldQuotaPerUnit := common.QuotaPerUnit
-	oldDisplayType := operation_setting.GetGeneralSetting().QuotaDisplayType
-	common.QuotaPerUnit = 500000
-	operation_setting.GetGeneralSetting().QuotaDisplayType = operation_setting.QuotaDisplayTypeUSD
-	t.Cleanup(func() {
-		common.QuotaPerUnit = oldQuotaPerUnit
-		operation_setting.GetGeneralSetting().QuotaDisplayType = oldDisplayType
-	})
-
+func TestRequestAmountRejectsOutOfPaymentPointsBounds(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
-	maxAmount := decimal.NewFromInt(common.MaxWalletQuota).
-		Div(decimal.NewFromFloat(common.QuotaPerUnit)).
-		Floor().IntPart()
 	ctx.Request = httptest.NewRequest(
 		http.MethodPost,
 		"/api/user/amount",
-		strings.NewReader(fmt.Sprintf(`{"amount":%d}`, maxAmount+1)),
+		strings.NewReader(`{"amount":10000.1}`),
 	)
 	ctx.Request.Header.Set("Content-Type", "application/json")
 
 	RequestAmount(ctx)
 
 	assert.Equal(t, http.StatusOK, recorder.Code)
-	assert.JSONEq(t, fmt.Sprintf(`{"message":"error","data":"单笔充值数量不能大于 %d"}`, maxAmount), recorder.Body.String())
+	assert.JSONEq(t, `{"message":"error","data":"支付方积分最低支持0.1，最高支持 10000"}`, recorder.Body.String())
 }
 
 func TestRequestAmountRejectsTopUpThatWouldOverflowWallet(t *testing.T) {

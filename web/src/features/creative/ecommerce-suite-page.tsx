@@ -307,12 +307,13 @@ export function EcommerceSuitePage() {
         setStep('review')
       } catch (error) {
         const message =
-          error instanceof Error ? error.message : t('Generation failed')
+          error instanceof Error ? error.message : t("Generation didn't complete. Please try again later.")
         appendProcessEvent(
           createCreativeProcessEvent({
             stage: 'done',
             type: 'detail',
-            messageKey: 'Generation failed: {{message}}',
+            messageKey:
+              "Generation didn't complete: {{message}}",
             status: 'error',
             params: { message },
           })
@@ -473,12 +474,13 @@ export function EcommerceSuitePage() {
       setStep('review')
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : t('Generation failed')
+        error instanceof Error ? error.message : t("Generation didn't complete. Please try again later.")
       appendProcessEvent(
         createCreativeProcessEvent({
           stage: 'done',
           type: 'detail',
-          messageKey: 'Generation failed: {{message}}',
+          messageKey:
+              "Generation didn't complete: {{message}}",
           status: 'error',
           params: { message },
         })

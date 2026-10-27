@@ -49,7 +49,7 @@ export function GeneralError({
   const isRateLimited = status === 429
   const title = isRateLimited
     ? t('Too many requests')
-    : `${t('Oops! Something went wrong')} ${`:')`}`
+    : `${t('Something went wrong. Please try again later.')} ${`:')`}`
   const description = isRateLimited
     ? t('Please wait a moment before trying again.')
     : t('Please try again later.')

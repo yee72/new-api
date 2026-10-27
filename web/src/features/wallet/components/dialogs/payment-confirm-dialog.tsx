@@ -30,7 +30,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
-import { formatLocalCurrencyAmount } from '@/lib/currency'
+import { formatNumber } from '@/lib/format'
 
 import { DEFAULT_DISCOUNT_RATE } from '../../constants'
 import { formatCurrency, getPaymentIcon } from '../../lib'
@@ -81,13 +81,11 @@ export function PaymentConfirmDialog({
         <div className='space-y-3 py-3 sm:space-y-4 sm:py-4'>
           <div className='flex items-center justify-between'>
             <span className='text-muted-foreground text-sm'>
-              {t('Topup Amount')}
+              {t('Topup Points')}
             </span>
             <span className='text-lg font-semibold'>
-              {formatLocalCurrencyAmount(topupAmount * usdExchangeRate, {
-                digitsLarge: 2,
-                digitsSmall: 2,
-                abbreviate: false,
+              {t('{{amount}} points', {
+                amount: formatNumber(topupAmount * usdExchangeRate),
               })}
             </span>
           </div>
@@ -101,11 +99,15 @@ export function PaymentConfirmDialog({
             ) : (
               <div className='flex items-baseline gap-2'>
                 <span className='text-2xl font-semibold'>
-                  {formatCurrency(paymentAmount)}
+                  {t('{{amount}} points', {
+                    amount: formatCurrency(paymentAmount),
+                  })}
                 </span>
                 {hasDiscount && (
                   <span className='text-muted-foreground text-sm line-through'>
-                    {formatCurrency(originalAmount)}
+                    {t('{{amount}} points', {
+                      amount: formatCurrency(originalAmount),
+                    })}
                   </span>
                 )}
               </div>
@@ -117,7 +119,9 @@ export function PaymentConfirmDialog({
               <div className='flex items-center justify-between text-sm'>
                 <span className='text-muted-foreground'>{t('You save')}</span>
                 <span className='font-semibold text-green-600'>
-                  {formatCurrency(discountAmount)}
+                  {t('{{amount}} points', {
+                    amount: formatCurrency(discountAmount),
+                  })}
                 </span>
               </div>
             </div>

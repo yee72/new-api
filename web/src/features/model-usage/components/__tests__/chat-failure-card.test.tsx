@@ -40,7 +40,10 @@ async function renderCard(detail?: string) {
   })
   return render(
     <I18nextProvider i18n={i18n}>
-      <ModelUsageChatFailureCard title='Chat request failed' detail={detail} />
+      <ModelUsageChatFailureCard
+        title="This request didn't go through. Please try again later."
+        detail={detail}
+      />
     </I18nextProvider>
   )
 }
@@ -50,7 +53,9 @@ describe('ModelUsageChatFailureCard', () => {
     await renderCard('upstream refused the model')
 
     const expand = screen.getByRole('button', { name: 'Show error details' })
-    const title = screen.getByText('Chat request failed')
+    const title = screen.getByText(
+      "This request didn't go through. Please try again later."
+    )
     expect(
       expand.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_PRECEDING
     ).toBeTruthy()
@@ -66,7 +71,9 @@ describe('ModelUsageChatFailureCard', () => {
 
     await user.click(screen.getByRole('button', { name: 'Show error details' }))
 
-    const title = screen.getByText('Chat request failed')
+    const title = screen.getByText(
+      "This request didn't go through. Please try again later."
+    )
     const detail = screen.getByText('upstream refused the model')
     expect(title).toBeVisible()
     expect(detail).toBeVisible()
