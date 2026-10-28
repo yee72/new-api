@@ -16,9 +16,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { Link } from '@tanstack/react-router'
 import { Gift, ExternalLink, Loader2, Receipt, WalletCards } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -34,18 +36,19 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { POINTS_DISPLAY_SCALE } from '@/lib/currency'
 import { formatNumber } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
-import { PAYMENT_POINTS_MAX, PAYMENT_POINTS_MIN } from '../constants'
+import { PAYMENT_CNY_MAX, PAYMENT_CNY_MIN } from '../constants'
 import {
-  formatCurrency,
-  getDiscountLabel,
+  formatPayCNY,
   getPaymentIcon,
   getMinTopupAmount,
   getMaxTopupAmount,
   isTopupAmountInBounds,
   calculatePresetPricing,
+  payCnyToCreditAmount,
 } from '../lib'
 import type {
   PaymentMethod,
@@ -66,6 +69,8 @@ interface RechargeFormCardProps {
   paymentAmount: number
   calculating: boolean
   onPaymentMethodSelect: (method: PaymentMethod) => void
+  /** 当前选中的支付方式（单选，确认后再下单） */
+  selectedPaymentMethod?: PaymentMethod
   paymentLoading: string | null
   redemptionCode: string
   onRedemptionCodeChange: (code: string) => void
@@ -84,6 +89,14 @@ interface RechargeFormCardProps {
   waffoMinTopup?: number
   onWaffoMethodSelect?: (method: WaffoPayMethod, index: number) => void
   enableWaffoPancakeTopup?: boolean
+  /** 嵌入弹窗：无外层卡片标题 / 订单历史 */
+  embedded?: boolean
+  /** 隐藏兑换码区（由外层 Tab 承载） */
+  hideRedemption?: boolean
+  /** 展示协议与确认充值（确认按钮在支付方式右侧） */
+  showActionFooter?: boolean
+  confirming?: boolean
+  onConfirmPay?: () => void
 }
 
 export function RechargeFormCard({
@@ -93,9 +106,10 @@ export function RechargeFormCard({
   onSelectPreset,
   topupAmount,
   onTopupAmountChange,
-  paymentAmount,
+  paymentAmount: _paymentAmount,
   calculating,
   onPaymentMethodSelect,
+  selectedPaymentMethod,
   paymentLoading,
   redemptionCode,
   onRedemptionCodeChange,
@@ -111,9 +125,13 @@ export function RechargeFormCard({
   onCreemProductSelect,
   enableWaffoTopup,
   waffoPayMethods,
-  waffoMinTopup,
   onWaffoMethodSelect,
   enableWaffoPancakeTopup,
+  embedded = false,
+  hideRedemption = false,
+  showActionFooter = true,
+  confirming = false,
+  onConfirmPay,
 }: RechargeFormCardProps) {
   const { t } = useTranslation()
   const [localAmount, setLocalAmount] = useState(topupAmount.toString())
@@ -126,12 +144,18 @@ export function RechargeFormCard({
   }, [topupAmount])
 
   const handleAmountChange = (value: string) => {
-    setLocalAmount(value)
-    if (value.trim() === '' || value === '.') {
+    // 自定义金额仅允许正整数人民币；限制位数防止溢出输入
+    const trimmed = value.trim()
+    if (trimmed === '') {
+      setLocalAmount(value)
       onTopupAmountChange(0)
       return
     }
-    const numValue = Number.parseFloat(value)
+    if (!/^\d+$/.test(trimmed) || trimmed.length > 5) {
+      return
+    }
+    setLocalAmount(trimmed)
+    const numValue = Number.parseInt(trimmed, 10)
     if (Number.isFinite(numValue) && numValue >= 0) {
       onTopupAmountChange(numValue)
     }
@@ -151,16 +175,20 @@ export function RechargeFormCard({
   const maxTopup = getMaxTopupAmount()
   const amountInBounds = isTopupAmountInBounds(topupAmount, minTopup, maxTopup)
   const trimmedLocalAmount = localAmount.trim()
-  const parsedLocalAmount = Number.parseFloat(trimmedLocalAmount)
+  const parsedLocalAmount = Number.parseInt(trimmedLocalAmount, 10)
+  const creditAmount = payCnyToCreditAmount(topupAmount, priceRatio)
+  const receivePointsDisplay = Number.isFinite(creditAmount)
+    ? creditAmount * usdExchangeRate * POINTS_DISPLAY_SCALE
+    : 0
   const customAmountError = (() => {
-    if (trimmedLocalAmount === '' || trimmedLocalAmount === '.') {
-      return t('Please enter topup points')
+    if (trimmedLocalAmount === '') {
+      return t('Please enter the payment amount in CNY')
     }
-    if (!Number.isFinite(parsedLocalAmount)) {
-      return t('Please enter a valid number')
+    if (!/^\d+$/.test(trimmedLocalAmount) || !Number.isFinite(parsedLocalAmount)) {
+      return t('Please enter a positive integer')
     }
     if (parsedLocalAmount < minTopup || parsedLocalAmount > maxTopup) {
-      return t('Payment points must be between {{min}} and {{max}}', {
+      return t('Payment amount must be an integer between {{min}} and {{max}}', {
         min: minTopup,
         max: maxTopup,
       })
@@ -220,50 +248,89 @@ export function RechargeFormCard({
     )
   }
 
-  return (
-    <TitledCard
-      title={t('Add Funds')}
-      description={t('Choose points and a payment method')}
-      icon={<WalletCards className='h-4 w-4' />}
-      iconTone='success'
-      disableHoverEffect
-      action={
-        onOpenBilling ? (
-          <Button
-            variant='outline'
-            size='sm'
-            onClick={onOpenBilling}
-            className='w-full gap-2 sm:w-auto'
-          >
-            <Receipt className='h-4 w-4' />
-            {t('Order History')}
-          </Button>
-        ) : null
-      }
-      contentClassName='space-y-4 sm:space-y-6'
-    >
+  let redemptionSection: ReactNode = null
+  if (!hideRedemption) {
+    if (redemptionEnabled) {
+      redemptionSection = (
+        <div className='space-y-2.5 border-t pt-4 sm:space-y-3 sm:pt-6'>
+          <div className='flex items-center gap-2'>
+            <IconBadge tone='warning' size='xs'>
+              <Gift />
+            </IconBadge>
+            <Label
+              htmlFor='redemption-code'
+              className='text-muted-foreground text-xs font-medium tracking-wider uppercase'
+            >
+              {t('Have a Code?')}
+            </Label>
+          </div>
+          <div className='grid grid-cols-[minmax(0,1fr)_auto] gap-2'>
+            <Input
+              id='redemption-code'
+              value={redemptionCode}
+              onChange={(e) => onRedemptionCodeChange(e.target.value)}
+              placeholder={t('Enter your redemption code')}
+              className='h-9 min-w-0'
+            />
+            <Button
+              onClick={onRedeem}
+              disabled={redeeming}
+              variant='outline'
+              className='h-9 px-4'
+            >
+              {redeeming && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
+              {t('Redeem')}
+            </Button>
+          </div>
+          {topupLink && (
+            <p className='text-muted-foreground text-xs'>
+              {t('Need a redemption code?')}{' '}
+              <a
+                href={topupLink}
+                target='_blank'
+                rel='noopener noreferrer'
+                className='inline-flex items-center gap-1 underline-offset-4 hover:underline'
+              >
+                {t('Get one here')}
+                <ExternalLink className='h-3 w-3' />
+              </a>
+            </p>
+          )}
+        </div>
+      )
+    } else {
+      redemptionSection = (
+        <Alert className='border-t'>
+          <AlertDescription>
+            {t(
+              'Redemption codes are disabled until the administrator confirms compliance terms.'
+            )}
+          </AlertDescription>
+        </Alert>
+      )
+    }
+  }
+
+  const formBody = (
+    <>
       {/* Online Topup Section */}
       {hasAnyTopup ? (
-        <div className='space-y-4 sm:space-y-6'>
+        <div className={cn(embedded ? 'space-y-3' : 'space-y-4 sm:space-y-6')}>
           {hasConfigurableTopup && (
             <>
               {presetAmounts.length > 0 && (
-                <div className='space-y-2.5 sm:space-y-3'>
+                <div className='space-y-2 sm:space-y-2.5'>
                   <Label className='text-muted-foreground text-xs font-medium tracking-wider uppercase'>
-                    {t('Points')}
+                    {t('Payment amount')}
                   </Label>
-                  <div className='grid grid-cols-2 gap-1.5 sm:gap-3 md:grid-cols-4'>
+                  <div className='grid grid-cols-4 gap-1.5 sm:gap-2'>
                     {presetAmounts.map((preset) => {
                       const discount =
                         preset.discount ||
                         topupInfo?.discount?.[preset.value] ||
                         1.0
-                      const {
-                        displayValue,
-                        actualPrice,
-                        savedAmount,
-                        hasDiscount,
-                      } = calculatePresetPricing(
+                      // 仅用于展示到账积分；不展示活动角标 / 折扣文案
+                      const { displayValue } = calculatePresetPricing(
                         preset.value,
                         priceRatio,
                         discount,
@@ -274,38 +341,20 @@ export function RechargeFormCard({
                           key={preset.value}
                           variant='outline'
                           className={cn(
-                            'flex min-h-16 flex-col items-start rounded-lg px-3 py-2.5 text-left whitespace-normal sm:min-h-[72px] sm:p-4',
+                            'flex min-h-16 flex-col items-start rounded-lg px-2.5 py-2.5 text-left whitespace-normal sm:min-h-[72px] sm:px-3 sm:py-3',
                             selectedPreset === preset.value
-                              ? 'border-foreground bg-foreground/5 dark:border-foreground dark:bg-foreground/10'
+                              ? 'border-emerald-500 bg-emerald-500/10 ring-1 ring-emerald-500/40'
                               : 'border-muted'
                           )}
                           onClick={() => onSelectPreset(preset)}
                         >
-                          <div className='flex w-full items-center justify-between'>
-                            <div className='text-base font-semibold sm:text-lg'>
-                              {t('{{amount}} points', {
-                                amount: formatNumber(displayValue),
-                              })}
-                            </div>
-                            {hasDiscount && (
-                              <div className='text-xs font-medium text-green-600'>
-                                {getDiscountLabel(discount)}
-                              </div>
-                            )}
+                          <div className='text-base font-semibold sm:text-lg'>
+                            {formatPayCNY(preset.value)}
                           </div>
-                          <div className='text-muted-foreground mt-1.5 w-full text-xs sm:mt-2'>
-                            {t('Pay {{amount}} points', {
-                              amount: formatCurrency(actualPrice),
+                          <div className='text-muted-foreground mt-1.5 w-full truncate text-xs sm:mt-2'>
+                            {t('{{amount}} credits', {
+                              amount: formatNumber(displayValue),
                             })}
-                            {hasDiscount && savedAmount > 0 && (
-                              <span className='text-green-600'>
-                                {' '}
-                                •{' '}
-                                {t('Save {{amount}} points', {
-                                  amount: formatCurrency(savedAmount),
-                                })}
-                              </span>
-                            )}
                           </div>
                         </Button>
                       )
@@ -314,36 +363,35 @@ export function RechargeFormCard({
                 </div>
               )}
 
-              <div className='space-y-2.5 sm:space-y-3'>
+              <div className='space-y-2 sm:space-y-2.5'>
                 <Label
                   htmlFor='topup-amount'
                   className='text-muted-foreground text-xs font-medium tracking-wider uppercase'
                 >
-                  {t('Custom Points')}
+                  {t('Custom amount (¥)')}
                 </Label>
-                <div className='grid grid-cols-[minmax(0,1fr)_minmax(110px,0.55fr)] gap-2 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center'>
+                <div className='grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2'>
                   <Input
                     id='topup-amount'
                     type='number'
+                    inputMode='numeric'
                     value={localAmount}
                     onChange={(e) => handleAmountChange(e.target.value)}
-                    min={PAYMENT_POINTS_MIN}
-                    max={PAYMENT_POINTS_MAX}
-                    step={0.1}
-                    placeholder={`${PAYMENT_POINTS_MIN} – ${PAYMENT_POINTS_MAX}`}
+                    min={PAYMENT_CNY_MIN}
+                    max={PAYMENT_CNY_MAX}
+                    step={1}
+                    maxLength={5}
+                    placeholder={`${PAYMENT_CNY_MIN} – ${PAYMENT_CNY_MAX}`}
                     aria-invalid={!!customAmountError}
                     className='h-9 text-base sm:h-10 sm:text-lg'
                   />
-                  <div className='bg-muted/30 flex min-h-9 items-center justify-between gap-2 rounded-md border px-3 lg:min-w-52'>
-                    <span className='text-muted-foreground truncate text-xs'>
-                      {t('Points to pay:')}
-                    </span>
+                  <div className='bg-muted/30 flex h-9 min-w-24 items-center justify-center rounded-md border px-3 sm:h-10'>
                     {calculating ? (
-                      <Skeleton className='h-5 w-16' />
+                      <Skeleton className='h-5 w-14' />
                     ) : (
-                      <span className='text-sm font-semibold'>
-                        {t('{{amount}} points', {
-                          amount: formatCurrency(paymentAmount),
+                      <span className='text-sm font-semibold tabular-nums'>
+                        {t('{{amount}} credits', {
+                          amount: formatNumber(receivePointsDisplay),
                         })}
                       </span>
                     )}
@@ -351,7 +399,7 @@ export function RechargeFormCard({
                 </div>
                 <p className='text-muted-foreground text-xs'>
                   {t(
-                    'Payment points support a minimum of 0.1 and a maximum of 10000'
+                    'Custom top-up supports integers from 1 to 10000 CNY'
                   )}
                 </p>
                 {customAmountError ? (
@@ -361,47 +409,54 @@ export function RechargeFormCard({
                 ) : null}
               </div>
 
-              <div className='space-y-2.5 sm:space-y-3'>
+              <div className='space-y-2 sm:space-y-2.5'>
                 <Label className='text-muted-foreground text-xs font-medium tracking-wider uppercase'>
                   {t('Payment Method')}
                 </Label>
+                <div className='flex flex-col gap-2 sm:flex-row sm:items-stretch'>
                 {hasStandardPaymentMethods ? (
-                  <div className='grid grid-cols-2 gap-1.5 sm:gap-3 lg:grid-cols-3'>
+                  <div className='flex min-w-0 flex-1 flex-wrap gap-1.5 sm:gap-2'>
                     {topupInfo?.pay_methods?.map((method) => {
-                      // 产品边界覆盖服务端全局下限；支付方式若显式配置更高下限仍生效
+                      // 产品边界覆盖服务端全局下限；支付方式若显式配置更高下限仍按 ¥ 生效
                       const methodMin = Math.max(
-                        PAYMENT_POINTS_MIN,
+                        PAYMENT_CNY_MIN,
                         method.min_topup || 0
                       )
                       const belowMin = topupAmount < methodMin
                       const aboveMax = topupAmount > maxTopup
                       const disabled =
                         !amountInBounds || belowMin || aboveMax
-                      const disabledReason = !amountInBounds
-                        ? t(
-                            'Payment points must be between {{min}} and {{max}}',
-                            {
-                              min: minTopup,
-                              max: maxTopup,
-                            }
-                          )
-                        : belowMin
-                          ? t('Minimum topup points: {{amount}}', {
-                              amount: methodMin,
-                            })
-                          : aboveMax
-                            ? t('Maximum topup points: {{amount}}', {
-                                amount: maxTopup,
-                              })
-                            : undefined
-                      const disabledLabel = !amountInBounds
-                        ? `${minTopup} – ${maxTopup}`
-                        : belowMin
-                          ? `${t('Minimum:')} ${methodMin}`
-                          : aboveMax
-                            ? `${t('Maximum:')} ${maxTopup}`
-                            : undefined
+                      let disabledReason: string | undefined
+                      let disabledLabel: string | undefined
+                      if (!amountInBounds) {
+                        disabledReason = t(
+                          'Payment amount must be an integer between {{min}} and {{max}}',
+                          {
+                            min: minTopup,
+                            max: maxTopup,
+                          }
+                        )
+                        disabledLabel = `${minTopup} – ${maxTopup}¥`
+                      } else if (belowMin) {
+                        disabledReason = t(
+                          'Minimum top-up amount: {{amount}}¥',
+                          {
+                            amount: methodMin,
+                          }
+                        )
+                        disabledLabel = `${t('Minimum:')} ${methodMin}¥`
+                      } else if (aboveMax) {
+                        disabledReason = t(
+                          'Maximum top-up amount: {{amount}}¥',
+                          {
+                            amount: maxTopup,
+                          }
+                        )
+                        disabledLabel = `${t('Maximum:')} ${maxTopup}¥`
+                      }
 
+                      const selected =
+                        selectedPaymentMethod?.type === method.type
                       const button = (
                         <Button
                           key={method.type}
@@ -409,12 +464,17 @@ export function RechargeFormCard({
                           onClick={() => onPaymentMethodSelect(method)}
                           disabled={disabled || !!paymentLoading}
                           title={disabledReason}
+                          aria-pressed={selected}
                           aria-label={
                             disabledReason
                               ? `${method.name}. ${disabledReason}`
                               : method.name
                           }
-                          className='min-h-14 min-w-0 justify-start gap-2 rounded-lg px-3 py-2 text-left'
+                          className={cn(
+                            'min-h-14 min-w-[9.5rem] flex-1 justify-start gap-2 rounded-lg px-3 py-2 text-left sm:min-w-[11rem]',
+                            selected &&
+                              'border-emerald-500 bg-emerald-500/10 ring-1 ring-emerald-500/40'
+                          )}
                         >
                           {paymentLoading === method.type ? (
                             <Loader2 className='h-4 w-4 animate-spin' />
@@ -426,7 +486,7 @@ export function RechargeFormCard({
                               method.name
                             )
                           )}
-                          <span className='flex min-w-0 flex-col items-start gap-0.5'>
+                          <span className='flex min-w-0 flex-1 flex-col items-start gap-0.5'>
                             <span className='max-w-full truncate'>
                               {method.name}
                             </span>
@@ -436,6 +496,15 @@ export function RechargeFormCard({
                               </span>
                             )}
                           </span>
+                          <span
+                            className={cn(
+                              'ml-auto size-4 shrink-0 rounded-full border',
+                              selected
+                                ? 'border-emerald-500 bg-emerald-500'
+                                : 'border-muted-foreground/40'
+                            )}
+                            aria-hidden
+                          />
                         </Button>
                       )
 
@@ -452,6 +521,27 @@ export function RechargeFormCard({
                     })}
                   </div>
                 ) : null}
+                {showActionFooter ? (
+                  <Button
+                    type='button'
+                    className='h-14 w-full shrink-0 bg-emerald-500 px-5 text-white hover:bg-emerald-600 sm:w-auto sm:min-w-28'
+                    onClick={onConfirmPay}
+                    disabled={
+                      confirming ||
+                      !amountInBounds ||
+                      !selectedPaymentMethod ||
+                      calculating
+                    }
+                  >
+                    {confirming && (
+                      <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                    )}
+                    <span className='text-sm font-semibold'>
+                      {t('Confirm recharge')}
+                    </span>
+                  </Button>
+                ) : null}
+                </div>
                 {!hasStandardPaymentMethods && !hasWaffoPaymentMethods && (
                   <Alert>
                     <AlertDescription>
@@ -461,6 +551,27 @@ export function RechargeFormCard({
                     </AlertDescription>
                   </Alert>
                 )}
+                {showActionFooter ? (
+                  <p className='text-muted-foreground text-xs leading-relaxed'>
+                    {t('By paying you agree to the')}{' '}
+                    <Link
+                      to='/user-agreement'
+                      className='text-emerald-600 underline-offset-4 hover:underline'
+                    >
+                      {t('User Agreement')}
+                    </Link>
+                    {t(' and ')}
+                    <button
+                      type='button'
+                      className='text-emerald-600 underline-offset-4 hover:underline'
+                      onClick={() =>
+                        toast.message(t('Refund policy coming soon'))
+                      }
+                    >
+                      {t('Refund Policy')}
+                    </button>
+                  </p>
+                ) : null}
               </div>
 
               {enableWaffoTopup &&
@@ -480,30 +591,34 @@ export function RechargeFormCard({
                         const aboveMax = topupAmount > maxTopup
                         const disabled =
                           !amountInBounds || belowMin || aboveMax
-                        const disabledReason = !amountInBounds
-                          ? t(
-                              'Payment points must be between {{min}} and {{max}}',
-                              {
-                                min: minTopup,
-                                max: maxTopup,
-                              }
-                            )
-                          : belowMin
-                            ? t('Minimum topup points: {{amount}}', {
-                                amount: waffoMin,
-                              })
-                            : aboveMax
-                              ? t('Maximum topup points: {{amount}}', {
-                                  amount: maxTopup,
-                                })
-                              : undefined
-                        const disabledLabel = !amountInBounds
-                          ? `${minTopup} – ${maxTopup}`
-                          : belowMin
-                            ? `${t('Minimum:')} ${waffoMin}`
-                            : aboveMax
-                              ? `${t('Maximum:')} ${maxTopup}`
-                              : undefined
+                        let disabledReason: string | undefined
+                        let disabledLabel: string | undefined
+                        if (!amountInBounds) {
+                          disabledReason = t(
+                            'Payment amount must be an integer between {{min}} and {{max}}',
+                            {
+                              min: minTopup,
+                              max: maxTopup,
+                            }
+                          )
+                          disabledLabel = `${minTopup} – ${maxTopup}¥`
+                        } else if (belowMin) {
+                          disabledReason = t(
+                            'Minimum top-up amount: {{amount}}¥',
+                            {
+                              amount: waffoMin,
+                            }
+                          )
+                          disabledLabel = `${t('Minimum:')} ${waffoMin}¥`
+                        } else if (aboveMax) {
+                          disabledReason = t(
+                            'Maximum top-up amount: {{amount}}¥',
+                            {
+                              amount: maxTopup,
+                            }
+                          )
+                          disabledLabel = `${t('Maximum:')} ${maxTopup}¥`
+                        }
 
                         let methodIcon = getPaymentIcon('waffo')
                         if (paymentLoading === loadingKey) {
@@ -592,61 +707,37 @@ export function RechargeFormCard({
         )}
 
       {/* Redemption Code Section */}
-      {redemptionEnabled ? (
-        <div className='space-y-2.5 border-t pt-4 sm:space-y-3 sm:pt-6'>
-          <div className='flex items-center gap-2'>
-            <IconBadge tone='warning' size='xs'>
-              <Gift />
-            </IconBadge>
-            <Label
-              htmlFor='redemption-code'
-              className='text-muted-foreground text-xs font-medium tracking-wider uppercase'
-            >
-              {t('Have a Code?')}
-            </Label>
-          </div>
-          <div className='grid grid-cols-[minmax(0,1fr)_auto] gap-2'>
-            <Input
-              id='redemption-code'
-              value={redemptionCode}
-              onChange={(e) => onRedemptionCodeChange(e.target.value)}
-              placeholder={t('Enter your redemption code')}
-              className='h-9 min-w-0'
-            />
-            <Button
-              onClick={onRedeem}
-              disabled={redeeming}
-              variant='outline'
-              className='h-9 px-4'
-            >
-              {redeeming && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
-              {t('Redeem')}
-            </Button>
-          </div>
-          {topupLink && (
-            <p className='text-muted-foreground text-xs'>
-              {t('Need a redemption code?')}{' '}
-              <a
-                href={topupLink}
-                target='_blank'
-                rel='noopener noreferrer'
-                className='inline-flex items-center gap-1 underline-offset-4 hover:underline'
-              >
-                {t('Get one here')}
-                <ExternalLink className='h-3 w-3' />
-              </a>
-            </p>
-          )}
-        </div>
-      ) : (
-        <Alert className='border-t'>
-          <AlertDescription>
-            {t(
-              'Redemption codes are disabled until the administrator confirms compliance terms.'
-            )}
-          </AlertDescription>
-        </Alert>
-      )}
+      {redemptionSection}
+    </>
+  )
+
+  if (embedded) {
+    return <div className='space-y-3'>{formBody}</div>
+  }
+
+  return (
+    <TitledCard
+      title={t('Add Funds')}
+      description={t('Choose a payment amount and method')}
+      icon={<WalletCards className='h-4 w-4' />}
+      iconTone='success'
+      disableHoverEffect
+      action={
+        onOpenBilling ? (
+          <Button
+            variant='outline'
+            size='sm'
+            onClick={onOpenBilling}
+            className='w-full gap-2 sm:w-auto'
+          >
+            <Receipt className='h-4 w-4' />
+            {t('Order History')}
+          </Button>
+        ) : null
+      }
+      contentClassName='space-y-4 sm:space-y-6'
+    >
+      {formBody}
     </TitledCard>
   )
 }

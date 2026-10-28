@@ -30,16 +30,18 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
+import { POINTS_DISPLAY_SCALE } from '@/lib/currency'
 import { formatNumber } from '@/lib/format'
 
 import { DEFAULT_DISCOUNT_RATE } from '../../constants'
-import { formatCurrency, getPaymentIcon } from '../../lib'
+import { formatPayCNY, getPaymentIcon, payCnyToCreditAmount } from '../../lib'
 import type { PaymentMethod } from '../../types'
 
 interface PaymentConfirmDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onConfirm: () => void
+  /** 应付人民币（正整数） */
   topupAmount: number
   paymentAmount: number
   paymentMethod: PaymentMethod | undefined
@@ -47,6 +49,7 @@ interface PaymentConfirmDialogProps {
   processing: boolean
   discountRate?: number
   usdExchangeRate?: number
+  priceRatio?: number
 }
 
 export function PaymentConfirmDialog({
@@ -60,11 +63,16 @@ export function PaymentConfirmDialog({
   processing,
   discountRate = DEFAULT_DISCOUNT_RATE,
   usdExchangeRate = 1,
+  priceRatio = 1,
 }: PaymentConfirmDialogProps) {
   const { t } = useTranslation()
   const hasDiscount = discountRate > 0 && discountRate < 1 && paymentAmount > 0
   const originalAmount = hasDiscount ? paymentAmount / discountRate : 0
   const discountAmount = hasDiscount ? originalAmount - paymentAmount : 0
+  const receivePoints =
+    payCnyToCreditAmount(topupAmount, priceRatio) *
+    usdExchangeRate *
+    POINTS_DISPLAY_SCALE
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -81,33 +89,29 @@ export function PaymentConfirmDialog({
         <div className='space-y-3 py-3 sm:space-y-4 sm:py-4'>
           <div className='flex items-center justify-between'>
             <span className='text-muted-foreground text-sm'>
-              {t('Topup Points')}
+              {t('You will receive')}
             </span>
             <span className='text-lg font-semibold'>
               {t('{{amount}} points', {
-                amount: formatNumber(topupAmount * usdExchangeRate),
+                amount: formatNumber(receivePoints),
               })}
             </span>
           </div>
 
           <div className='flex items-center justify-between'>
             <span className='text-muted-foreground text-sm'>
-              {t('You Pay')}
+              {t('Amount due')}
             </span>
             {calculating ? (
               <Skeleton className='h-6 w-24' />
             ) : (
               <div className='flex items-baseline gap-2'>
                 <span className='text-2xl font-semibold'>
-                  {t('{{amount}} points', {
-                    amount: formatCurrency(paymentAmount),
-                  })}
+                  {formatPayCNY(paymentAmount)}
                 </span>
                 {hasDiscount && (
                   <span className='text-muted-foreground text-sm line-through'>
-                    {t('{{amount}} points', {
-                      amount: formatCurrency(originalAmount),
-                    })}
+                    {formatPayCNY(originalAmount)}
                   </span>
                 )}
               </div>
@@ -119,9 +123,7 @@ export function PaymentConfirmDialog({
               <div className='flex items-center justify-between text-sm'>
                 <span className='text-muted-foreground'>{t('You save')}</span>
                 <span className='font-semibold text-green-600'>
-                  {t('{{amount}} points', {
-                    amount: formatCurrency(discountAmount),
-                  })}
+                  {formatPayCNY(discountAmount)}
                 </span>
               </div>
             </div>

@@ -13,120 +13,110 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>.
-
-For commercial licensing, please contact support@quantumnous.com
 */
 import { describe, expect, test } from 'vitest'
 
 import {
-  PAYMENT_POINTS_MAX,
-  PAYMENT_POINTS_MIN,
+  PAYMENT_CNY_MAX,
+  PAYMENT_CNY_MIN,
+  PAYMENT_CNY_PRESETS,
   PAYMENT_TYPES,
 } from '../constants'
 import {
-  dispatchSelectedPayment,
   filterPresetAmountsByBounds,
-  generatePresetAmounts,
+  generateCnyPresetAmounts,
+  getDefaultPayCnyAmount,
   getMaxTopupAmount,
   getMinTopupAmount,
-  isStripePayment,
+  getPreferredPaymentType,
   isTopupAmountInBounds,
-  isWaffoPayment,
-  isWaffoPancakePayment,
+  payCnyToCreditAmount,
+  resolveCnyPresetAmounts,
 } from './payment'
 
-describe('payment type classification', () => {
-  test('keeps Waffo and Waffo Pancake on their dedicated flows', () => {
-    expect(isWaffoPayment(PAYMENT_TYPES.WAFFO)).toBe(true)
-    expect(isWaffoPayment(PAYMENT_TYPES.WAFFO_PANCAKE)).toBe(false)
-    expect(isWaffoPancakePayment(PAYMENT_TYPES.WAFFO_PANCAKE)).toBe(true)
-    expect(isWaffoPancakePayment(PAYMENT_TYPES.WAFFO)).toBe(false)
-    expect(isStripePayment(PAYMENT_TYPES.STRIPE)).toBe(true)
-  })
-})
-
-describe('payment points bounds', () => {
-  test('enforces product min and max for topup points', () => {
-    expect(getMinTopupAmount(null)).toBe(PAYMENT_POINTS_MIN)
+describe('payment CNY bounds', () => {
+  test('enforces product min and max for topup CNY integers', () => {
+    expect(getMinTopupAmount(null)).toBe(PAYMENT_CNY_MIN)
     expect(
       getMinTopupAmount({
         enable_online_topup: true,
-        min_topup: 1,
+        min_topup: 5,
         enable_stripe_topup: false,
         stripe_min_topup: 1,
         enable_waffo_topup: false,
+        waffo_min_topup: 1,
         enable_waffo_pancake_topup: false,
+        waffo_pancake_min_topup: 1,
         enable_creem_topup: false,
         enable_redemption: true,
         pay_methods: [],
         amount_options: [],
         discount: {},
       } as never)
-    ).toBe(PAYMENT_POINTS_MIN)
-    expect(getMaxTopupAmount()).toBe(PAYMENT_POINTS_MAX)
-    expect(isTopupAmountInBounds(0.1, PAYMENT_POINTS_MIN)).toBe(true)
-    expect(isTopupAmountInBounds(0.09, PAYMENT_POINTS_MIN)).toBe(false)
-    expect(isTopupAmountInBounds(10000, PAYMENT_POINTS_MIN)).toBe(true)
-    expect(isTopupAmountInBounds(10000.1, PAYMENT_POINTS_MIN)).toBe(false)
+    ).toBe(PAYMENT_CNY_MIN)
+    expect(getMaxTopupAmount()).toBe(PAYMENT_CNY_MAX)
+    expect(isTopupAmountInBounds(1, PAYMENT_CNY_MIN)).toBe(true)
+    expect(isTopupAmountInBounds(0, PAYMENT_CNY_MIN)).toBe(false)
+    expect(isTopupAmountInBounds(1.5, PAYMENT_CNY_MIN)).toBe(false)
+    expect(isTopupAmountInBounds(10000, PAYMENT_CNY_MIN)).toBe(true)
+    expect(isTopupAmountInBounds(10001, PAYMENT_CNY_MIN)).toBe(false)
   })
 
-  test('filters preset amounts outside the payment points bounds', () => {
+  test('generates fixed CNY payment presets', () => {
+    const presets = generateCnyPresetAmounts()
+    expect(presets.map((item) => item.value)).toEqual([...PAYMENT_CNY_PRESETS])
     expect(
-      filterPresetAmountsByBounds(
-        [{ value: 0.05 }, { value: 1 }, { value: 500 }, { value: 20000 }],
-        PAYMENT_POINTS_MIN
+      presets.every((preset) =>
+        isTopupAmountInBounds(preset.value, PAYMENT_CNY_MIN)
       )
-    ).toEqual([{ value: 1 }, { value: 500 }])
-    expect(generatePresetAmounts(PAYMENT_POINTS_MIN).every((preset) =>
-      isTopupAmountInBounds(preset.value, PAYMENT_POINTS_MIN)
-    )).toBe(true)
-  })
-})
-
-describe('payment dispatch', () => {
-  test('keeps the selected Waffo method index through confirmation', async () => {
-    const calls: string[] = []
-    const success = await dispatchSelectedPayment(
-      { name: 'Waffo Card', type: PAYMENT_TYPES.WAFFO },
-      120,
-      3,
-      {
-        regular: async () => {
-          calls.push('regular')
-          return false
-        },
-        waffo: async (amount, index) => {
-          calls.push(`waffo:${amount}:${index}`)
-          return true
-        },
-        waffoPancake: async () => {
-          calls.push('pancake')
-          return false
-        },
-      }
-    )
-
-    expect(success).toBe(true)
-    expect(calls).toEqual(['waffo:120:3'])
+    ).toBe(true)
+    expect(
+      filterPresetAmountsByBounds(presets, PAYMENT_CNY_MIN).length
+    ).toBe(PAYMENT_CNY_PRESETS.length)
   })
 
-  test('does not create a Waffo order without a selected method index', async () => {
-    let called = false
-    const success = await dispatchSelectedPayment(
-      { name: 'Waffo Card', type: PAYMENT_TYPES.WAFFO },
-      120,
-      null,
-      {
-        regular: async () => false,
-        waffo: async () => {
-          called = true
-          return true
-        },
-        waffoPancake: async () => false,
-      }
-    )
+  test('prefers gateway amount options over product defaults', () => {
+    const presets = resolveCnyPresetAmounts([30, 10, 50], { 50: 0.9 })
+    expect(presets.map((item) => item.value)).toEqual([10, 30, 50])
+    expect(presets.find((item) => item.value === 50)?.discount).toBe(0.9)
+    expect(resolveCnyPresetAmounts([]).map((item) => item.value)).toEqual([
+      ...PAYMENT_CNY_PRESETS,
+    ])
+  })
 
-    expect(success).toBe(false)
-    expect(called).toBe(false)
+  test('converts pay CNY to credit amount by price ratio', () => {
+    expect(payCnyToCreditAmount(10, 1)).toBe(10)
+    expect(payCnyToCreditAmount(70, 7)).toBe(10)
+    expect(payCnyToCreditAmount(10, 0)).toBe(10)
+  })
+
+  test('defaults dialog pay amount to 10¥ when present in presets', () => {
+    expect(getDefaultPayCnyAmount([10, 50, 100])).toBe(10)
+    expect(getDefaultPayCnyAmount([50, 100])).toBe(50)
+    expect(getDefaultPayCnyAmount([])).toBe(PAYMENT_CNY_MIN)
+  })
+
+  test('prefers wechat when listed in pay methods', () => {
+    expect(
+      getPreferredPaymentType({
+        enable_online_topup: true,
+        min_topup: 1,
+        enable_stripe_topup: true,
+        stripe_min_topup: 1,
+        enable_waffo_topup: false,
+        waffo_min_topup: 1,
+        enable_waffo_pancake_topup: false,
+        waffo_pancake_min_topup: 1,
+        enable_creem_topup: false,
+        enable_redemption: true,
+        pay_methods: [
+          { name: 'Alipay', type: PAYMENT_TYPES.ALIPAY },
+          { name: 'WeChat', type: PAYMENT_TYPES.WECHAT },
+          { name: 'Stripe', type: PAYMENT_TYPES.STRIPE },
+        ],
+        amount_options: [],
+        discount: {},
+      } as never)
+    ).toBe(PAYMENT_TYPES.WECHAT)
   })
 })

@@ -16,14 +16,17 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { POINTS_DISPLAY_SCALE } from '@/lib/currency'
+
 import { DEFAULT_DISCOUNT_RATE } from '../constants'
+import { payCnyToCreditAmount } from './payment'
 
 // ============================================================================
 // Wallet-specific Formatting Functions
 // ============================================================================
 
 /**
- * Format Creem price as points amount (no currency symbol)
+ * Format Creem price as display points (含全站展示倍率)
  */
 export function formatCreemPrice(
   price: number,
@@ -34,16 +37,18 @@ export function formatCreemPrice(
 
 /**
  * Format a points amount without currency symbols ($/¥/€).
+ * 含全站积分展示倍率。
  */
 export function formatPointsAmount(amount: number | string): string {
   const numeric =
     typeof amount === 'number' ? amount : Number.parseFloat(String(amount))
   if (!Number.isFinite(numeric)) return '-'
 
+  const display = numeric * POINTS_DISPLAY_SCALE
   return new Intl.NumberFormat(undefined, {
     minimumFractionDigits: 0,
-    maximumFractionDigits: Math.abs(numeric) >= 1 ? 2 : 4,
-  }).format(numeric)
+    maximumFractionDigits: Math.abs(display) >= 1 ? 2 : 4,
+  }).format(display)
 }
 
 /**
@@ -60,10 +65,25 @@ export function formatQuotaShort(quota: number): string {
 }
 
 /**
- * Format payment/topup numeric amount (alias of points formatting, no $).
+ * 实付人民币展示，如 10¥（不乘积分倍率）
+ */
+export function formatPayCNY(amount: number | string): string {
+  const numeric =
+    typeof amount === 'number' ? amount : Number.parseFloat(String(amount))
+  if (!Number.isFinite(numeric)) return '-'
+
+  const decimal = new Intl.NumberFormat(undefined, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: Math.abs(numeric) >= 1 ? 2 : 4,
+  }).format(numeric)
+  return `${decimal}¥`
+}
+
+/**
+ * @deprecated 支付展示请用 formatPayCNY；保留别名避免旧调用瞬时报错
  */
 export function formatCurrency(amount: number | string): string {
-  return formatPointsAmount(amount)
+  return formatPayCNY(amount)
 }
 
 /**
@@ -78,7 +98,7 @@ export function getDiscountLabel(discount: number): string {
 }
 
 /**
- * Calculate pricing details for a preset amount
+ * 人民币付款档定价：presetValue 为应付 ¥
  */
 export function calculatePresetPricing(
   presetValue: number,
@@ -86,14 +106,18 @@ export function calculatePresetPricing(
   discount: number,
   usdExchangeRate: number = 1
 ) {
-  const originalPrice = presetValue * priceRatio
+  const creditAmount = payCnyToCreditAmount(presetValue, priceRatio)
+  const originalPrice = presetValue
   const actualPrice = originalPrice * discount
   const savedAmount = originalPrice - actualPrice
   const hasDiscount = discount < 1.0
-  const displayValue = presetValue * usdExchangeRate
+  // 展示积分 = 系统额度 × 汇率展示系数 × 全站倍率
+  const displayValue =
+    creditAmount * usdExchangeRate * POINTS_DISPLAY_SCALE
 
   return {
     displayValue,
+    creditAmount,
     originalPrice,
     actualPrice,
     savedAmount,

@@ -301,11 +301,11 @@ it.each([
       if (fixture.mode === 'claude_ttl') label = 'Cache Creation (5m)'
       expect(
         within(panel).getByText(label).nextElementSibling
-      ).toHaveTextContent(`${fixture.ratio * 2} points / 1M token`)
+      ).toHaveTextContent(`${fixture.ratio * 20} points / 1M token`)
       if (fixture.mode === 'claude_ttl') {
         expect(
           within(panel).getByText('Cache create (1h) price').nextElementSibling
-        ).toHaveTextContent('4.8 points / 1M token')
+        ).toHaveTextContent('48 points / 1M token')
       } else {
         expect(
           within(panel).queryByText('Cache create (1h) price')
@@ -394,7 +394,7 @@ it.each([
       }
       expect(
         within(panel).getByText('Input price').nextElementSibling
-      ).toHaveTextContent(`${fixture.inputRatio * 2} points / 1M token`)
+      ).toHaveTextContent(`${fixture.inputRatio * 20} points / 1M token`)
     }
     await userEvent
       .setup()
@@ -466,7 +466,7 @@ it('previews and retains image quantity and nested quality rules when applying a
     const panel = within(dialog).getByRole('region', { name })
     expect(
       within(panel).getByText('Price per image').nextElementSibling
-    ).toHaveTextContent('0.04 points / image')
+    ).toHaveTextContent('0.4 points / image')
     expect(
       within(panel).getByText('Image count').nextElementSibling
     ).toHaveTextContent('Reserve requested images; settle returned images.')
@@ -513,7 +513,7 @@ it('shows Gemini audio pricing when the legacy text price is zero without creati
     const panel = within(dialog).getByRole('region', { name })
     expect(
       within(panel).getByText('Audio input price').nextElementSibling
-    ).toHaveTextContent('1 points / 1M token')
+    ).toHaveTextContent('10 points / 1M token')
   }
   await userEvent
     .setup()
@@ -552,7 +552,7 @@ it.each([0, 2])(
       expect(within(panel).getByText('Image input price')).toBeVisible()
       expect(
         within(panel).getByText('Image input price').nextElementSibling
-      ).toHaveTextContent(`${imageRatio * 2} points / 1M token`)
+      ).toHaveTextContent(`${imageRatio * 20} points / 1M token`)
     }
   }
 )

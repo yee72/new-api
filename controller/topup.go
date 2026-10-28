@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -133,9 +134,9 @@ type AmountRequest struct {
 	Amount float64 `json:"amount"`
 }
 
-// 支付方积分充值边界（与前端钱包页一致）
+// 充值额度边界（与前端人民币付款档换算后的 Amount 对齐；自定义 1～10000¥）
 const (
-	paymentPointsMin = 0.1
+	paymentPointsMin = 1.0
 	paymentPointsMax = 10000
 )
 
@@ -143,7 +144,7 @@ func rejectOutOfPaymentPointsBounds(c *gin.Context, amount float64) bool {
 	if amount < paymentPointsMin || amount > paymentPointsMax {
 		c.JSON(http.StatusOK, gin.H{
 			"message": "error",
-			"data":    "支付方积分最低支持0.1，最高支持 10000",
+			"data":    "充值金额最低支持 1，最高支持 10000",
 		})
 		return true
 	}
@@ -195,7 +196,7 @@ func getPayMoney(amount float64, group string) float64 {
 }
 
 func getMinTopup() float64 {
-	// 产品固定下限，覆盖后台 MinTopUp，保证可充值 0.1 积分
+	// 产品固定下限，覆盖后台 MinTopUp（自定义充值 1～10000¥）
 	return paymentPointsMin
 }
 
@@ -320,7 +321,7 @@ func RequestEpay(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "当前管理员未配置支付信息"})
 		return
 	}
-	uri, params, err := client.Purchase(&epay.PurchaseArgs{
+	purchaseArgs := &epay.PurchaseArgs{
 		Type:           req.PaymentMethod,
 		ServiceTradeNo: tradeNo,
 		Name:           fmt.Sprintf("TUC%g", req.Amount),
@@ -328,11 +329,6 @@ func RequestEpay(c *gin.Context) {
 		Device:         epay.PC,
 		NotifyUrl:      notifyUrl,
 		ReturnUrl:      returnUrl,
-	})
-	if err != nil {
-		logger.LogError(c.Request.Context(), fmt.Sprintf("易支付 拉起支付失败 user_id=%d trade_no=%s payment_method=%s amount=%g error=%q", id, tradeNo, req.PaymentMethod, req.Amount, err.Error()))
-		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "拉起支付失败"})
-		return
 	}
 	amount := req.Amount
 	if operation_setting.GetQuotaDisplayType() == operation_setting.QuotaDisplayTypeTokens {
@@ -356,8 +352,66 @@ func RequestEpay(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "创建订单失败"})
 		return
 	}
+
+	// 优先 mapi 程序化建单，供页内扫码；失败再回退 submit.php 表单跳转
+	mapiResult, mapiErr := service.RequestEpayMapi(client, purchaseArgs)
+	if mapiErr == nil && mapiResult != nil && mapiResult.QRContent != "" {
+		logger.LogInfo(c.Request.Context(), fmt.Sprintf("易支付 mapi 充值订单创建成功 user_id=%d trade_no=%s payment_method=%s amount=%g money=%.2f pay_url=%q", id, tradeNo, req.PaymentMethod, req.Amount, payMoney, mapiResult.PayURL))
+		c.JSON(http.StatusOK, gin.H{
+			"message": "success",
+			"data": gin.H{
+				"mode":           "qr",
+				"trade_no":       tradeNo,
+				"money":          payMoney,
+				"payment_method": req.PaymentMethod,
+				"pay_url":        mapiResult.PayURL,
+				"qr_content":     mapiResult.QRContent,
+			},
+		})
+		return
+	}
+	if mapiErr != nil {
+		logger.LogWarn(c.Request.Context(), fmt.Sprintf("易支付 mapi 不可用，回退表单跳转 user_id=%d trade_no=%s error=%q", id, tradeNo, mapiErr.Error()))
+	}
+
+	uri, params, err := client.Purchase(purchaseArgs)
+	if err != nil {
+		logger.LogError(c.Request.Context(), fmt.Sprintf("易支付 拉起支付失败 user_id=%d trade_no=%s payment_method=%s amount=%g error=%q", id, tradeNo, req.PaymentMethod, req.Amount, err.Error()))
+		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "拉起支付失败"})
+		return
+	}
 	logger.LogInfo(c.Request.Context(), fmt.Sprintf("易支付 充值订单创建成功 user_id=%d trade_no=%s payment_method=%s amount=%g money=%.2f uri=%q params=%q", id, tradeNo, req.PaymentMethod, req.Amount, payMoney, uri, common.GetJsonString(params)))
-	c.JSON(http.StatusOK, gin.H{"message": "success", "data": params, "url": uri})
+	c.JSON(http.StatusOK, gin.H{
+		"message":  "success",
+		"data":     params,
+		"url":      uri,
+		"trade_no": tradeNo,
+		"mode":     "form",
+	})
+}
+
+// GetSelfTopUpStatus 查询当前用户自己的充值订单状态（供扫码弹窗轮询）
+func GetSelfTopUpStatus(c *gin.Context) {
+	tradeNo := strings.TrimSpace(c.Query("trade_no"))
+	if tradeNo == "" {
+		c.JSON(http.StatusOK, gin.H{"success": false, "message": "missing trade_no"})
+		return
+	}
+	userId := c.GetInt("id")
+	topUp := model.GetTopUpByTradeNo(tradeNo)
+	if topUp == nil || topUp.UserId != userId {
+		c.JSON(http.StatusOK, gin.H{"success": false, "message": "order not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"trade_no":       topUp.TradeNo,
+			"status":         topUp.Status,
+			"money":          topUp.Money,
+			"payment_method": topUp.PaymentMethod,
+		},
+	})
 }
 
 // tradeNo lock

@@ -22,6 +22,7 @@ import { useTranslation } from 'react-i18next'
 
 import { StaticDataTable } from '@/components/data-table'
 import { Badge } from '@/components/ui/badge'
+import { POINTS_DISPLAY_SCALE } from '@/lib/currency'
 import { cn } from '@/lib/utils'
 import { useSystemConfigStore } from '@/stores/system-config-store'
 
@@ -208,7 +209,9 @@ function formatBreakdownPrice(
     field.unit === 'request' ||
     field.unit === 'image'
       ? formatTaskUsageUnitPrice(value, { tokenUnit: 'M', ...taskPriceOptions })
-      : t('{{amount}} points', { amount: (value * rate).toFixed(4) })
+      : t('{{amount}} points', {
+          amount: (value * rate * POINTS_DISPLAY_SCALE).toFixed(4),
+        })
   if (field.unit === 'second') return `${amount}/${t('s')}`
   if (field.unit === 'count') {
     return `${amount}/${taskUsageUnitLabel(field, language, t('unit'))}`

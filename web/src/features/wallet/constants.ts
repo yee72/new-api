@@ -23,6 +23,7 @@ For commercial licensing, please contact support@quantumnous.com
 /**
  * Default preset amount multipliers
  * Used to generate quick select amounts based on minimum topup
+ * @deprecated 产品改用固定人民币付款档 PAYMENT_CNY_PRESETS
  */
 export const DEFAULT_PRESET_MULTIPLIERS = [1, 5, 10, 30, 50, 100, 300, 500]
 
@@ -41,7 +42,7 @@ export const PAYMENT_TYPES = {
 /**
  * Default payment type
  */
-export const DEFAULT_PAYMENT_TYPE = PAYMENT_TYPES.ALIPAY
+export const DEFAULT_PAYMENT_TYPE = PAYMENT_TYPES.WECHAT
 
 /**
  * Payment icon colors (HEX format for react-icons)
@@ -61,12 +62,21 @@ export const PAYMENT_ICON_COLORS = {
 export const DEFAULT_DISCOUNT_RATE = 1.0
 
 /**
- * Default minimum topup amount（与支付方积分下限对齐）
+ * 自定义充值：人民币正整数边界
  */
-export const DEFAULT_MIN_TOPUP = 0.1
+export const PAYMENT_CNY_MIN = 1
+export const PAYMENT_CNY_MAX = 10000
 
 /**
- * 支付方积分充值边界（产品固定）
+ * 固定人民币付款档（产品配置）
  */
-export const PAYMENT_POINTS_MIN = 0.1
-export const PAYMENT_POINTS_MAX = 10000
+export const PAYMENT_CNY_PRESETS = [
+  1, 5, 10, 30, 50, 100, 200, 300, 500,
+] as const
+
+/**
+ * @deprecated 使用 PAYMENT_CNY_MIN；保留别名避免旧引用瞬时报错
+ */
+export const DEFAULT_MIN_TOPUP = PAYMENT_CNY_MIN
+export const PAYMENT_POINTS_MIN = PAYMENT_CNY_MIN
+export const PAYMENT_POINTS_MAX = PAYMENT_CNY_MAX

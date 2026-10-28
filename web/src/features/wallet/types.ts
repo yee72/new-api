@@ -35,9 +35,38 @@ export interface ApiResponse<T = unknown> {
 export type TopupInfoResponse = ApiResponse<TopupInfo>
 export type RedemptionResponse = ApiResponse<number>
 export type AmountResponse = ApiResponse<string>
-export type PaymentResponse = ApiResponse<Record<string, unknown>> & {
-  url?: string
+/** 易支付页内扫码会话（mapi 建单结果） */
+export interface EpayQrPaySession {
+  tradeNo: string
+  qrContent: string
+  payUrl: string
+  money: number
+  paymentMethod: string
 }
+
+export type EpayQrPayPayload = {
+  mode?: 'qr' | 'form'
+  trade_no?: string
+  money?: number
+  payment_method?: string
+  pay_url?: string
+  qr_content?: string
+}
+
+export type PaymentResponse = ApiResponse<
+  Record<string, unknown> | EpayQrPayPayload
+> & {
+  url?: string
+  trade_no?: string
+  mode?: 'qr' | 'form'
+}
+
+export type TopupStatusResponse = ApiResponse<{
+  trade_no: string
+  status: string
+  money: number
+  payment_method?: string
+}>
 export type StripePaymentResponse = ApiResponse<{ pay_link: string }>
 export type AffiliateCodeResponse = ApiResponse<string>
 export type AffiliateTransferResponse = ApiResponse

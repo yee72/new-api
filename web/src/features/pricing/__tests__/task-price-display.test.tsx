@@ -147,8 +147,8 @@ it('shows nested task conditions and prices in detail and group tables without a
   expect(
     screen.getAllByText(/resolution: 768P · Outside these times:/).length
   ).toBeGreaterThan(0)
-  expect(screen.getByText('0.072 points – 0.15 points')).toBeVisible()
-  expect(screen.getAllByText('0.24 points').length).toBeGreaterThan(0)
+  expect(screen.getByText('0.72 points – 1.5 points')).toBeVisible()
+  expect(screen.getAllByText('2.4 points').length).toBeGreaterThan(0)
   expect(screen.queryByText('Matched')).not.toBeInTheDocument()
 })
 
@@ -218,8 +218,8 @@ it.each([false, true])(
     expect(screen.getAllByText(configured ? '/ 张' : '张')).toHaveLength(2)
     expect(screen.queryByText('image_count')).not.toBeInTheDocument()
     if (configured) {
-      expect(screen.getByText('0.2 points')).toBeVisible()
-      expect(screen.getByText('0.4 points')).toBeVisible()
+      expect(screen.getByText('2 points')).toBeVisible()
+      expect(screen.getByText('4 points')).toBeVisible()
     }
   }
 )
@@ -284,11 +284,11 @@ it('refreshes memoized provider prices when the group or display currency change
     const view = render(
       <ModelPriceCell model={shared} options={{ selectedGroup: 'default' }} />
     )
-    expect(view.container).toHaveTextContent('0.22/unit')
+    expect(view.container).toHaveTextContent('2.2/unit')
     view.rerender(
       <ModelPriceCell model={shared} options={{ selectedGroup: 'premium' }} />
     )
-    expect(view.container).toHaveTextContent('0.66/unit')
+    expect(view.container).toHaveTextContent('6.6/unit')
     act(() =>
       useSystemConfigStore.getState().setConfig({
         currency: {
@@ -298,7 +298,7 @@ it('refreshes memoized provider prices when the group or display currency change
         },
       })
     )
-    expect(view.container).toHaveTextContent('1.32/unit')
+    expect(view.container).toHaveTextContent('13.2/unit')
   } finally {
     act(() => useSystemConfigStore.getState().setConfig({ currency: previous }))
   }
@@ -330,8 +330,8 @@ it('shows one standard task price and a localized group price without duplicate 
   expect(screen.queryByText('Tiered price table')).not.toBeInTheDocument()
   expect(screen.queryByText('Dynamic Pricing')).not.toBeInTheDocument()
   expect(screen.queryByText('music')).not.toBeInTheDocument()
-  expect(screen.getByText('0.22 points')).toBeVisible()
-  expect(screen.getByText('0.44 points')).toBeVisible()
+  expect(screen.getByText('2.2 points')).toBeVisible()
+  expect(screen.getByText('4.4 points')).toBeVisible()
   await act(() => i18next.changeLanguage('zhCN'))
   expect(screen.getAllByText('生成歌曲单价', { exact: false })).toHaveLength(2)
   await act(() => i18next.changeLanguage('fr'))
@@ -501,8 +501,8 @@ it('uses the same recharge conversion and token unit in task condition prices', 
       }}
     />
   )
-  expect(screen.getAllByText('5 points/1M token')).toHaveLength(2)
-  expect(screen.getAllByText('3 points/1M token')).toHaveLength(2)
+  expect(screen.getAllByText('50 points/1M token')).toHaveLength(2)
+  expect(screen.getAllByText('30 points/1M token')).toHaveLength(2)
 })
 
 it('switches provider group prices, localized conditions and examples, and shows unconfigured providers', async () => {
@@ -588,7 +588,7 @@ it('switches provider group prices, localized conditions and examples, and shows
   expect(alpha).toHaveAttribute('aria-selected', 'true')
   let panel = screen.getByRole('tabpanel', { name: 'Alpha' })
   expect(within(panel).getByText('Alpha sample')).toBeVisible()
-  expect(within(panel).getByText('0.8 points')).toBeVisible()
+  expect(within(panel).getByText('8 points')).toBeVisible()
   await user.click(alpha)
   await user.keyboard('{ArrowRight}')
   expect(screen.getByRole('tab', { name: 'Beta' })).toHaveFocus()
@@ -601,8 +601,8 @@ it('switches provider group prices, localized conditions and examples, and shows
   expect(within(panel).getByText('Beta sample')).toBeVisible()
   expect(within(panel).queryByText('Alpha sample')).not.toBeInTheDocument()
   expect(within(panel).getByText('Professional mode')).toBeVisible()
-  expect(within(panel).getByText('3 points')).toBeVisible()
-  expect(within(panel).getByText('6 points')).toBeVisible()
+  expect(within(panel).getByText('30 points')).toBeVisible()
+  expect(within(panel).getByText('60 points')).toBeVisible()
   await act(() => i18next.changeLanguage('zhCN'))
   expect(within(panel).getByText('专业模式')).toBeVisible()
   await act(() => i18next.changeLanguage('en'))
@@ -616,7 +616,7 @@ it('switches provider group prices, localized conditions and examples, and shows
   expect(within(panel).queryByRole('table')).not.toBeInTheDocument()
   await user.click(screen.getByRole('tab', { name: 'Delta' }))
   panel = screen.getByRole('tabpanel', { name: 'Delta' })
-  expect(within(panel).getByText('0.5 points')).toBeVisible()
+  expect(within(panel).getByText('5 points')).toBeVisible()
 })
 
 it('shows provider count, price range and missing-price status in both list and card views', () => {
@@ -659,6 +659,6 @@ it('shows provider count, price range and missing-price status in both list and 
   expect(screen.getAllByText(/Not configured for some providers/)).toHaveLength(
     2
   )
-  expect(screen.getByText('0.4 – 0.8/s')).toBeVisible()
-  expect(screen.getByText('0.4 points – 0.8 points')).toBeVisible()
+  expect(screen.getByText('4 – 8/s')).toBeVisible()
+  expect(screen.getByText('4 points – 8 points')).toBeVisible()
 })

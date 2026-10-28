@@ -142,6 +142,12 @@ const DEFAULT_FORMAT_OPTIONS: ResolvedCurrencyFormatOptions = {
   locale: undefined,
 }
 
+/**
+ * 全站积分展示倍率：仅放大用户可见数字，不改变入账 / 扣费 / 支付计算。
+ * 例：系统额度 10 → 展示 100 积分。
+ */
+export const POINTS_DISPLAY_SCALE = 10
+
 const DISPLAY_TYPE_VALUES = ['USD', 'CNY', 'TOKENS', 'CUSTOM'] as const
 type DisplayTypeLiteral = (typeof DISPLAY_TYPE_VALUES)[number]
 
@@ -317,12 +323,18 @@ function formatCurrencyValue(
     )
   }
 
+  // 积分展示口径放大；tokens 模式不走此分支
+  const scaledValue = value * POINTS_DISPLAY_SCALE
   const digits = getFractionDigits(
-    value,
+    scaledValue,
     options.digitsLarge,
     options.digitsSmall
   )
-  const adjustedValue = adjustForMinimum(value, digits, options.minimumNonZero)
+  const adjustedValue = adjustForMinimum(
+    scaledValue,
+    digits,
+    options.minimumNonZero
+  )
 
   const decimal = new Intl.NumberFormat(options.locale, {
     notation: options.compact ? 'compact' : 'standard',
@@ -611,9 +623,24 @@ export function formatLocalCurrencyAmount(
 ): string {
   if (amount == null || Number.isNaN(amount)) return '-'
 
-  const { config } = getCurrencyDisplay()
-  const meta = getBillingDisplayMeta(config)
   const merged = mergeOptions(options)
+  const digits = getFractionDigits(
+    amount,
+    merged.digitsLarge,
+    merged.digitsSmall
+  )
+  const adjustedValue = adjustForMinimum(
+    amount,
+    digits,
+    merged.minimumNonZero
+  )
+  const decimal = new Intl.NumberFormat(merged.locale, {
+    notation: merged.compact ? 'compact' : 'standard',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: merged.compact ? 1 : digits,
+  }).format(adjustedValue)
 
-  return formatCurrencyValue(amount, merged, meta)
+  // 实付金额固定为人民币展示，不套用积分倍率
+  if (!merged.showSymbol) return decimal
+  return `${decimal}¥`
 }

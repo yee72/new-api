@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import i18next from 'i18next'
 
 import { formatPricingNumber } from '@/features/system-settings/models/pricing-format'
+import { POINTS_DISPLAY_SCALE } from '@/lib/currency'
 import type { CurrencyConfig } from '@/stores/system-config-store'
 
 export type PricingCurrency = {
@@ -64,7 +65,7 @@ export function formatPricingAmount(
   currency = USD_PRICING_CURRENCY
 ): string {
   if (value === '') return ''
-  const amount = Number(value) * currency.exchangeRate
+  const amount = Number(value) * currency.exchangeRate * POINTS_DISPLAY_SCALE
   if (!Number.isFinite(amount)) return '—'
   const formatted = formatPricingNumber(amount)
   return i18next.t('{{amount}} points', { amount: formatted })

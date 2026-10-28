@@ -37,7 +37,12 @@ import {
   isWaffoPancakePayment,
   submitPaymentForm,
 } from '../lib'
-import type { AmountRequest, AmountResponse } from '../types'
+import type {
+  AmountRequest,
+  AmountResponse,
+  EpayQrPayPayload,
+  EpayQrPaySession,
+} from '../types'
 
 // ============================================================================
 // Payment Hook
@@ -81,12 +86,31 @@ export async function requestPaymentAmount(
   return Number.parseFloat(response.data)
 }
 
+function parseEpayQrSession(
+  data: unknown,
+  paymentType: string
+): EpayQrPaySession | null {
+  if (!data || typeof data !== 'object') return null
+  const payload = data as EpayQrPayPayload
+  if (payload.mode !== 'qr') return null
+  const tradeNo = payload.trade_no?.trim()
+  const qrContent = (payload.qr_content || payload.pay_url || '').trim()
+  if (!tradeNo || !qrContent) return null
+  return {
+    tradeNo,
+    qrContent,
+    payUrl: (payload.pay_url || qrContent).trim(),
+    money: Number(payload.money) || 0,
+    paymentMethod: payload.payment_method || paymentType,
+  }
+}
+
 export function usePayment() {
   const [amount, setAmount] = useState<number>(0)
   const [calculating, setCalculating] = useState(false)
   const [processing, setProcessing] = useState(false)
+  const [qrSession, setQrSession] = useState<EpayQrPaySession | null>(null)
 
-  // Calculate payment amount
   const calculatePaymentAmount = useCallback(
     async (topupAmount: number, paymentType: string) => {
       try {
@@ -107,7 +131,6 @@ export function usePayment() {
     []
   )
 
-  // Process payment
   const processPayment = useCallback(
     async (topupAmount: number, paymentType: string) => {
       try {
@@ -131,18 +154,22 @@ export function usePayment() {
           return false
         }
 
-        // Handle Stripe payment
         if (isStripe && response.data?.pay_link) {
           window.open(response.data.pay_link as string, '_blank')
           toast.success(i18next.t('Redirecting to payment page...'))
           return true
         }
 
-        // Handle non-Stripe payment
         if (!isStripe && response.data) {
+          const qr = parseEpayQrSession(response.data, paymentType)
+          if (qr) {
+            setQrSession(qr)
+            return true
+          }
+
           const url = (response as unknown as { url?: string }).url
           if (url) {
-            submitPaymentForm(url, response.data)
+            submitPaymentForm(url, response.data as Record<string, unknown>)
             toast.success(i18next.t('Redirecting to payment page...'))
             return true
           }
@@ -159,12 +186,18 @@ export function usePayment() {
     []
   )
 
+  const clearQrSession = useCallback(() => {
+    setQrSession(null)
+  }, [])
+
   return {
     amount,
     calculating,
     processing,
+    qrSession,
     calculatePaymentAmount,
     processPayment,
+    clearQrSession,
     setAmount,
   }
 }

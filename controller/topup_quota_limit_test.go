@@ -108,7 +108,7 @@ func TestRequestAmountRejectsOutOfPaymentPointsBounds(t *testing.T) {
 	RequestAmount(ctx)
 
 	assert.Equal(t, http.StatusOK, recorder.Code)
-	assert.JSONEq(t, `{"message":"error","data":"支付方积分最低支持0.1，最高支持 10000"}`, recorder.Body.String())
+	assert.JSONEq(t, `{"message":"error","data":"充值金额最低支持 1，最高支持 10000"}`, recorder.Body.String())
 }
 
 func TestRequestAmountRejectsTopUpThatWouldOverflowWallet(t *testing.T) {

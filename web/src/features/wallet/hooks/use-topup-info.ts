@@ -21,12 +21,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { handleServerError } from '@/lib/handle-server-error'
 
 import { getTopupInfo } from '../api'
-import {
-  generatePresetAmounts,
-  mergePresetAmounts,
-  filterPresetAmountsByBounds,
-  getMinTopupAmount,
-} from '../lib'
+import { resolveCnyPresetAmounts } from '../lib'
 import type {
   TopupInfo,
   PresetAmount,
@@ -198,19 +193,13 @@ export function useTopupInfo() {
 
       setTopupInfo(processedData)
 
-      const minTopup = getMinTopupAmount(processedData)
-      if (processedData.amount_options.length > 0) {
-        const customPresets = filterPresetAmountsByBounds(
-          mergePresetAmounts(
-            processedData.amount_options,
-            processedData.discount || {}
-          ),
-          minTopup
+      // 与支付网关「充值金额选项」联动；未配置时回退产品默认档
+      setPresetAmounts(
+        resolveCnyPresetAmounts(
+          processedData.amount_options || [],
+          processedData.discount || {}
         )
-        setPresetAmounts(customPresets)
-      } else {
-        setPresetAmounts(generatePresetAmounts(minTopup))
-      }
+      )
     } catch (err) {
       handleServerError(err)
     } finally {

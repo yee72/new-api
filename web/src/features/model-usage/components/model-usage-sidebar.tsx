@@ -37,6 +37,7 @@ import {
   resolveModelUsageVendorFilterValue,
 } from '../lib/vendor-display'
 import type { ModelUsageItem, ModelUsageTab, ModelUsageVendor } from '../types'
+import { ModelUsageAccountFooter } from './model-usage-account-footer'
 import { ModelUsageCard } from './model-usage-card'
 
 type ModelUsageSidebarProps = {
@@ -170,28 +171,32 @@ export function ModelUsageSidebar(props: ModelUsageSidebarProps) {
         </form>
       </div>
 
-      <div className='min-h-0 flex-1 space-y-2 overflow-y-auto pr-1'>
-        {props.isLoading && (
-          <p className='text-muted-foreground py-8 text-center text-sm'>
-            {t('Loading...')}
-          </p>
-        )}
-        {!props.isLoading && props.models.length === 0 && (
-          <p className='text-muted-foreground py-8 text-center text-sm'>
-            {t('No models found')}
-          </p>
-        )}
-        {props.models.map((model) => (
-          <ModelUsageCard
-            key={model.model_name}
-            model={model}
-            selected={props.selectedModelName === model.model_name}
-            sending={props.isModelSending?.(model.model_name)}
-            pinned={props.isPinned?.(model.model_name)}
-            onSelect={props.onSelectModel}
-            onTogglePin={props.onTogglePin}
-          />
-        ))}
+      <div className='relative min-h-0 flex-1 overflow-hidden'>
+        <div className='h-full space-y-2 overflow-y-auto pr-1 pb-[4.75rem]'>
+          {props.isLoading && (
+            <p className='text-muted-foreground py-8 text-center text-sm'>
+              {t('Loading...')}
+            </p>
+          )}
+          {!props.isLoading && props.models.length === 0 && (
+            <p className='text-muted-foreground py-8 text-center text-sm'>
+              {t('No models found')}
+            </p>
+          )}
+          {props.models.map((model) => (
+            <ModelUsageCard
+              key={model.model_name}
+              model={model}
+              selected={props.selectedModelName === model.model_name}
+              sending={props.isModelSending?.(model.model_name)}
+              pinned={props.isPinned?.(model.model_name)}
+              onSelect={props.onSelectModel}
+              onTogglePin={props.onTogglePin}
+            />
+          ))}
+        </div>
+
+        <ModelUsageAccountFooter />
       </div>
     </aside>
   )

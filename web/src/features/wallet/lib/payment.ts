@@ -21,6 +21,9 @@ import {
   DEFAULT_PRESET_MULTIPLIERS,
   DEFAULT_PAYMENT_TYPE,
   DEFAULT_MIN_TOPUP,
+  PAYMENT_CNY_MIN,
+  PAYMENT_CNY_MAX,
+  PAYMENT_CNY_PRESETS,
   PAYMENT_POINTS_MIN,
   PAYMENT_POINTS_MAX,
 } from '../constants'
@@ -150,6 +153,35 @@ export function getDefaultPaymentType(topupInfo: TopupInfo | null): string {
 }
 
 /**
+ * 优先微信支付；不可用时尝试支付宝，再回退 getDefaultPaymentType
+ */
+export function getPreferredPaymentType(topupInfo: TopupInfo | null): string {
+  const wechat = topupInfo?.pay_methods?.find(
+    (method) => method.type === PAYMENT_TYPES.WECHAT
+  )
+  if (wechat) {
+    return PAYMENT_TYPES.WECHAT
+  }
+  const alipay = topupInfo?.pay_methods?.find(
+    (method) => method.type === PAYMENT_TYPES.ALIPAY
+  )
+  if (alipay) {
+    return PAYMENT_TYPES.ALIPAY
+  }
+  return getDefaultPaymentType(topupInfo)
+}
+
+/**
+ * 默认人民币付款档（10¥）；不在预设内则回退最低档
+ */
+export function getDefaultPayCnyAmount(presetValues: number[]): number {
+  if (presetValues.includes(10)) {
+    return 10
+  }
+  return presetValues[0] ?? PAYMENT_CNY_MIN
+}
+
+/**
  * Get server-configured minimum topup (未套用产品上下限)
  */
 export function getServerMinTopupAmount(topupInfo: TopupInfo | null): number {
@@ -177,37 +209,54 @@ export function getServerMinTopupAmount(topupInfo: TopupInfo | null): number {
 }
 
 /**
- * 有效最低充值积分：产品固定下限 0.1（覆盖服务端 MinTopUp）
+ * 有效最低充值人民币（正整数）
  */
 export function getMinTopupAmount(_topupInfo: TopupInfo | null): number {
-  return PAYMENT_POINTS_MIN
+  return PAYMENT_CNY_MIN
 }
 
 /**
- * 有效最高充值积分（产品上限）
+ * 有效最高充值人民币
  */
 export function getMaxTopupAmount(): number {
-  return PAYMENT_POINTS_MAX
+  return PAYMENT_CNY_MAX
 }
 
 /**
- * 充值积分是否在有效边界内
+ * 人民币充值金额是否为 1～10000 的正整数
  */
 export function isTopupAmountInBounds(
   amount: number,
-  minAmount: number,
-  maxAmount: number = PAYMENT_POINTS_MAX
+  minAmount: number = PAYMENT_CNY_MIN,
+  maxAmount: number = PAYMENT_CNY_MAX
 ): boolean {
-  return Number.isFinite(amount) && amount >= minAmount && amount <= maxAmount
+  return (
+    Number.isFinite(amount) &&
+    Number.isInteger(amount) &&
+    amount >= minAmount &&
+    amount <= maxAmount
+  )
 }
 
 /**
- * 按充值边界过滤预设积分档位
+ * 人民币付款额 → 后端充值额度单位（Amount）
+ * payMoney ≈ Amount × priceRatio，故 Amount = payCNY / priceRatio
+ */
+export function payCnyToCreditAmount(
+  payCny: number,
+  priceRatio: number = 1
+): number {
+  const ratio = Number.isFinite(priceRatio) && priceRatio > 0 ? priceRatio : 1
+  return payCny / ratio
+}
+
+/**
+ * 按充值边界过滤预设档位
  */
 export function filterPresetAmountsByBounds(
   presets: PresetAmount[],
   minAmount: number,
-  maxAmount: number = PAYMENT_POINTS_MAX
+  maxAmount: number = PAYMENT_CNY_MAX
 ): PresetAmount[] {
   return presets.filter(
     (preset) =>
@@ -218,7 +267,37 @@ export function filterPresetAmountsByBounds(
 }
 
 /**
+ * 生成产品固定人民币付款档，并套用折扣表（键为付款档金额）
+ */
+export function generateCnyPresetAmounts(
+  discounts: Record<number, number> = {}
+): PresetAmount[] {
+  return resolveCnyPresetAmounts([], discounts)
+}
+
+/**
+ * 优先使用支付网关「充值金额选项」；为空时回退产品默认档
+ */
+export function resolveCnyPresetAmounts(
+  amountOptions: number[] = [],
+  discounts: Record<number, number> = {}
+): PresetAmount[] {
+  const source =
+    amountOptions.length > 0
+      ? [...amountOptions].sort((a, b) => a - b)
+      : [...PAYMENT_CNY_PRESETS]
+  return filterPresetAmountsByBounds(
+    source.map((value) => ({
+      value,
+      discount: discounts[value] || 1.0,
+    })),
+    PAYMENT_CNY_MIN
+  )
+}
+
+/**
  * Generate preset amounts based on minimum topup
+ * @deprecated 优先使用 generateCnyPresetAmounts
  */
 export function generatePresetAmounts(minAmount: number): PresetAmount[] {
   return filterPresetAmountsByBounds(
@@ -245,3 +324,6 @@ export function mergePresetAmounts(
     discount: discounts[amount] || 1.0,
   }))
 }
+
+// 兼容旧测试 / 引用
+export { PAYMENT_POINTS_MIN, PAYMENT_POINTS_MAX, PAYMENT_CNY_MIN, PAYMENT_CNY_MAX }

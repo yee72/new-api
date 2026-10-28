@@ -118,7 +118,22 @@ export async function requestPayment(
   return {
     ...res.data,
     url: res.data.url || (res as unknown as { url?: string }).url,
+    trade_no: res.data.trade_no,
+    mode: res.data.mode,
   }
+}
+
+/**
+ * 查询当前用户充值订单状态（扫码轮询）
+ */
+export async function getTopupStatus(
+  tradeNo: string
+): Promise<import('./types').TopupStatusResponse> {
+  const res = await api.get('/api/user/topup/status', {
+    params: { trade_no: tradeNo },
+    skipBusinessError: true,
+  } as Record<string, unknown>)
+  return res.data
 }
 
 /**
